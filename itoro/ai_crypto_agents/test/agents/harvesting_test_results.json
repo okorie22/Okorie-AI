@@ -1,0 +1,350 @@
+{
+  "timestamp": "2025-10-11 21:15:40",
+  "total_tests": 31,
+  "passed_tests": 9,
+  "failed_tests": 22,
+  "success_rate": 29.03225806451613,
+  "results": [
+    {
+      "name": "Dust Conversion",
+      "passed": false,
+      "error": "name 'MockPriceService' is not defined"
+    },
+    {
+      "name": "Realized Gains Harvesting (5% Increment)",
+      "passed": false,
+      "error": "name 'MockPriceService' is not defined"
+    },
+    {
+      "name": "Below Threshold Gains",
+      "passed": true,
+      "details": {
+        "no_harvesting": true,
+        "no_transfers": true,
+        "initial_gains": 0.0,
+        "final_gains": 0.0
+      }
+    },
+    {
+      "name": "External Wallet Transfers (Paper Trading Mode)",
+      "passed": false,
+      "details": {
+        "transfers_logged": false,
+        "transfer_details_valid": true,
+        "transfer_count": 0,
+        "transfers": []
+      }
+    },
+    {
+      "name": "Dust Conversion with Excluded Tokens",
+      "passed": false,
+      "error": "UNIQUE constraint failed: paper_portfolio.token_address"
+    },
+    {
+      "name": "Multiple Dust Positions",
+      "passed": false,
+      "details": {
+        "conversion_success": true,
+        "dust_removed": false,
+        "sol_increased": false,
+        "total_dust_value": 8.15,
+        "positions_count": 15
+      }
+    },
+    {
+      "name": "Large Realized Gains",
+      "passed": false,
+      "details": {
+        "transfers_recorded": true,
+        "gains_updated": false,
+        "amount_accuracy": false,
+        "realized_gains_total": 0.0,
+        "expected_usdc": 250.0,
+        "expected_wallet1": 125.0,
+        "expected_wallet2": 75.0,
+        "expected_sol": 50.0
+      }
+    },
+    {
+      "name": "Exact 5% Threshold",
+      "passed": false,
+      "details": {
+        "gains_triggered": false,
+        "transfers_recorded": true,
+        "initial_gains": 0.0,
+        "final_gains": 0.0,
+        "gain_percentage": 5.0
+      }
+    },
+    {
+      "name": "Exact $50 Threshold",
+      "passed": false,
+      "details": {
+        "gains_triggered": false,
+        "transfers_recorded": true,
+        "threshold_met": false,
+        "initial_gains": 0.0,
+        "final_gains": 0.0,
+        "gain_amount": 50.0
+      }
+    },
+    {
+      "name": "Negative Portfolio Changes",
+      "passed": true,
+      "details": {
+        "no_harvesting_negative": true,
+        "no_transfers": true,
+        "no_zero_harvesting": true,
+        "initial_gains": 0.0,
+        "final_gains": 0.0,
+        "zero_change_gains": 0.0
+      }
+    },
+    {
+      "name": "Missing External Wallets",
+      "passed": true,
+      "details": {
+        "transfers_attempted": true,
+        "graceful_handling": true,
+        "transfer_count": 2,
+        "transfer_statuses": [
+          "paper_trading_simulated",
+          "no_address"
+        ]
+      }
+    },
+    {
+      "name": "Failed Jupiter Swap",
+      "passed": false,
+      "details": {
+        "conversion_success": true,
+        "graceful_failure": false,
+        "no_crashes": true
+      }
+    },
+    {
+      "name": "Price Service Failure",
+      "passed": true,
+      "details": {
+        "graceful_failure": true,
+        "no_crashes": true,
+        "initial_gains": 0.0,
+        "final_gains": 0.0
+      }
+    },
+    {
+      "name": "Database Transaction Failure",
+      "passed": true,
+      "details": {
+        "conversion_success": false,
+        "graceful_failure": true,
+        "no_crashes": true
+      }
+    },
+    {
+      "name": "Rapid Consecutive Gains",
+      "passed": false,
+      "details": {
+        "gains_processed": false,
+        "transfers_recorded": true,
+        "gain_accuracy": false,
+        "initial_gains": 0.0,
+        "final_gains": 0.0,
+        "expected_total": 250.0,
+        "transfer_count": 10
+      }
+    },
+    {
+      "name": "Large Portfolio Many Dust",
+      "passed": false,
+      "details": {
+        "conversion_success": true,
+        "dust_removed": false,
+        "sol_increased": false,
+        "performance_ok": true,
+        "execution_time": 0.08518528938293457,
+        "total_dust_value": 25.0,
+        "positions_count": 50
+      }
+    },
+    {
+      "name": "Rapid Portfolio Gains",
+      "passed": false,
+      "details": {
+        "gains_processed": false,
+        "transfers_recorded": true,
+        "gain_accuracy": false,
+        "performance_ok": true,
+        "execution_time": 3.5201470851898193,
+        "initial_gains": 0.0,
+        "final_gains": 0.0,
+        "expected_total": 4999.999999999999,
+        "transfer_count": 18
+      }
+    },
+    {
+      "name": "Extreme Values",
+      "passed": false,
+      "details": {
+        "transfers_recorded": true,
+        "gains_updated": false,
+        "calculation_accuracy": false,
+        "no_overflow": true,
+        "realized_gains_total": 0.0,
+        "expected_usdc": 25000.0,
+        "expected_wallet1": 12500.0,
+        "expected_wallet2": 7500.0,
+        "expected_sol": 5000.0
+      }
+    },
+    {
+      "name": "Database Integrity",
+      "passed": false,
+      "details": {
+        "total_operations": 100,
+        "successful_operations": 0,
+        "failed_operations": 100,
+        "success_rate": 0.0,
+        "performance_ok": true,
+        "execution_time": 35.730464458465576,
+        "final_realized_gains": 0.0,
+        "total_transfers": 200
+      }
+    },
+    {
+      "name": "Failed USDC->SOL Swap",
+      "passed": true,
+      "details": {
+        "graceful_failure": true,
+        "no_crashes": true,
+        "no_transfers": true,
+        "initial_gains": 0.0,
+        "final_gains": 0.0
+      }
+    },
+    {
+      "name": "Failed External Wallet Transfer",
+      "passed": false,
+      "details": {
+        "transfers_attempted": true,
+        "partial_success": false,
+        "no_crashes": true,
+        "transfer_count": 2,
+        "transfer_statuses": [
+          "failed",
+          "no_address"
+        ]
+      }
+    },
+    {
+      "name": "Price Service Timeout",
+      "passed": false,
+      "details": {
+        "conversion_success": true,
+        "graceful_failure": false,
+        "no_crashes": true
+      }
+    },
+    {
+      "name": "Corrupted Portfolio Data",
+      "passed": true,
+      "details": {
+        "graceful_handling": true,
+        "no_crashes": true,
+        "no_gains_change": true,
+        "initial_gains": 0.0,
+        "final_gains": 0.0
+      }
+    },
+    {
+      "name": "Insufficient Balance Swap",
+      "passed": false,
+      "details": {
+        "conversion_success": true,
+        "graceful_failure": false,
+        "no_crashes": true
+      }
+    },
+    {
+      "name": "API Manager Failure",
+      "passed": true,
+      "details": {
+        "graceful_failure": true,
+        "no_crashes": true,
+        "initial_gains": 0.0,
+        "final_gains": 0.0
+      }
+    },
+    {
+      "name": "nice_funcs Import Failure",
+      "passed": false,
+      "details": {
+        "conversion_success": true,
+        "graceful_failure": false,
+        "no_crashes": true
+      }
+    },
+    {
+      "name": "Configuration Errors",
+      "passed": true,
+      "details": {
+        "agent_initialized": true,
+        "no_crashes": true,
+        "graceful_handling": true,
+        "conversion_success": false
+      }
+    },
+    {
+      "name": "Portfolio Tracker Integration",
+      "passed": false,
+      "details": {
+        "gains_processed": false,
+        "transfers_recorded": true,
+        "dust_conversion_triggered": true,
+        "realized_gains_total": 0.0,
+        "transfer_count": 2
+      }
+    },
+    {
+      "name": "Rebalancing Agent Coordination",
+      "passed": false,
+      "details": {
+        "dust_conversion_success": true,
+        "rebalancing_worked": true,
+        "gains_harvested": false,
+        "no_conflicts": true,
+        "rebalancing_still_works": true,
+        "realized_gains_total": 0.0,
+        "transfer_count": 2
+      }
+    },
+    {
+      "name": "Risk Agent Coordination",
+      "passed": false,
+      "details": {
+        "gains_harvested": false,
+        "risk_assessment_ok": true,
+        "transfers_recorded": true,
+        "portfolio_value_ok": true,
+        "sol_balance_ok": true,
+        "usdc_balance_ok": true,
+        "realized_gains_total": 0.0
+      }
+    },
+    {
+      "name": "Full System Workflow",
+      "passed": false,
+      "details": {
+        "dust_converted": true,
+        "gains_harvested": false,
+        "rebalancing_worked": true,
+        "small_gain_ignored": true,
+        "final_rebalancing_worked": true,
+        "transfers_recorded": true,
+        "all_transfers_successful": false,
+        "realized_gains_total": 0.0,
+        "transfer_count": 2
+      }
+    }
+  ]
+}

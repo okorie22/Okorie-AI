@@ -1,0 +1,339 @@
+[
+  {
+    "timestamp": "2025-07-20T17:22:01.066100",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 3,
+    "wallets": [
+      {
+        "address": "DYAn4XpAkN5mhiXkRB7dGq4Jadnx6XYgu8L5b3WGhbrt",
+        "twitter_handle": "KayTheDoc",
+        "score": 0.36365938954088883,
+        "pnl_30d": 0.3297727187130491,
+        "winrate_7d": 0.6703703703703704
+      },
+      {
+        "address": "86AEJExyjeNNgcp7GrAvCXTDicf5aGWgoERbXFiG1EdD",
+        "twitter_handle": "publixplays",
+        "score": 0.3548326442726237,
+        "pnl_30d": 0.05982138809059487,
+        "winrate_7d": 0.4423676012461059
+      },
+      {
+        "address": "4DdrfiDHpmx55i4SPssxVzS9ZaKLb8qr45NKY9Er9nNh",
+        "twitter_handle": "TheMisterFrog",
+        "score": 0.35292752353204687,
+        "pnl_30d": 0.0667610130096091,
+        "winrate_7d": 0.8146341463414634
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  },
+  {
+    "timestamp": "2025-08-31T13:50:19.486889",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 2,
+    "wallets": [
+      {
+        "address": "8CRGEUBcBztAUgd61VY7ss3eW17R7HVvnvhtjKB5Y4G4",
+        "twitter_handle": "None",
+        "score": 0.881444082947531,
+        "pnl_30d": 717.5193992939736,
+        "winrate_7d": 1.0
+      },
+      {
+        "address": "CChcZtUXCv7CDp6vq9Zto6oqG4eE1nbHGh8AwA4ZRfnC",
+        "twitter_handle": "None",
+        "score": 0.31913362044565835,
+        "pnl_30d": 0.4336066506375747,
+        "winrate_7d": 0.7701863354037267
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  },
+  {
+    "timestamp": "2025-08-31T14:36:10.219357",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 2,
+    "wallets": [
+      {
+        "address": "8CRGEUBcBztAUgd61VY7ss3eW17R7HVvnvhtjKB5Y4G4",
+        "twitter_handle": "None",
+        "score": 0.881444082947531,
+        "pnl_30d": 717.5193992939736,
+        "winrate_7d": 1.0
+      },
+      {
+        "address": "CChcZtUXCv7CDp6vq9Zto6oqG4eE1nbHGh8AwA4ZRfnC",
+        "twitter_handle": "None",
+        "score": 0.31913362044565835,
+        "pnl_30d": 0.4336066506375747,
+        "winrate_7d": 0.7701863354037267
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  },
+  {
+    "timestamp": "2025-08-31T14:49:37.764738",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 2,
+    "wallets": [
+      {
+        "address": "8CRGEUBcBztAUgd61VY7ss3eW17R7HVvnvhtjKB5Y4G4",
+        "twitter_handle": "None",
+        "score": 0.881444082947531,
+        "pnl_30d": 717.5193992939736,
+        "winrate_7d": 1.0
+      },
+      {
+        "address": "CChcZtUXCv7CDp6vq9Zto6oqG4eE1nbHGh8AwA4ZRfnC",
+        "twitter_handle": "None",
+        "score": 0.31913362044565835,
+        "pnl_30d": 0.4336066506375747,
+        "winrate_7d": 0.7701863354037267
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  },
+  {
+    "timestamp": "2025-08-31T15:05:15.913446",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 2,
+    "wallets": [
+      {
+        "address": "8CRGEUBcBztAUgd61VY7ss3eW17R7HVvnvhtjKB5Y4G4",
+        "twitter_handle": "None",
+        "score": 0.881444082947531,
+        "pnl_30d": 717.5193992939736,
+        "winrate_7d": 1.0
+      },
+      {
+        "address": "CChcZtUXCv7CDp6vq9Zto6oqG4eE1nbHGh8AwA4ZRfnC",
+        "twitter_handle": "None",
+        "score": 0.31913362044565835,
+        "pnl_30d": 0.4336066506375747,
+        "winrate_7d": 0.7701863354037267
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  },
+  {
+    "timestamp": "2025-08-31T15:16:13.712167",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 2,
+    "wallets": [
+      {
+        "address": "8CRGEUBcBztAUgd61VY7ss3eW17R7HVvnvhtjKB5Y4G4",
+        "twitter_handle": "None",
+        "score": 0.881444082947531,
+        "pnl_30d": 717.5193992939736,
+        "winrate_7d": 1.0
+      },
+      {
+        "address": "CChcZtUXCv7CDp6vq9Zto6oqG4eE1nbHGh8AwA4ZRfnC",
+        "twitter_handle": "None",
+        "score": 0.31913362044565835,
+        "pnl_30d": 0.4336066506375747,
+        "winrate_7d": 0.7701863354037267
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  },
+  {
+    "timestamp": "2025-08-31T15:18:33.120601",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 2,
+    "wallets": [
+      {
+        "address": "8CRGEUBcBztAUgd61VY7ss3eW17R7HVvnvhtjKB5Y4G4",
+        "twitter_handle": "None",
+        "score": 0.881444082947531,
+        "pnl_30d": 717.5193992939736,
+        "winrate_7d": 1.0
+      },
+      {
+        "address": "CChcZtUXCv7CDp6vq9Zto6oqG4eE1nbHGh8AwA4ZRfnC",
+        "twitter_handle": "None",
+        "score": 0.31913362044565835,
+        "pnl_30d": 0.4336066506375747,
+        "winrate_7d": 0.7701863354037267
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  },
+  {
+    "timestamp": "2025-08-31T15:21:31.121844",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 2,
+    "wallets": [
+      {
+        "address": "8CRGEUBcBztAUgd61VY7ss3eW17R7HVvnvhtjKB5Y4G4",
+        "twitter_handle": "None",
+        "score": 0.881444082947531,
+        "pnl_30d": 717.5193992939736,
+        "winrate_7d": 1.0
+      },
+      {
+        "address": "CChcZtUXCv7CDp6vq9Zto6oqG4eE1nbHGh8AwA4ZRfnC",
+        "twitter_handle": "None",
+        "score": 0.31913362044565835,
+        "pnl_30d": 0.4336066506375747,
+        "winrate_7d": 0.7701863354037267
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  },
+  {
+    "timestamp": "2025-08-31T15:35:05.745003",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 2,
+    "wallets": [
+      {
+        "address": "8CRGEUBcBztAUgd61VY7ss3eW17R7HVvnvhtjKB5Y4G4",
+        "twitter_handle": "None",
+        "score": 0.881444082947531,
+        "pnl_30d": 717.5193992939736,
+        "winrate_7d": 1.0
+      },
+      {
+        "address": "CChcZtUXCv7CDp6vq9Zto6oqG4eE1nbHGh8AwA4ZRfnC",
+        "twitter_handle": "None",
+        "score": 0.31913362044565835,
+        "pnl_30d": 0.4336066506375747,
+        "winrate_7d": 0.7701863354037267
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  },
+  {
+    "timestamp": "2025-08-31T15:45:09.811551",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 2,
+    "wallets": [
+      {
+        "address": "8CRGEUBcBztAUgd61VY7ss3eW17R7HVvnvhtjKB5Y4G4",
+        "twitter_handle": "None",
+        "score": 0.881444082947531,
+        "pnl_30d": 717.5193992939736,
+        "winrate_7d": 1.0
+      },
+      {
+        "address": "CChcZtUXCv7CDp6vq9Zto6oqG4eE1nbHGh8AwA4ZRfnC",
+        "twitter_handle": "None",
+        "score": 0.31913362044565835,
+        "pnl_30d": 0.4336066506375747,
+        "winrate_7d": 0.7701863354037267
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  },
+  {
+    "timestamp": "2025-08-31T15:52:36.589596",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 2,
+    "wallets": [
+      {
+        "address": "8CRGEUBcBztAUgd61VY7ss3eW17R7HVvnvhtjKB5Y4G4",
+        "twitter_handle": "None",
+        "score": 0.881444082947531,
+        "pnl_30d": 717.5193992939736,
+        "winrate_7d": 1.0
+      },
+      {
+        "address": "CChcZtUXCv7CDp6vq9Zto6oqG4eE1nbHGh8AwA4ZRfnC",
+        "twitter_handle": "None",
+        "score": 0.31913362044565835,
+        "pnl_30d": 0.4336066506375747,
+        "winrate_7d": 0.7701863354037267
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  },
+  {
+    "timestamp": "2025-09-04T07:29:08.909231",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 2,
+    "wallets": [
+      {
+        "address": "EHg5YkU2SZBTvuT87rUsvxArGp3HLeye1fXaSDfuMyaf",
+        "twitter_handle": "tilcrypto",
+        "score": 0.27793698339725836,
+        "pnl_30d": 0.2124310318459752,
+        "winrate_7d": 0.4844124700239808
+      },
+      {
+        "address": "4DdrfiDHpmx55i4SPssxVzS9ZaKLb8qr45NKY9Er9nNh",
+        "twitter_handle": "TheMisterFrog",
+        "score": 0.27415545664748237,
+        "pnl_30d": 0.049364720435938855,
+        "winrate_7d": 0.7578125
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  },
+  {
+    "timestamp": "2025-09-04T07:29:30.577323",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 2,
+    "wallets": [
+      {
+        "address": "EHg5YkU2SZBTvuT87rUsvxArGp3HLeye1fXaSDfuMyaf",
+        "twitter_handle": "tilcrypto",
+        "score": 0.27793698339725836,
+        "pnl_30d": 0.2124310318459752,
+        "winrate_7d": 0.4844124700239808
+      },
+      {
+        "address": "4DdrfiDHpmx55i4SPssxVzS9ZaKLb8qr45NKY9Er9nNh",
+        "twitter_handle": "TheMisterFrog",
+        "score": 0.27415545664748237,
+        "pnl_30d": 0.049364720435938855,
+        "winrate_7d": 0.7578125
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  },
+  {
+    "timestamp": "2025-09-04T08:39:58.776859",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 2,
+    "wallets": [
+      {
+        "address": "EHg5YkU2SZBTvuT87rUsvxArGp3HLeye1fXaSDfuMyaf",
+        "twitter_handle": "tilcrypto",
+        "score": 0.27793698339725836,
+        "pnl_30d": 0.2124310318459752,
+        "winrate_7d": 0.4844124700239808
+      },
+      {
+        "address": "4DdrfiDHpmx55i4SPssxVzS9ZaKLb8qr45NKY9Er9nNh",
+        "twitter_handle": "TheMisterFrog",
+        "score": 0.27415545664748237,
+        "pnl_30d": 0.049364720435938855,
+        "winrate_7d": 0.7578125
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  },
+  {
+    "timestamp": "2025-09-28T17:36:30.130771",
+    "event": "emergency_stop_wallet_update",
+    "wallets_updated": 2,
+    "wallets": [
+      {
+        "address": "EHg5YkU2SZBTvuT87rUsvxArGp3HLeye1fXaSDfuMyaf",
+        "twitter_handle": "tilcrypto",
+        "score": 0.27793698339725836,
+        "pnl_30d": 0.2124310318459752,
+        "winrate_7d": 0.4844124700239808
+      },
+      {
+        "address": "4DdrfiDHpmx55i4SPssxVzS9ZaKLb8qr45NKY9Er9nNh",
+        "twitter_handle": "TheMisterFrog",
+        "score": 0.27415545664748237,
+        "pnl_30d": 0.049364720435938855,
+        "winrate_7d": 0.7578125
+      }
+    ],
+    "reason": "Emergency stop triggered - updating to best performing wallets"
+  }
+]

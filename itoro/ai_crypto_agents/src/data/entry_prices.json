@@ -1,0 +1,29 @@
+{
+  "So11111111111111111111111111111111111111112": {
+    "mint": "So11111111111111111111111111111111111111112",
+    "entry_price_usd": 213.018806,
+    "entry_amount": 0.019497087,
+    "entry_timestamp": 1756373163.146958,
+    "last_updated": 1756373163.146958,
+    "source": "auto_detected",
+    "notes": "Auto-detected from wallet balance"
+  },
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
+    "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "entry_price_usd": 1.0,
+    "entry_amount": 37.84162,
+    "entry_timestamp": 1756373163.2094412,
+    "last_updated": 1756373163.2094412,
+    "source": "auto_detected",
+    "notes": "Auto-detected from wallet balance"
+  },
+  "4G86CMxGsMdLETrYnavMFKPhQzKTvDBYGMRAdVtr72nu": {
+    "mint": "4G86CMxGsMdLETrYnavMFKPhQzKTvDBYGMRAdVtr72nu",
+    "entry_price_usd": 4.48941e-06,
+    "entry_amount": 10000.0,
+    "entry_timestamp": 1756373163.2875502,
+    "last_updated": 1756373163.2875502,
+    "source": "auto_detected",
+    "notes": "Auto-detected from wallet balance"
+  }
+}

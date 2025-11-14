@@ -1,0 +1,31 @@
+# Moon Dev's RBI Trading Strategy Ideas 🌙
+# Add your trading ideas here (one per line)
+# Can be YouTube URLs, PDF links, or text descriptions
+# Lines starting with # are ignored
+#
+# Examples:
+# YouTube videos: https://www.youtube.com/watch?v=VIDEO_ID
+# PDFs: https://example.com/trading_strategy.pdf
+# Text ideas: RSI divergence strategy with volume confirmation
+
+# Sample YouTube Trading Strategy Videos
+https://www.youtube.com/watch?v=6cOsxaNCW3g
+https://www.youtube.com/watch?v=9PFQ7HBv1KM
+https://www.youtube.com/watch?v=8P2QgXH2Dgc
+
+# Sample PDF Trading Resources
+# https://example.com/sample_trading_strategy.pdf
+
+# Sample Text-Based Trading Ideas
+Create a momentum strategy using RSI and MACD divergence with volume confirmation
+Implement a mean reversion strategy that buys oversold conditions and sells overbought conditions
+Build a breakout strategy that identifies key support/resistance levels and trades breakouts with proper risk management
+Develop a volatility-based strategy that increases position size during low volatility periods
+Create a trend-following strategy using moving averages and ADX for trend strength confirmation
+
+# Advanced Strategy Ideas
+Implement a multi-timeframe analysis strategy combining daily and hourly charts
+Create an options-based strategy using implied volatility and Greeks
+Build a statistical arbitrage strategy between correlated assets
+Develop a machine learning enhanced strategy using technical indicators as features
+Create a risk parity strategy that balances risk across different asset classes

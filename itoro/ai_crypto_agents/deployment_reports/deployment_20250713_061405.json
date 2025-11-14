@@ -1,0 +1,14 @@
+{
+  "deployment_time": "2025-07-13T06:14:05.703894",
+  "system_version": "1.0.0",
+  "python_version": "3.10.11",
+  "configuration": {
+    "position_sizing_mode": "dynamic",
+    "base_position_size": 25.0,
+    "max_single_position": 0.15,
+    "slippage": 100,
+    "risk_management_enabled": true,
+    "emergency_stop_enabled": true
+  },
+  "deployment_status": "SUCCESS"
+}

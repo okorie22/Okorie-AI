@@ -1,0 +1,4 @@
+"""
+Staking scripts module
+"""
+

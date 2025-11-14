@@ -1,0 +1,3 @@
+timestamp,sentiment_score,num_tweets,analysis_mode,classification,tokens_analyzed,engagement_avg,ai_enhanced_score,ai_model_used
+2025-08-18T23:42:43.381760,0.55,261,short_term,BULLISH,"Solana,Bitcoin,Ethereum",0.0439385979208817,0.55,deepseek-chat
+2025-08-19T00:10:32.700004,0.15,197,short_term,NEUTRAL,"Solana,Bitcoin",0.04226151717905294,0.15,deepseek-chat
