@@ -2,9 +2,8 @@ services:
   - type: web
     name: helius-webhook-handler
     env: python
-    rootDir: itoro/ai_crypto_agents
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
-    startCommand: python deploy/app.py
+    buildCommand: cd itoro/ai_crypto_agents && pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: cd itoro/ai_crypto_agents && python deploy/app.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.11
