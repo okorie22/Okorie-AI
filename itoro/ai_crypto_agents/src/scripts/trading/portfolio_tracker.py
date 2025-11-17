@@ -607,7 +607,7 @@ class PortfolioTracker:
                     positions_value_usd = 0.0
                     position_count = 0
                     positions = {}
-                    
+
                     # Collect all tokens from portfolio for batch fetching
                     portfolio_tokens = {}
                     for _, row in portfolio_df.iterrows():
@@ -616,28 +616,28 @@ class PortfolioTracker:
                                 'amount': row['amount'],
                                 'stored_price': row.get('last_price', 0)
                             }
-                    
+
                     # Batch fetch all prices at once
                     all_prices = self._batch_fetch_snapshot_prices(portfolio_tokens)
                     sol_price = all_prices.get(config.SOL_ADDRESS, 0.0)
-                    
+
                     if not sol_price or sol_price <= 0:
                         sol_price = 0.0
-                    
+
                     for _, row in portfolio_df.iterrows():
                         token_address = row['token_address']
                         amount = row['amount']
-                        
+
                         if amount <= 0:
                             continue
-                        
+
                         # Add validation for unrealistic token amounts
                         if amount > 1e12:  # Reject amounts over 1 trillion tokens
                             debug(f"⚠️ Rejecting unrealistic token amount: {token_address[:8]}... = {amount:.2f}")
                             continue
-                        
+
                         if token_address == config.USDC_ADDRESS:
-                            usdc_balance = amount
+                            usdc_balance = amount  # USDC is already in USD value
                         elif token_address == config.SOL_ADDRESS:
                             sol_balance = amount
                         elif "STAKED_SOL" in token_address or token_address == "STAKED_SOL_So11111111111111111111111111111111111111112":
@@ -647,7 +647,7 @@ class PortfolioTracker:
                             # Add to positions_value_usd for Portfolio Status display
                             positions_value_usd += staked_sol_value
                             position_count += 1
-                            
+
                             # Add staked SOL to positions dict
                             positions[token_address] = {
                                 'amount': float(amount),
@@ -665,9 +665,9 @@ class PortfolioTracker:
                                 # Fallback to stored price if API fails
                                 stored_price = row['last_price']
                                 price = stored_price if stored_price and stored_price > 0 else 0.0
-                            
+
                             debug(f"💾 Using batch-fetched price for {token_address[:8]}...: ${price:.6f}")
-                            
+
                             # CRITICAL: Validate individual token price BEFORE calculating value
                             if price and price > 0:
                                 # Layer 1: Individual price validation - reject unrealistic prices
@@ -680,9 +680,9 @@ class PortfolioTracker:
                                         debug(f"Using stored price: ${price:.6f}")
                                     else:
                                         continue  # Skip token entirely
-                                
+
                                 token_value = amount * price
-                                
+
                                 # Layer 2: Sanity check: reject values over $1M per token (likely API error)
                                 if token_value > 1_000_000:
                                     debug(f"⚠️ Rejecting unrealistic token value: {token_address[:8]}... = ${token_value:.2f}")
@@ -693,11 +693,11 @@ class PortfolioTracker:
                                         token_value = amount * price
                                     else:
                                         continue  # Skip this token entirely
-                                
+
                                 if include_dust_for_testing or token_value >= config.DUST_THRESHOLD_USD:
                                     positions_value_usd += token_value
                                     position_count += 1
-                                    
+
                                     # Fetch metadata for the token
                                     try:
                                         from src.scripts.data_processing.token_metadata_service import get_token_metadata_service
@@ -708,7 +708,7 @@ class PortfolioTracker:
                                     except:
                                         token_symbol = 'UNK'
                                         token_name = 'Unknown'
-                                    
+
                                     positions[token_address] = {
                                         'amount': float(amount),
                                         'price': float(price),
@@ -717,7 +717,7 @@ class PortfolioTracker:
                                         'name': str(token_name),
                                         'last_updated': datetime.now().isoformat()
                                     }
-                                    
+
                                     # Mark token as active for real-time price updates
                                     self.price_service.mark_token_active(token_address)
                     

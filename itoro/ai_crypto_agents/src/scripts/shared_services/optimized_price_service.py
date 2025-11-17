@@ -93,12 +93,12 @@ class OptimizedPriceService:
         self.cache_lock = threading.RLock()
         
         # Cache expiration times (in seconds) - driven by config
-        base_interval = getattr(config, 'PRICE_MONITOR_INTERVAL_SECONDS', 60)
+        base_interval = getattr(config, 'PRICE_MONITOR_INTERVAL_SECONDS', 300)  # Updated fallback to match config default (5 min)
         self.cache_expiry = {
             'active_trades': getattr(config, 'PRICE_CACHE_ACTIVE_SECONDS', base_interval),
             'recent_activity': getattr(config, 'PRICE_CACHE_RECENT_SECONDS', base_interval * 2),
-            'monitored': getattr(config, 'PRICE_CACHE_MONITORED_SECONDS', max(base_interval * 3, 600)),
-            'background': getattr(config, 'PRICE_CACHE_BACKGROUND_SECONDS', 1800)
+            'monitored': getattr(config, 'PRICE_CACHE_MONITORED_SECONDS', max(base_interval * 6, 1800)),  # Updated fallback to match config (30 min)
+            'background': getattr(config, 'PRICE_CACHE_BACKGROUND_SECONDS', 3600)  # Updated fallback to match config default (60 min)
         }
         
         # Track active trading tokens (tokens in your portfolio)
@@ -159,12 +159,12 @@ class OptimizedPriceService:
             'last_daily_reset': datetime.now().date(),
             'last_hourly_reset': datetime.now().hour,
             'throttle_active': False,
-            'original_interval': getattr(config, 'PRICE_MONITOR_INTERVAL_SECONDS', 60)  # Store original interval for reset
+            'original_interval': getattr(config, 'PRICE_MONITOR_INTERVAL_SECONDS', 300)  # Updated fallback to match config default (5 min)
         }
-        self.cu_daily_limit = getattr(config, 'CU_DAILY_LIMIT', 90000)
-        self.cu_warning_threshold = getattr(config, 'CU_WARNING_THRESHOLD', 80000)
+        self.cu_daily_limit = getattr(config, 'CU_DAILY_LIMIT', 100000)  # Updated fallback to match config default
+        self.cu_warning_threshold = getattr(config, 'CU_WARNING_THRESHOLD', 90000)  # Updated fallback to match config default
         self.cu_circuit_breaker_enabled = getattr(config, 'CU_CIRCUIT_BREAKER_ENABLED', True)
-        self.cu_throttle_interval = getattr(config, 'PRICE_THROTTLED_INTERVAL_SECONDS', 300)  # Throttled interval
+        self.cu_throttle_interval = getattr(config, 'PRICE_THROTTLED_INTERVAL_SECONDS', 1200)  # Updated fallback to match config default (20 min)
         
         # Background monitoring thread - ENABLED with smart batch fetching
         self.monitoring_active = True  # Enabled - uses batch fetching for efficiency

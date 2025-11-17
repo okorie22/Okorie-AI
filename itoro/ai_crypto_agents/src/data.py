@@ -89,6 +89,10 @@ class ColorTheme:
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 
+# Add parent directory to access core module
+parent_dir = os.path.dirname(project_root)
+sys.path.append(parent_dir)
+
 # Suppress verbose logging during initialization BEFORE any imports
 logging.basicConfig(
     level=logging.ERROR, 

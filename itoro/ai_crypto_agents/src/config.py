@@ -450,15 +450,18 @@ SMART_PRICE_CACHING = True  # Enable smart caching that skips validation for sta
 # Monitoring cadence and cache TTLs (config-driven)
 # -----------------------------------------------------------------------------
 # Base background monitoring interval (seconds). Used by OptimizedPriceService.
+# OPTIMIZATION: Set to 5 minutes (300s) to achieve ~100k CU/day target (288 cycles/day)
 PRICE_MONITOR_INTERVAL_SECONDS = int(os.getenv('PRICE_MONITOR_INTERVAL_SECONDS', 300))  # 5 minutes
 # Interval when CU throttle is active (seconds).
-PRICE_THROTTLED_INTERVAL_SECONDS = int(os.getenv('PRICE_THROTTLED_INTERVAL_SECONDS', 900))  # 15 minutes
+PRICE_THROTTLED_INTERVAL_SECONDS = int(os.getenv('PRICE_THROTTLED_INTERVAL_SECONDS', 1200))  # 20 minutes
 
 # Cache TTLs aligned to monitoring cadence (seconds).
 PRICE_CACHE_ACTIVE_SECONDS = int(os.getenv('PRICE_CACHE_ACTIVE_SECONDS', PRICE_MONITOR_INTERVAL_SECONDS))
 PRICE_CACHE_RECENT_SECONDS = int(os.getenv('PRICE_CACHE_RECENT_SECONDS', PRICE_MONITOR_INTERVAL_SECONDS * 2))
-PRICE_CACHE_MONITORED_SECONDS = int(os.getenv('PRICE_CACHE_MONITORED_SECONDS', max(PRICE_MONITOR_INTERVAL_SECONDS * 3, 600)))
-PRICE_CACHE_BACKGROUND_SECONDS = int(os.getenv('PRICE_CACHE_BACKGROUND_SECONDS', 1800))  # 30 minutes
+# OPTIMIZATION: Extended monitored cache to 30 minutes (6x base interval) to reduce fetches for non-active tokens
+PRICE_CACHE_MONITORED_SECONDS = int(os.getenv('PRICE_CACHE_MONITORED_SECONDS', max(PRICE_MONITOR_INTERVAL_SECONDS * 6, 1800)))
+# OPTIMIZATION: Extended background cache to 60 minutes to minimize updates for rarely-traded tokens
+PRICE_CACHE_BACKGROUND_SECONDS = int(os.getenv('PRICE_CACHE_BACKGROUND_SECONDS', 3600))  # 60 minutes
 
 # Birdeye batch fetch configuration
 BIRDEYE_BATCH_ENABLED = os.getenv('BIRDEYE_BATCH_ENABLED', 'true').lower() == 'true'
@@ -1014,8 +1017,8 @@ STAKING_INTERVAL_MINUTES = 1440  # Weekly execution (1440 is 7 days)
 STAKING_INTERVAL_UNIT = "Day(s)"
 STAKING_INTERVAL_VALUE = 1
 STAKING_RUN_AT_ENABLED = True  # Enable scheduled execution
-STAKING_RUN_AT_TIME = "18:25"  # Run at 9:00 AM daily
-STAKING_START_DATE = "2025-11-6"  # Start date (YYYY-MM-DD) - 7 days from now
+STAKING_RUN_AT_TIME = "00:10"  # Run at 9:00 AM daily
+STAKING_START_DATE = "2025-11-17"  # Start date (YYYY-MM-DD) - 7 days from now
 STAKING_START_TIME = STAKING_RUN_AT_TIME  # Start time (HH:MM)
 STAKING_REPEAT_DAYS = 1  # Repeat every 7 days
 
@@ -1718,8 +1721,8 @@ PORTFOLIO_SNAPSHOT_INTERVAL_SECONDS = 60  # 1 minute for fast agent response
 PRICE_BACKGROUND_MONITORING_ENABLED = True  # Enabled - fetches all tokens in ONE batch call per minute
 
 # CU usage limits and circuit breakers
-CU_DAILY_LIMIT = 90000  # Maximum CU per day (90k threshold)
-CU_WARNING_THRESHOLD = 80000  # Warning at 80k CU per day
+CU_DAILY_LIMIT = 100000  # Maximum CU per day (100k threshold - optimization target)
+CU_WARNING_THRESHOLD = 90000  # Warning at 90k CU per day
 CU_CIRCUIT_BREAKER_ENABLED = True  # Enable automatic throttling
 
 # WebSocket endpoints (already configured)

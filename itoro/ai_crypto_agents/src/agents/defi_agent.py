@@ -242,8 +242,9 @@ class DeFiAgent(BaseAgent):
     def _check_portfolio_state(self):
         """Check current portfolio state and update DeFi allocation"""
         try:
-            # Get portfolio data from integration layer
-            portfolio_data = self.integration_layer.get_defi_portfolio_data()
+            # CRITICAL FIX: Force refresh portfolio data to ensure we see latest staking updates
+            # This prevents DeFi agent from using stale cached data after staking operations
+            portfolio_data = self.integration_layer.get_defi_portfolio_data(force_refresh=True)
             self.current_portfolio_state = portfolio_data
             
             # Skip if no valid portfolio data (allow system to start without portfolio)

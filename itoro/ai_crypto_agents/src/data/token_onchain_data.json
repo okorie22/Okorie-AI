@@ -1,14 +1,14 @@
 {
-  "timestamp": "2025-11-07T23:26:28.889514",
+  "timestamp": "2025-11-16T22:10:27.448960",
   "tokens": {
-    "2VPKMdj3DuRm5C7nDP83ZX1izDuwkyzZVCDq2HDs1xif": {
-      "holder_count": 29,
+    "EJtwnDJU1wrmxzWYpQhcTrsw3GFge6o7AwkFzVsbKuf9": {
+      "holder_count": 13,
       "holder_change_count": 0,
       "holder_change_pct": 0.0,
       "tx_count_24h": 0,
-      "liquidity_usd": 0.41991885939768003,
+      "liquidity_usd": 4.2153714188800627e-07,
       "volume_24h": 0,
-      "price_change_24h": null,
+      "price_change_24h": 0,
       "trend_signal": "STABLE",
       "holder_distribution": {
         "whale_pct": 0.0,
@@ -16,16 +16,16 @@
         "top_10_holders": 0,
         "note": "Whale distribution analysis not yet implemented"
       },
-      "timestamp": "2025-11-07T23:26:24.824457"
+      "timestamp": "2025-11-16T22:10:24.834008"
     },
-    "pmZYS6k35cgbaBVcyGZUgn6bTTJLYdpMV78yG8wiT1g": {
-      "holder_count": 31,
+    "GFQymwg6eg8i8ZZctBEwpbDkjAxZzvTsMz5kc3Ap1rPw": {
+      "holder_count": 15,
       "holder_change_count": 0,
       "holder_change_pct": 0.0,
       "tx_count_24h": 0,
-      "liquidity_usd": 0.42030433159999997,
+      "liquidity_usd": 2.7767986924610366e-07,
       "volume_24h": 0,
-      "price_change_24h": null,
+      "price_change_24h": 0,
       "trend_signal": "STABLE",
       "holder_distribution": {
         "whale_pct": 0.0,
@@ -33,16 +33,16 @@
         "top_10_holders": 0,
         "note": "Whale distribution analysis not yet implemented"
       },
-      "timestamp": "2025-11-07T23:26:25.281716"
+      "timestamp": "2025-11-16T22:10:25.297995"
     },
-    "EQPq9cjHL9RftmmPmRv3tCV7MjvjtefTWGFVpooZm8Qi": {
-      "holder_count": 68,
+    "2zpps4u1pRKkRYevgynmvXn2T2pyn34XuZe43bD5YmHW": {
+      "holder_count": 14,
       "holder_change_count": 0,
       "holder_change_pct": 0.0,
       "tx_count_24h": 0,
-      "liquidity_usd": 0.20389183112479997,
+      "liquidity_usd": 4.190136749078613e-07,
       "volume_24h": 0,
-      "price_change_24h": null,
+      "price_change_24h": 0,
       "trend_signal": "STABLE",
       "holder_distribution": {
         "whale_pct": 0.0,
@@ -50,16 +50,16 @@
         "top_10_holders": 0,
         "note": "Whale distribution analysis not yet implemented"
       },
-      "timestamp": "2025-11-07T23:26:25.731621"
+      "timestamp": "2025-11-16T22:10:25.707549"
     },
-    "965n7yTvWbKMUz54bQr7t2TKjdxvBRAv7xt5Z4Agpuyg": {
-      "holder_count": 62,
+    "H4Ybw7L4JEoS71KQmznTz4JbBta6YL5WSTNVE1K85RLx": {
+      "holder_count": 12,
       "holder_change_count": 0,
       "holder_change_pct": 0.0,
       "tx_count_24h": 0,
-      "liquidity_usd": 0.2564671477708,
+      "liquidity_usd": 4.2191425483242795e-07,
       "volume_24h": 0,
-      "price_change_24h": null,
+      "price_change_24h": 0,
       "trend_signal": "STABLE",
       "holder_distribution": {
         "whale_pct": 0.0,
@@ -67,16 +67,16 @@
         "top_10_holders": 0,
         "note": "Whale distribution analysis not yet implemented"
       },
-      "timestamp": "2025-11-07T23:26:26.174103"
+      "timestamp": "2025-11-16T22:10:26.119034"
     },
-    "CdT7LUUwNThb2FVMH2h6tk5VgTguovkj3Fee1LaW73Eh": {
-      "holder_count": 62,
+    "2cdAtTAUaWwc3Xj3TeySTc1vPUC86JgcrhZoPQ45v89a": {
+      "holder_count": 15,
       "holder_change_count": 0,
       "holder_change_pct": 0.0,
       "tx_count_24h": 0,
-      "liquidity_usd": 0.2970328634,
+      "liquidity_usd": 4.2006943278435524e-07,
       "volume_24h": 0,
-      "price_change_24h": null,
+      "price_change_24h": 0,
       "trend_signal": "STABLE",
       "holder_distribution": {
         "whale_pct": 0.0,
@@ -84,16 +84,16 @@
         "top_10_holders": 0,
         "note": "Whale distribution analysis not yet implemented"
       },
-      "timestamp": "2025-11-07T23:26:26.604058"
+      "timestamp": "2025-11-16T22:10:26.553228"
     },
-    "6rAySULV2suUpcVfAm2ZuD5HU5enMUbg6Zprw6qorRiY": {
-      "holder_count": 64,
+    "ApsgU1aTEh9GcfR7cpMUjio4wND1uWAmU3daX19XPcr5": {
+      "holder_count": 13,
       "holder_change_count": 0,
       "holder_change_pct": 0.0,
       "tx_count_24h": 0,
-      "liquidity_usd": 0.3813275674,
+      "liquidity_usd": 4.201919199451848e-07,
       "volume_24h": 0,
-      "price_change_24h": null,
+      "price_change_24h": 0,
       "trend_signal": "STABLE",
       "holder_distribution": {
         "whale_pct": 0.0,
@@ -101,16 +101,16 @@
         "top_10_holders": 0,
         "note": "Whale distribution analysis not yet implemented"
       },
-      "timestamp": "2025-11-07T23:26:26.909455"
+      "timestamp": "2025-11-16T22:10:26.937834"
     },
-    "EWqZaPfYg4iGBdHMGYSUDyTgrRrqZhjTfm1DoZmTpump": {
-      "holder_count": 172,
+    "CCZduoojyiZ1dbSu15RYx5XRsiWSuvazkHtb4ggqDMM4": {
+      "holder_count": 12,
       "holder_change_count": 0,
       "holder_change_pct": 0.0,
-      "tx_count_24h": 1412,
-      "liquidity_usd": 39223.26722462071,
-      "volume_24h": 31323.4268077816,
-      "price_change_24h": 10.719739334811972,
+      "tx_count_24h": 0,
+      "liquidity_usd": 4.216457159879297e-07,
+      "volume_24h": 0,
+      "price_change_24h": 0,
       "trend_signal": "STABLE",
       "holder_distribution": {
         "whale_pct": 0.0,
@@ -118,75 +118,7 @@
         "top_10_holders": 0,
         "note": "Whale distribution analysis not yet implemented"
       },
-      "timestamp": "2025-11-07T23:26:27.305943"
-    },
-    "Ad22XDZjaTMBHzwHr4RBnukp7h6Vd3VERWH8cSZapump": {
-      "holder_count": 11,
-      "holder_change_count": -1,
-      "holder_change_pct": -8.333333333333332,
-      "tx_count_24h": 596,
-      "liquidity_usd": 5430.486156690545,
-      "volume_24h": 42785.78155767213,
-      "price_change_24h": 11.349689435116472,
-      "trend_signal": "SHRINKING",
-      "holder_distribution": {
-        "whale_pct": 0.0,
-        "concentration_risk": "UNKNOWN",
-        "top_10_holders": 0,
-        "note": "Whale distribution analysis not yet implemented"
-      },
-      "timestamp": "2025-11-07T23:26:27.720728"
-    },
-    "3N9yhXyv7vnBBea1DcWHHbjipyVeedWvJuyUmz5Ypump": {
-      "holder_count": 425,
-      "holder_change_count": 98,
-      "holder_change_pct": 29.96941896024465,
-      "tx_count_24h": 7676,
-      "liquidity_usd": 33328.72625411952,
-      "volume_24h": 532922.1222856463,
-      "price_change_24h": 1396.9836921457402,
-      "trend_signal": "GROWING",
-      "holder_distribution": {
-        "whale_pct": 0.0,
-        "concentration_risk": "UNKNOWN",
-        "top_10_holders": 0,
-        "note": "Whale distribution analysis not yet implemented"
-      },
-      "timestamp": "2025-11-07T23:26:28.058643"
-    },
-    "GRUd4i8Xt8rxEJ89MCc2UKEDWNucpLhnXQaKMeXPpump": {
-      "holder_count": 688,
-      "holder_change_count": 22,
-      "holder_change_pct": 3.303303303303303,
-      "tx_count_24h": 981,
-      "liquidity_usd": 40309.48740865626,
-      "volume_24h": 128542.30174163266,
-      "price_change_24h": 335.4340106526209,
-      "trend_signal": "GROWING",
-      "holder_distribution": {
-        "whale_pct": 0.0,
-        "concentration_risk": "UNKNOWN",
-        "top_10_holders": 0,
-        "note": "Whale distribution analysis not yet implemented"
-      },
-      "timestamp": "2025-11-07T23:26:28.483031"
-    },
-    "BhGfhndVH5Aa39vvdsTtNFy8uWQ8auzyU811xaXepump": {
-      "holder_count": 789,
-      "holder_change_count": -8,
-      "holder_change_pct": -1.0037641154328731,
-      "tx_count_24h": 4460,
-      "liquidity_usd": 67156.62280738045,
-      "volume_24h": 550813.3157512208,
-      "price_change_24h": 95.00737821173108,
-      "trend_signal": "GROWING",
-      "holder_distribution": {
-        "whale_pct": 0.0,
-        "concentration_risk": "UNKNOWN",
-        "top_10_holders": 0,
-        "note": "Whale distribution analysis not yet implemented"
-      },
-      "timestamp": "2025-11-07T23:26:28.889463"
+      "timestamp": "2025-11-16T22:10:27.448719"
     }
   }
 }

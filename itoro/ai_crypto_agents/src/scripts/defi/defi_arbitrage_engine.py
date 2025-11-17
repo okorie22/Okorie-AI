@@ -226,14 +226,12 @@ class DeFiArbitrageEngine:
             error(f"Error rebalancing positions: {str(e)}")
             return False
     
-    def _record_position(self, protocol: str, position_type: str, 
-                        amount_usd: float, rate: float, 
+    def _record_position(self, protocol: str, position_type: str,
+                        amount_usd: float, rate: float,
                         collateral_token: Optional[str] = None):
-        """Record a DeFi position"""
+        """Record a DeFi position to both memory and database"""
         try:
-            if protocol not in self.positions:
-                self.positions[protocol] = []
-            
+            # Create position object for in-memory tracking
             position = DeFiPosition(
                 protocol=protocol,
                 position_type=position_type,
@@ -242,9 +240,49 @@ class DeFiArbitrageEngine:
                 opened_at=datetime.now(),
                 collateral_token=collateral_token
             )
-            
+
+            # Add to memory
+            if protocol not in self.positions:
+                self.positions[protocol] = []
             self.positions[protocol].append(position)
-            
+
+            # Save to paper_trades table for dashboard visibility
+            try:
+                import sqlite3
+                from src import paper_trading
+
+                # Map position type to trade action
+                if position_type == "lending":
+                    action = "LEND"
+                    token_symbol = "USDC"
+                    token_name = "USD Coin"
+                elif position_type == "borrowing":
+                    action = "BORROW"
+                    token_symbol = "USDC"
+                    token_name = "USD Coin"
+                else:
+                    action = position_type.upper()
+                    token_symbol = "USDC"
+                    token_name = "USD Coin"
+
+                # Since we're dealing with USDC amounts, convert to token amount
+                # USDC is pegged to $1, so amount is the same as amount_usd
+                usdc_amount = amount_usd
+
+                timestamp = int(datetime.now().timestamp())
+
+                # Save to paper_trades table
+                with sqlite3.connect(paper_trading.DB_PATH) as conn:
+                    conn.execute(
+                        "INSERT INTO paper_trades (timestamp, token_address, action, amount, price, usd_value, agent, token_symbol, token_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (timestamp, "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", action, usdc_amount, 1.0, amount_usd, "arbitrage", token_symbol, token_name)
+                    )
+
+                debug(f"💾 Saved arbitrage position to paper_trades: {action} ${amount_usd:.2f} via {protocol}")
+
+            except Exception as e:
+                warning(f"Failed to save arbitrage position to paper_trades: {str(e)}")
+
         except Exception as e:
             error(f"Error recording position: {str(e)}")
     

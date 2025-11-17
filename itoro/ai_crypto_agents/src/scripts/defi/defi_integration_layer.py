@@ -109,22 +109,31 @@ class DeFiIntegrationLayer:
     def get_defi_portfolio_data(self, force_refresh: bool = False) -> DeFiPortfolioData:
         """
         Get comprehensive portfolio data formatted for DeFi operations
-        
+
         Args:
             force_refresh: Force refresh of cached data
-            
+
         Returns:
             DeFiPortfolioData object with current portfolio state
         """
         current_time = time.time()
-        
+
+        # CRITICAL FIX: Always force refresh after staking operations or when no cache exists
+        # This ensures DeFi agent sees updated portfolio data after staking transactions
+        if not self.portfolio_cache:
+            force_refresh = True
+
         # Check cache validity
-        if (not force_refresh and 
-            self.portfolio_cache and 
+        if (not force_refresh and
+            self.portfolio_cache and
             current_time - self.last_portfolio_update < self.portfolio_cache_expiry):
             return self.portfolio_cache
         
         try:
+            # Force refresh portfolio tracker data if requested
+            if force_refresh:
+                self.portfolio_tracker.force_refresh_portfolio_data()
+
             # Get current portfolio snapshot
             portfolio_snapshot = self.portfolio_tracker.current_snapshot
             if not portfolio_snapshot:

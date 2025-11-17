@@ -2929,16 +2929,23 @@ class StakingAgent(QObject if QT_AVAILABLE else object):
                 return None
             
             if PAPER_TRADING_ENABLED:
-                # Prefer PortfolioTracker summary for paper mode consistency
+                # Prefer PortfolioTracker snapshot for paper mode consistency (includes staked SOL)
                 try:
                     from src.scripts.trading.portfolio_tracker import get_portfolio_tracker
                     tracker = get_portfolio_tracker()
-                    summary = tracker.get_portfolio_summary() if hasattr(tracker, 'get_portfolio_summary') else {}
-                    if summary and summary.get('current_value', 0.0) > 0:
+
+                    # Force a fresh snapshot so we see the latest staking operations
+                    if hasattr(tracker, "force_refresh_portfolio_data"):
+                        tracker.force_refresh_portfolio_data()
+
+                    snapshot = getattr(tracker, "current_snapshot", None)
+                    if snapshot and snapshot.total_value_usd > 0:
                         return {
-                            'total_value': float(summary.get('current_value', 0.0)),
-                            'sol_balance': float(summary.get('sol_balance', 0.0)),
-                            'sol_value_usd': float(summary.get('sol_value_usd', 0.0))
+                            "total_value": float(snapshot.total_value_usd),
+                            "sol_balance": float(snapshot.sol_balance),
+                            "sol_value_usd": float(snapshot.sol_value_usd),
+                            "staked_sol_balance": float(getattr(snapshot, "staked_sol_balance", 0.0)),
+                            "staked_sol_value_usd": float(getattr(snapshot, "staked_sol_value_usd", 0.0)),
                         }
                 except Exception:
                     # Fallback to legacy DB path if tracker unavailable
@@ -2956,11 +2963,14 @@ class StakingAgent(QObject if QT_AVAILABLE else object):
                         sol_price = data_coordinator.price_service.get_price(SOL_ADDRESS) if hasattr(data_coordinator, 'price_service') else 176.46
                         sol_value = sol_balance * sol_price
                         total_value = usdc_balance + sol_value
-                        
+
                         return {
                             'total_value': total_value,
                             'sol_balance': sol_balance,
-                            'sol_value_usd': sol_value
+                            'sol_value_usd': sol_value,
+                            # Legacy fallback has no staked SOL info
+                            'staked_sol_balance': 0.0,
+                            'staked_sol_value_usd': 0.0,
                         }
             else:
                 # Get live wallet data
@@ -2973,7 +2983,10 @@ class StakingAgent(QObject if QT_AVAILABLE else object):
                 return {
                     'total_value': total_balance,
                     'sol_balance': sol_balance,
-                    'sol_value_usd': sol_value
+                    'sol_value_usd': sol_value,
+                    # Live mode stSOL can be added in the future if needed
+                    'staked_sol_balance': 0.0,
+                    'staked_sol_value_usd': 0.0,
                 }
             
             return None

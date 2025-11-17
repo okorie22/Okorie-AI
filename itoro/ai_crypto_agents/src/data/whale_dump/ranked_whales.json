@@ -1,37 +1,343 @@
 {
+  "3sZNDKVEU7BpU5GQNp3WdBMXbNhQPqSyiwD63aM1zGQz": {
+    "address": "3sZNDKVEU7BpU5GQNp3WdBMXbNhQPqSyiwD63aM1zGQz",
+    "twitter_handle": "krittt_t",
+    "pnl_30d": 14.34880752912304,
+    "pnl_7d": 14.34880752912304,
+    "pnl_1d": 16.070862938900895,
+    "winrate_7d": 0.9966832504145937,
+    "txs_30d": 2916,
+    "token_active": 583,
+    "last_active": "1763263508",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 345.9900826446281,
+    "score": 0.8642994379617067,
+    "rank": 1,
+    "last_updated": "2025-11-15T23:45:22.948067",
+    "is_active": true
+  },
+  "8EVPBu1UbQJewbPPfrem4pka4WEVDPgBoht29HeZCuSv": {
+    "address": "8EVPBu1UbQJewbPPfrem4pka4WEVDPgBoht29HeZCuSv",
+    "twitter_handle": "LetciasabrinaT1",
+    "pnl_30d": 7.40383585067258,
+    "pnl_7d": 7.40383585067258,
+    "pnl_1d": 9.507931104244113,
+    "winrate_7d": 0.9959100204498977,
+    "txs_30d": 1438,
+    "token_active": 469,
+    "last_active": "1763263515",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 196.0633946830266,
+    "score": 0.854107640453616,
+    "rank": 2,
+    "last_updated": "2025-11-15T23:45:22.979357",
+    "is_active": true
+  },
+  "8UFhj9k3sDeW5GsqSnq4R8rNC3CRHbd5UexuWkW15Uoj": {
+    "address": "8UFhj9k3sDeW5GsqSnq4R8rNC3CRHbd5UexuWkW15Uoj",
+    "twitter_handle": "yumikun_kirari",
+    "pnl_30d": 10.385682946765401,
+    "pnl_7d": 10.385682946765401,
+    "pnl_1d": 17.318576635356557,
+    "winrate_7d": 0.9938650306748467,
+    "txs_30d": 1454,
+    "token_active": 469,
+    "last_active": "1763263512",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 193.27607361963192,
+    "score": 0.8536826424986058,
+    "rank": 3,
+    "last_updated": "2025-11-15T23:45:22.979935",
+    "is_active": true
+  },
+  "B1oF1PcEBensmhxzGCYdN6dcLrDk53RCtDKfJkzBe2uF": {
+    "address": "B1oF1PcEBensmhxzGCYdN6dcLrDk53RCtDKfJkzBe2uF",
+    "twitter_handle": "al_fares500",
+    "pnl_30d": 8.762845409319416,
+    "pnl_7d": 8.762845409319416,
+    "pnl_1d": 13.704883694256884,
+    "winrate_7d": 0.9918533604887984,
+    "txs_30d": 1429,
+    "token_active": 471,
+    "last_active": "1763263518",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 328.2784552845528,
+    "score": 0.8535073286634164,
+    "rank": 4,
+    "last_updated": "2025-11-15T23:45:23.012258",
+    "is_active": true
+  },
+  "AhJpbuAj56hKuhd8m2gwX2LWWQeWKuJCGQ2nrsSr9K32": {
+    "address": "AhJpbuAj56hKuhd8m2gwX2LWWQeWKuJCGQ2nrsSr9K32",
+    "twitter_handle": "None",
+    "pnl_30d": 27.853236553300427,
+    "pnl_7d": 29.637649956320452,
+    "pnl_1d": 27.933845093684113,
+    "winrate_7d": 1.0,
+    "txs_30d": 6103,
+    "token_active": 433,
+    "last_active": "1763263447",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 1053.3223350253807,
+    "score": 0.8466242727272728,
+    "rank": 5,
+    "last_updated": "2025-11-15T23:45:22.946377",
+    "is_active": true
+  },
+  "BMDh9mxgkNNX9LK6YUC1pp1VXr8PBKgGtZtcxnQv7bL2": {
+    "address": "BMDh9mxgkNNX9LK6YUC1pp1VXr8PBKgGtZtcxnQv7bL2",
+    "twitter_handle": "zoltar04",
+    "pnl_30d": 6.798971799453901,
+    "pnl_7d": 6.798971799453901,
+    "pnl_1d": 7.09159052717566,
+    "winrate_7d": 0.9974358974358974,
+    "txs_30d": 1332,
+    "token_active": 378,
+    "last_active": "1763263259",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 487.33503836317135,
+    "score": 0.8453268966588968,
+    "rank": 6,
+    "last_updated": "2025-11-15T23:45:22.967041",
+    "is_active": true
+  },
+  "F4HHWTNExo95keTLqyE4WuPUTbMfoMofzG6kotHryZnp": {
+    "address": "F4HHWTNExo95keTLqyE4WuPUTbMfoMofzG6kotHryZnp",
+    "twitter_handle": "AreenAlYath",
+    "pnl_30d": 12.006127605852907,
+    "pnl_7d": 12.006127605852907,
+    "pnl_1d": 11.347098461881558,
+    "winrate_7d": 0.9923954372623575,
+    "txs_30d": 1075,
+    "token_active": 209,
+    "last_active": "1763263300",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 1419.4172932330828,
+    "score": 0.8275050975534817,
+    "rank": 7,
+    "last_updated": "2025-11-15T23:45:22.950044",
+    "is_active": true
+  },
+  "HwSU6wjLtEfk5ZinXFV4ZT3pK11Z3XfgdqWh7LvHcZXF": {
+    "address": "HwSU6wjLtEfk5ZinXFV4ZT3pK11Z3XfgdqWh7LvHcZXF",
+    "twitter_handle": "champthanet",
+    "pnl_30d": 16.967532681757508,
+    "pnl_7d": 16.967532681757508,
+    "pnl_1d": 17.676248133719398,
+    "winrate_7d": 0.9808917197452229,
+    "txs_30d": 611,
+    "token_active": 157,
+    "last_active": "1763239649",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 423.64331210191085,
+    "score": 0.8204158287975295,
+    "rank": 8,
+    "last_updated": "2025-11-15T23:45:22.967766",
+    "is_active": true
+  },
+  "HVVFwdeDjS23A3qh6nP9MVEndegHw1hnRkXjTbphCXEA": {
+    "address": "HVVFwdeDjS23A3qh6nP9MVEndegHw1hnRkXjTbphCXEA",
+    "twitter_handle": "MsKeybYT",
+    "pnl_30d": 16.28792819436605,
+    "pnl_7d": 16.28792819436605,
+    "pnl_1d": 16.28792819436605,
+    "winrate_7d": 1.0,
+    "txs_30d": 520,
+    "token_active": 39,
+    "last_active": "1763263476",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 349.4642857142857,
+    "score": 0.812409292929293,
+    "rank": 9,
+    "last_updated": "2025-11-15T23:45:22.950606",
+    "is_active": true
+  },
+  "5QBoymTFNftP9dYNYsxffrtng3T8NLSHtvgBbgSgDocA": {
+    "address": "5QBoymTFNftP9dYNYsxffrtng3T8NLSHtvgBbgSgDocA",
+    "twitter_handle": "beinosukebody",
+    "pnl_30d": 3.4885429492797844,
+    "pnl_7d": 3.4885429492797844,
+    "pnl_1d": 2.600644335183949,
+    "winrate_7d": 0.9808917197452229,
+    "txs_30d": 489,
+    "token_active": 157,
+    "last_active": "1763239649",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 423.89171974522293,
+    "score": 0.7147358352471145,
+    "rank": 10,
+    "last_updated": "2025-11-15T23:45:23.048400",
+    "is_active": true
+  },
+  "FASVLupK828VvdXiyiwtE6JJZ2FEehfMXpHFdJ6pC53G": {
+    "address": "FASVLupK828VvdXiyiwtE6JJZ2FEehfMXpHFdJ6pC53G",
+    "twitter_handle": "hao9400141030",
+    "pnl_30d": 2.3820513668241103,
+    "pnl_7d": 2.3820513668241103,
+    "pnl_1d": 2.4426197254949673,
+    "winrate_7d": 0.9943977591036415,
+    "txs_30d": 506,
+    "token_active": 349,
+    "last_active": "1763263259",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 295.12849162011173,
+    "score": 0.618162996195781,
+    "rank": 11,
+    "last_updated": "2025-11-15T23:45:23.037271",
+    "is_active": true
+  },
+  "35WemKfEvQ7A6Xfbt6hMPEAQuZH3jTL4EMHooQ92kCPV": {
+    "address": "35WemKfEvQ7A6Xfbt6hMPEAQuZH3jTL4EMHooQ92kCPV",
+    "twitter_handle": "zeyadalzaben",
+    "pnl_30d": 2.328061635834005,
+    "pnl_7d": 2.328061635834005,
+    "pnl_1d": 2.9142082686501016,
+    "winrate_7d": 0.9930555555555556,
+    "txs_30d": 764,
+    "token_active": 277,
+    "last_active": "1763263479",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 319.06944444444446,
+    "score": 0.6029852316447889,
+    "rank": 12,
+    "last_updated": "2025-11-15T23:45:23.067305",
+    "is_active": true
+  },
+  "C1zaDvfrLqHsnmfYx6VUZmCWGgY6vS3wSDzZ49kY6qKQ": {
+    "address": "C1zaDvfrLqHsnmfYx6VUZmCWGgY6vS3wSDzZ49kY6qKQ",
+    "twitter_handle": "CandyLi81998969",
+    "pnl_30d": 2.229575516560144,
+    "pnl_7d": 2.229575516560144,
+    "pnl_1d": 2.280429946051277,
+    "winrate_7d": 0.9941520467836257,
+    "txs_30d": 478,
+    "token_active": 334,
+    "last_active": "1763263259",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 287.2886297376093,
+    "score": 0.5957883360138843,
+    "rank": 13,
+    "last_updated": "2025-11-15T23:45:23.038116",
+    "is_active": true
+  },
+  "B3ZVefoYMngfH8LTa7DW4UFgBXzNHdn1BPWGxgFVM3yK": {
+    "address": "B3ZVefoYMngfH8LTa7DW4UFgBXzNHdn1BPWGxgFVM3yK",
+    "twitter_handle": "mahatara11",
+    "pnl_30d": 2.1462990569838563,
+    "pnl_7d": 2.1462990569838563,
+    "pnl_1d": 2.228722066031493,
+    "winrate_7d": 0.9938461538461538,
+    "txs_30d": 452,
+    "token_active": 317,
+    "last_active": "1763263259",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 287.33742331288346,
+    "score": 0.5826548695671255,
+    "rank": 14,
+    "last_updated": "2025-11-15T23:45:23.047823",
+    "is_active": true
+  },
+  "2QioJBwKBVtsP2FajWoquvCt5VVjPUxtpDaXecprcgpF": {
+    "address": "2QioJBwKBVtsP2FajWoquvCt5VVjPUxtpDaXecprcgpF",
+    "twitter_handle": "7dariusroskra",
+    "pnl_30d": 1.5334641059841283,
+    "pnl_7d": 1.5334641059841283,
+    "pnl_1d": 1.5334641059841283,
+    "winrate_7d": 1.0,
+    "txs_30d": 35,
+    "token_active": 19,
+    "last_active": "1763248779",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 619.2105263157895,
+    "score": 0.47044751872692187,
+    "rank": 15,
+    "last_updated": "2025-11-15T23:45:23.019306",
+    "is_active": true
+  },
   "4BdKaxN8G6ka4GYtQQWk4G4dZRUTX2vQH9GcXdBREFUk": {
     "address": "4BdKaxN8G6ka4GYtQQWk4G4dZRUTX2vQH9GcXdBREFUk",
     "twitter_handle": "jijo_exe",
-    "pnl_30d": 0.403655610718878,
-    "pnl_7d": 0.4602196037538362,
-    "pnl_1d": 0.2185003016346989,
-    "winrate_7d": 0.6706231454005934,
-    "txs_30d": 3827,
-    "token_active": 339,
-    "last_active": "1762468094",
+    "pnl_30d": 0.3875025867874361,
+    "pnl_7d": 0.3539425314337886,
+    "pnl_1d": 0.7787888293953152,
+    "winrate_7d": 0.6505190311418685,
+    "txs_30d": 5398,
+    "token_active": 306,
+    "last_active": "1763258476",
     "is_blue_verified": true,
-    "avg_holding_period_7d": 46785.30337078652,
-    "score": 0.3413804371419186,
-    "rank": 1,
-    "last_updated": "2025-11-06T18:49:36.021157",
+    "avg_holding_period_7d": 36710.69902912621,
+    "score": 0.3391046833444986,
+    "rank": 16,
+    "last_updated": "2025-11-15T23:45:23.014050",
     "is_active": true
   },
   "78N177fzNJpp8pG49xDv1efYcTMSzo9tPTKEA9mAVkh2": {
     "address": "78N177fzNJpp8pG49xDv1efYcTMSzo9tPTKEA9mAVkh2",
     "twitter_handle": "imsheepsol",
-    "pnl_30d": 0.2570753174106157,
-    "pnl_7d": 0.1895060297884243,
-    "pnl_1d": 0.1774584507772093,
-    "winrate_7d": 0.8031914893617021,
-    "txs_30d": 7136,
-    "token_active": 377,
-    "last_active": "1762468160",
+    "pnl_30d": 0.2139209368734594,
+    "pnl_7d": 0.2129451426951864,
+    "pnl_1d": 0.1058753631543533,
+    "winrate_7d": 0.7639593908629442,
+    "txs_30d": 7358,
+    "token_active": 407,
+    "last_active": "1763248728",
     "is_blue_verified": true,
-    "avg_holding_period_7d": 40040.220207253886,
-    "score": 0.3375829072480184,
-    "rank": 2,
-    "last_updated": "2025-11-06T18:49:36.021648",
+    "avg_holding_period_7d": 40630.477611940296,
+    "score": 0.32905296022147756,
+    "rank": 17,
+    "last_updated": "2025-11-15T23:45:23.036379",
     "is_active": true
+  },
+  "DfMxre4cKmvogbLrPigxmibVTTQDuzjdXojWzjCXXhzj": {
+    "address": "DfMxre4cKmvogbLrPigxmibVTTQDuzjdXojWzjCXXhzj",
+    "twitter_handle": "None",
+    "pnl_30d": 0.0793503785679434,
+    "pnl_7d": 0.025681629173643,
+    "pnl_1d": 0.2085562598271353,
+    "winrate_7d": 0.6041666666666666,
+    "txs_30d": 5281,
+    "token_active": 308,
+    "last_active": "1763258855",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 20607.63157894737,
+    "score": 0.25648523724692246,
+    "rank": 18,
+    "last_updated": "2025-11-15T23:45:23.054799",
+    "is_active": true
+  },
+  "84vL38o5zTQjvA2fv7f3MgwXVBm8rBs1QBVXHtranQy5": {
+    "address": "84vL38o5zTQjvA2fv7f3MgwXVBm8rBs1QBVXHtranQy5",
+    "twitter_handle": "Loopierr",
+    "pnl_30d": 0.1827325443151923,
+    "pnl_7d": 0.0626509368846298,
+    "pnl_1d": -0.5151287826402186,
+    "winrate_7d": 0.36363636363636365,
+    "txs_30d": 1041,
+    "token_active": 98,
+    "last_active": "1763242060",
+    "is_blue_verified": true,
+    "avg_holding_period_7d": 50780.46315789474,
+    "score": 0.21067211621228815,
+    "rank": 19,
+    "last_updated": "2025-11-15T23:45:23.067979",
+    "is_active": true
+  },
+  "7PU8Na6Pm74zozDizGrV21EXDNYXfXGpb6WiQNY9RiQe": {
+    "address": "7PU8Na6Pm74zozDizGrV21EXDNYXfXGpb6WiQNY9RiQe",
+    "twitter_handle": "MCDennerjames",
+    "pnl_30d": 15.770537436623451,
+    "pnl_7d": 15.770537436623451,
+    "pnl_1d": 13.683865422478558,
+    "winrate_7d": 0.9906542056074766,
+    "txs_30d": 401,
+    "token_active": 107,
+    "last_active": "1763180040",
+    "is_blue_verified": false,
+    "avg_holding_period_7d": 330.6296296296296,
+    "score": 0.8175278209194753,
+    "rank": 5,
+    "last_updated": "2025-11-15T23:45:23.190343",
+    "is_active": false
   },
   "ysxc5z3iEH7MFmYnCWzPUsUuy9RwdvqPfQFgTkTyFTe": {
     "address": "ysxc5z3iEH7MFmYnCWzPUsUuy9RwdvqPfQFgTkTyFTe",
@@ -47,8 +353,8 @@
     "avg_holding_period_7d": 254.1637744034707,
     "score": 0.26698568116821986,
     "rank": 3,
-    "last_updated": "2025-11-06T18:49:36.022350",
-    "is_active": true
+    "last_updated": "2025-11-15T23:45:23.190368",
+    "is_active": false
   },
   "EHg5YkU2SZBTvuT87rUsvxArGp3HLeye1fXaSDfuMyaf": {
     "address": "EHg5YkU2SZBTvuT87rUsvxArGp3HLeye1fXaSDfuMyaf",
@@ -64,8 +370,8 @@
     "avg_holding_period_7d": 49828.897777777776,
     "score": 0.24077898914052323,
     "rank": 4,
-    "last_updated": "2025-11-06T18:49:36.023022",
-    "is_active": true
+    "last_updated": "2025-11-15T23:45:23.190377",
+    "is_active": false
   },
   "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ": {
     "address": "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ",
@@ -81,24 +387,7 @@
     "avg_holding_period_7d": 79206.57627118644,
     "score": 0.22799771680634517,
     "rank": 5,
-    "last_updated": "2025-11-06T18:49:36.021941",
-    "is_active": true
-  },
-  "DfMxre4cKmvogbLrPigxmibVTTQDuzjdXojWzjCXXhzj": {
-    "address": "DfMxre4cKmvogbLrPigxmibVTTQDuzjdXojWzjCXXhzj",
-    "twitter_handle": "None",
-    "pnl_30d": 0.2256975607168514,
-    "pnl_7d": 0.1121209336146724,
-    "pnl_1d": 0.0364597899394805,
-    "winrate_7d": 0.6784313725490196,
-    "txs_30d": 4034,
-    "token_active": 250,
-    "last_active": "1761690800",
-    "is_blue_verified": false,
-    "avg_holding_period_7d": 49905.5687732342,
-    "score": 0.28322222976974054,
-    "rank": 3,
-    "last_updated": "2025-11-06T18:49:36.032779",
+    "last_updated": "2025-11-15T23:45:23.190385",
     "is_active": false
   },
   "4DdrfiDHpmx55i4SPssxVzS9ZaKLb8qr45NKY9Er9nNh": {
@@ -115,7 +404,7 @@
     "avg_holding_period_7d": 15137.34,
     "score": 0.27415545664748237,
     "rank": 2,
-    "last_updated": "2025-11-06T18:49:36.032783",
+    "last_updated": "2025-11-15T23:45:23.190391",
     "is_active": false
   },
   "DYAn4XpAkN5mhiXkRB7dGq4Jadnx6XYgu8L5b3WGhbrt": {
@@ -132,7 +421,7 @@
     "avg_holding_period_7d": 2863.12,
     "score": 0.2358734917480939,
     "rank": 4,
-    "last_updated": "2025-11-06T18:49:36.032786",
+    "last_updated": "2025-11-15T23:45:23.190396",
     "is_active": false
   },
   "GJA1HEbxGnqBhBifH9uQauzXSB53to5rhDrzmKxhSU65": {
@@ -149,7 +438,7 @@
     "avg_holding_period_7d": 19260.42,
     "score": 0.2119502863704812,
     "rank": 5,
-    "last_updated": "2025-11-06T18:49:36.032788",
+    "last_updated": "2025-11-15T23:45:23.190400",
     "is_active": false
   },
   "BCnqsPEtA1TkgednYEebRpkmwFRJDCjMQcKZMMtEdArc": {
@@ -166,7 +455,7 @@
     "avg_holding_period_7d": 195.28,
     "score": 0.15941672666612355,
     "rank": 6,
-    "last_updated": "2025-11-06T18:49:36.032790",
+    "last_updated": "2025-11-15T23:45:23.190405",
     "is_active": false
   },
   "8CRGEUBcBztAUgd61VY7ss3eW17R7HVvnvhtjKB5Y4G4": {
@@ -183,7 +472,7 @@
     "avg_holding_period_7d": 42880.75,
     "score": 0.881444082947531,
     "rank": 1,
-    "last_updated": "2025-11-06T18:49:36.032792",
+    "last_updated": "2025-11-15T23:45:23.190410",
     "is_active": false
   },
   "vTSCoiCrTWCCD1T9pcgjnEG1N8CAgLkipagzuXXyWdU": {
@@ -200,7 +489,7 @@
     "avg_holding_period_7d": 24736.08,
     "score": 0.3217276461563143,
     "rank": 2,
-    "last_updated": "2025-11-06T18:49:36.032794",
+    "last_updated": "2025-11-15T23:45:23.190415",
     "is_active": false
   },
   "CChcZtUXCv7CDp6vq9Zto6oqG4eE1nbHGh8AwA4ZRfnC": {
@@ -217,7 +506,7 @@
     "avg_holding_period_7d": 18.8,
     "score": 0.31913362044565835,
     "rank": 3,
-    "last_updated": "2025-11-06T18:49:36.032795",
+    "last_updated": "2025-11-15T23:45:23.190420",
     "is_active": false
   },
   "ooooWw86ipKYVA5tCYPF6EgVPBJtLy4THwy7iRZoWgC": {
@@ -234,7 +523,7 @@
     "avg_holding_period_7d": 1368.68,
     "score": 0.28537537317135586,
     "rank": 7,
-    "last_updated": "2025-11-06T18:49:36.032797",
+    "last_updated": "2025-11-15T23:45:23.190424",
     "is_active": false
   },
   "DHm7W3k4Xqk7UseFkLb1DCjiFkk9rDh8qz9sEevrt8n": {
@@ -251,7 +540,7 @@
     "avg_holding_period_7d": 17.52,
     "score": 0.2846570777515277,
     "rank": 8,
-    "last_updated": "2025-11-06T18:49:36.032799",
+    "last_updated": "2025-11-15T23:45:23.190428",
     "is_active": false
   },
   "86AEJExyjeNNgcp7GrAvCXTDicf5aGWgoERbXFiG1EdD": {
@@ -268,7 +557,7 @@
     "avg_holding_period_7d": 968.02,
     "score": 0.3548326442726237,
     "rank": 2,
-    "last_updated": "2025-11-06T18:49:36.032800",
+    "last_updated": "2025-11-15T23:45:23.190432",
     "is_active": false
   },
   "9FNz4MjPUmnJqTf6yEDbL1D4SsHVh7uA8zRHhR5K138r": {
@@ -285,7 +574,7 @@
     "avg_holding_period_7d": 10108.62,
     "score": 0.3484556583766885,
     "rank": 4,
-    "last_updated": "2025-11-06T18:49:36.032802",
+    "last_updated": "2025-11-15T23:45:23.190437",
     "is_active": false
   },
   "4S9U8HckRngscHWrW418cG6Suw62dhEZzmyrT2hxSye5": {
@@ -302,7 +591,7 @@
     "avg_holding_period_7d": 11885.9,
     "score": 0.33532790681377506,
     "rank": 5,
-    "last_updated": "2025-11-06T18:49:36.032804",
+    "last_updated": "2025-11-15T23:45:23.190440",
     "is_active": false
   },
   "EaVboaPxFCYanjoNWdkxTbPvt57nhXGu5i6m9m6ZS2kK": {
@@ -319,7 +608,7 @@
     "avg_holding_period_7d": 53777.74,
     "score": 0.3334875037203976,
     "rank": 6,
-    "last_updated": "2025-11-06T18:49:36.032805",
+    "last_updated": "2025-11-15T23:45:23.190445",
     "is_active": false
   },
   "6PCniazSc5YpjYSc9e8A7Chx3QpGUqim3L2eU6h7sNf8": {
@@ -336,7 +625,7 @@
     "avg_holding_period_7d": 28681.285714285714,
     "score": 0.31833736004014535,
     "rank": 8,
-    "last_updated": "2025-11-06T18:49:36.032807",
+    "last_updated": "2025-11-15T23:45:23.190449",
     "is_active": false
   },
   "Dvjs6ArwiX1PzX9ZaaqutdAi7yAKKsdN5wvq88u9yCav": {
@@ -353,7 +642,7 @@
     "avg_holding_period_7d": 14528.5625,
     "score": 0.31530185108446934,
     "rank": 9,
-    "last_updated": "2025-11-06T18:49:36.032809",
+    "last_updated": "2025-11-15T23:45:23.190454",
     "is_active": false
   },
   "168eS83Tx5C4PCMCT4eKtnyLyk5wQEtJKtSrqk41L9d": {
@@ -370,7 +659,7 @@
     "avg_holding_period_7d": 45568.0,
     "score": 0.29917077377158385,
     "rank": 11,
-    "last_updated": "2025-11-06T18:49:36.032810",
+    "last_updated": "2025-11-15T23:45:23.190458",
     "is_active": false
   },
   "8MaVa9kdt3NW4Q5HyNAm1X5LbR8PQRVDc1W8NMVK88D5": {
@@ -387,7 +676,7 @@
     "avg_holding_period_7d": 34433.14,
     "score": 0.2987723012767469,
     "rank": 12,
-    "last_updated": "2025-11-06T18:49:36.032813",
+    "last_updated": "2025-11-15T23:45:23.190462",
     "is_active": false
   },
   "mW4PZB45isHmnjGkLpJvjKBzVS5NXzTJ8UDyug4gTsM": {
@@ -404,7 +693,7 @@
     "avg_holding_period_7d": 31165.56,
     "score": 0.2984653694513662,
     "rank": 13,
-    "last_updated": "2025-11-06T18:49:36.032814",
+    "last_updated": "2025-11-15T23:45:23.190467",
     "is_active": false
   },
   "J485YzQjuJPLYoFEYjrjxd7NAoLHTiyUU63JwK7kLxRr": {
@@ -421,7 +710,7 @@
     "avg_holding_period_7d": 24456.69387755102,
     "score": 0.2877243576538352,
     "rank": 15,
-    "last_updated": "2025-11-06T18:49:36.032816",
+    "last_updated": "2025-11-15T23:45:23.190471",
     "is_active": false
   },
   "FRbUNvGxYNC1eFngpn7AD3f14aKKTJVC6zSMtvj2dyCS": {
@@ -438,7 +727,7 @@
     "avg_holding_period_7d": 67.98,
     "score": 0.28736189033764153,
     "rank": 16,
-    "last_updated": "2025-11-06T18:49:36.032817",
+    "last_updated": "2025-11-15T23:45:23.190489",
     "is_active": false
   },
   "Av3xWHJ5EsoLZag6pr7LKbrGgLRTaykXomDD5kBhL9YQ": {
@@ -455,7 +744,7 @@
     "avg_holding_period_7d": 69.26,
     "score": 0.2764388406025291,
     "rank": 17,
-    "last_updated": "2025-11-06T18:49:36.032819",
+    "last_updated": "2025-11-15T23:45:23.190496",
     "is_active": false
   },
   "Hnnw2hAgPgGiFKouRWvM3fSk3HnYgRv4Xq1PjUEBEuWM": {
@@ -472,7 +761,7 @@
     "avg_holding_period_7d": 28828.66,
     "score": 0.2611450437069901,
     "rank": 18,
-    "last_updated": "2025-11-06T18:49:36.032820",
+    "last_updated": "2025-11-15T23:45:23.190501",
     "is_active": false
   },
   "96sErVjEN7LNJ6Uvj63bdRWZxNuBngj56fnT9biHLKBf": {
@@ -489,7 +778,7 @@
     "avg_holding_period_7d": 6842.76,
     "score": 0.25983113403056957,
     "rank": 19,
-    "last_updated": "2025-11-06T18:49:36.032822",
+    "last_updated": "2025-11-15T23:45:23.190506",
     "is_active": false
   },
   "7nihQa2AZBYzXS4sDHZidYG8EvfphYwiBLYpo7FBSkc5": {
@@ -506,7 +795,7 @@
     "avg_holding_period_7d": 42220.53125,
     "score": 0.2382414583453952,
     "rank": 20,
-    "last_updated": "2025-11-06T18:49:36.032823",
+    "last_updated": "2025-11-15T23:45:23.190510",
     "is_active": false
   }
 }
