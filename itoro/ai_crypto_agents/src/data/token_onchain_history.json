@@ -1,83 +1,6 @@
 {
   "EQPq9cjHL9RftmmPmRv3tCV7MjvjtefTWGFVpooZm8Qi": [
     {
-      "timestamp": "2025-10-28T17:24:43.629185",
-      "holder_count": 71,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.20389183112479997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T05:21:55.961010",
-      "holder_count": 69,
-      "holder_change_count": -2,
-      "holder_change_pct": -2.8169014084507045,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.20389183112479997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T06:22:12.799730",
-      "holder_count": 69,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.20389183112479997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T07:22:25.076297",
-      "holder_count": 69,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.20389183112479997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T08:22:38.686053",
-      "holder_count": 69,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.20389183112479997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T09:22:53.695451",
-      "holder_count": 69,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.20389183112479997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T10:23:01.315561",
-      "holder_count": 69,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.20389183112479997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
       "timestamp": "2025-11-07T11:23:21.168222",
       "holder_count": 69,
       "holder_change_count": 0,
@@ -219,86 +142,86 @@
       "liquidity_usd": 0.20389183112479997,
       "price_change_24h": null,
       "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T12:13:00.772788",
+      "holder_count": 65,
+      "holder_change_count": -3,
+      "holder_change_pct": -4.411764705882353,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.20389183112479997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T13:13:20.638570",
+      "holder_count": 65,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.20389183112479997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T14:13:38.484649",
+      "holder_count": 65,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.20389183112479997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T15:13:48.215447",
+      "holder_count": 65,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.20389183112479997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T16:14:06.086320",
+      "holder_count": 65,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.20389183112479997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T17:14:22.654174",
+      "holder_count": 65,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.20389183112479997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T18:14:40.794906",
+      "holder_count": 65,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.20389183112479997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
     }
   ],
   "965n7yTvWbKMUz54bQr7t2TKjdxvBRAv7xt5Z4Agpuyg": [
-    {
-      "timestamp": "2025-10-28T17:24:43.629185",
-      "holder_count": 63,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.2564671477708,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T05:21:55.961010",
-      "holder_count": 62,
-      "holder_change_count": -1,
-      "holder_change_pct": -1.5873015873015872,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.2564671477708,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T06:22:12.799730",
-      "holder_count": 62,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.2564671477708,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T07:22:25.076297",
-      "holder_count": 62,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.2564671477708,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T08:22:38.686053",
-      "holder_count": 62,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.2564671477708,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T09:22:53.695451",
-      "holder_count": 62,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.2564671477708,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T10:23:01.315561",
-      "holder_count": 62,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.2564671477708,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
     {
       "timestamp": "2025-11-07T11:23:21.168222",
       "holder_count": 62,
@@ -434,6 +357,83 @@
     {
       "timestamp": "2025-11-07T23:26:28.890911",
       "holder_count": 62,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.2564671477708,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T12:13:00.772788",
+      "holder_count": 61,
+      "holder_change_count": -1,
+      "holder_change_pct": -1.6129032258064515,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.2564671477708,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T13:13:20.638570",
+      "holder_count": 61,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.2564671477708,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T14:13:38.484649",
+      "holder_count": 61,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.2564671477708,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T15:13:48.215447",
+      "holder_count": 61,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.2564671477708,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T16:14:06.086320",
+      "holder_count": 61,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.2564671477708,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T17:14:22.654174",
+      "holder_count": 61,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.2564671477708,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T18:14:40.794906",
+      "holder_count": 61,
       "holder_change_count": 0,
       "holder_change_pct": 0.0,
       "tx_count_24h": 0,
@@ -445,72 +445,6 @@
   ],
   "CdT7LUUwNThb2FVMH2h6tk5VgTguovkj3Fee1LaW73Eh": [
     {
-      "timestamp": "2025-10-28T07:45:27.068126",
-      "holder_count": 65,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.2970328634,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-10-28T17:24:43.629185",
-      "holder_count": 65,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.2970328634,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T06:22:12.799730",
-      "holder_count": 63,
-      "holder_change_count": -2,
-      "holder_change_pct": -3.076923076923077,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.2970328634,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T07:22:25.076297",
-      "holder_count": 62,
-      "holder_change_count": -1,
-      "holder_change_pct": -1.5873015873015872,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.2970328634,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T08:22:38.686053",
-      "holder_count": 62,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.2970328634,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T09:22:53.695451",
-      "holder_count": 62,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.2970328634,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
       "timestamp": "2025-11-07T10:23:01.315561",
       "holder_count": 62,
       "holder_change_count": 0,
@@ -656,6 +590,72 @@
     {
       "timestamp": "2025-11-07T23:26:28.890911",
       "holder_count": 62,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.2970328634,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T13:13:20.638570",
+      "holder_count": 61,
+      "holder_change_count": -1,
+      "holder_change_pct": -1.6129032258064515,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.2970328634,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T14:13:38.484649",
+      "holder_count": 61,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.2970328634,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T15:13:48.215447",
+      "holder_count": 61,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.2970328634,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T16:14:06.086320",
+      "holder_count": 61,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.2970328634,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T17:14:22.654174",
+      "holder_count": 61,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.2970328634,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T18:14:40.794906",
+      "holder_count": 61,
       "holder_change_count": 0,
       "holder_change_pct": 0.0,
       "tx_count_24h": 0,
@@ -667,72 +667,6 @@
   ],
   "6rAySULV2suUpcVfAm2ZuD5HU5enMUbg6Zprw6qorRiY": [
     {
-      "timestamp": "2025-11-05T22:38:05.533769",
-      "holder_count": 64,
-      "holder_change_count": -1,
-      "holder_change_pct": -1.5384615384615385,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.3813275674,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-05T22:55:55.667537",
-      "holder_count": 64,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.3813275674,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T06:22:12.799730",
-      "holder_count": 64,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.3813275674,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T07:22:25.076297",
-      "holder_count": 64,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.3813275674,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T08:22:38.686053",
-      "holder_count": 64,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.3813275674,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T09:22:53.695451",
-      "holder_count": 64,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.3813275674,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
       "timestamp": "2025-11-07T10:23:01.315561",
       "holder_count": 64,
       "holder_change_count": 0,
@@ -878,6 +812,72 @@
     {
       "timestamp": "2025-11-07T23:26:28.890911",
       "holder_count": 64,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.3813275674,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T13:13:20.638570",
+      "holder_count": 63,
+      "holder_change_count": -1,
+      "holder_change_pct": -1.5625,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.3813275674,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T14:13:38.484649",
+      "holder_count": 63,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.3813275674,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T15:13:48.215447",
+      "holder_count": 63,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.3813275674,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T16:14:06.086320",
+      "holder_count": 63,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.3813275674,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T17:14:22.654174",
+      "holder_count": 63,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.3813275674,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T18:14:40.794906",
+      "holder_count": 63,
       "holder_change_count": 0,
       "holder_change_pct": 0.0,
       "tx_count_24h": 0,
@@ -1263,94 +1263,6 @@
   ],
   "2VPKMdj3DuRm5C7nDP83ZX1izDuwkyzZVCDq2HDs1xif": [
     {
-      "timestamp": "2025-11-07T04:21:39.101482",
-      "holder_count": 29,
-      "holder_change_count": 0,
-      "holder_change_pct": 0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.41991885939768003,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T05:21:55.961010",
-      "holder_count": 29,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.41991885939768003,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T06:22:12.799730",
-      "holder_count": 29,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.41991885939768003,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T07:22:25.076297",
-      "holder_count": 29,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.41991885939768003,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T08:22:38.686053",
-      "holder_count": 29,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.41991885939768003,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T09:22:53.695451",
-      "holder_count": 29,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.41991885939768003,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T10:23:01.315561",
-      "holder_count": 29,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.41991885939768003,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T11:23:21.168222",
-      "holder_count": 29,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.41991885939768003,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
       "timestamp": "2025-11-07T12:23:37.732812",
       "holder_count": 29,
       "holder_change_count": 0,
@@ -1474,6 +1386,94 @@
     {
       "timestamp": "2025-11-07T23:26:28.890911",
       "holder_count": 29,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.41991885939768003,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T11:12:49.999249",
+      "holder_count": 28,
+      "holder_change_count": -1,
+      "holder_change_pct": -3.4482758620689653,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.41991885939768003,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T12:13:00.772788",
+      "holder_count": 28,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.41991885939768003,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T13:13:20.638570",
+      "holder_count": 28,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.41991885939768003,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T14:13:38.484649",
+      "holder_count": 28,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.41991885939768003,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T15:13:48.215447",
+      "holder_count": 28,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.41991885939768003,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T16:14:06.086320",
+      "holder_count": 28,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.41991885939768003,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T17:14:22.654174",
+      "holder_count": 28,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.41991885939768003,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T18:14:40.794906",
+      "holder_count": 28,
       "holder_change_count": 0,
       "holder_change_pct": 0.0,
       "tx_count_24h": 0,
@@ -1485,94 +1485,6 @@
   ],
   "pmZYS6k35cgbaBVcyGZUgn6bTTJLYdpMV78yG8wiT1g": [
     {
-      "timestamp": "2025-11-07T04:21:39.101482",
-      "holder_count": 31,
-      "holder_change_count": 0,
-      "holder_change_pct": 0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.42030433159999997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T05:21:55.961010",
-      "holder_count": 31,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.42030433159999997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T06:22:12.799730",
-      "holder_count": 31,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.42030433159999997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T07:22:25.076297",
-      "holder_count": 31,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.42030433159999997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T08:22:38.686053",
-      "holder_count": 31,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.42030433159999997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T09:22:53.695451",
-      "holder_count": 31,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.42030433159999997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T10:23:01.315561",
-      "holder_count": 31,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.42030433159999997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
-      "timestamp": "2025-11-07T11:23:21.168222",
-      "holder_count": 31,
-      "holder_change_count": 0,
-      "holder_change_pct": 0.0,
-      "tx_count_24h": 0,
-      "volume_24h": 0,
-      "liquidity_usd": 0.42030433159999997,
-      "price_change_24h": null,
-      "trend_signal": "STABLE"
-    },
-    {
       "timestamp": "2025-11-07T12:23:37.732812",
       "holder_count": 31,
       "holder_change_count": 0,
@@ -1695,6 +1607,94 @@
     },
     {
       "timestamp": "2025-11-07T23:26:28.890911",
+      "holder_count": 31,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.42030433159999997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T11:12:49.999249",
+      "holder_count": 31,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.42030433159999997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T12:13:00.772788",
+      "holder_count": 31,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.42030433159999997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T13:13:20.638570",
+      "holder_count": 31,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.42030433159999997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T14:13:38.484649",
+      "holder_count": 31,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.42030433159999997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T15:13:48.215447",
+      "holder_count": 31,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.42030433159999997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T16:14:06.086320",
+      "holder_count": 31,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.42030433159999997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T17:14:22.654174",
+      "holder_count": 31,
+      "holder_change_count": 0,
+      "holder_change_pct": 0.0,
+      "tx_count_24h": 0,
+      "volume_24h": 0,
+      "liquidity_usd": 0.42030433159999997,
+      "price_change_24h": null,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T18:14:40.794906",
       "holder_count": 31,
       "holder_change_count": 0,
       "holder_change_pct": 0.0,
@@ -3554,6 +3554,236 @@
       "volume_24h": 0,
       "liquidity_usd": 4.216457159879297e-07,
       "price_change_24h": 0,
+      "trend_signal": "STABLE"
+    }
+  ],
+  "4SCSL4FwBN7StevSQBL5ghQ3XrAgb1BFpzQed8Dkpump": [
+    {
+      "timestamp": "2025-11-17T02:11:02.011648",
+      "holder_count": 152,
+      "holder_change_count": 0,
+      "holder_change_pct": 0,
+      "tx_count_24h": 1648,
+      "volume_24h": 106705.18096961617,
+      "liquidity_usd": 6463.676374215643,
+      "price_change_24h": 440.0380151118204,
+      "trend_signal": "GROWING"
+    },
+    {
+      "timestamp": "2025-11-17T03:11:12.014945",
+      "holder_count": 207,
+      "holder_change_count": 55,
+      "holder_change_pct": 36.18421052631579,
+      "tx_count_24h": 2957,
+      "volume_24h": 189101.94482352465,
+      "liquidity_usd": 23624.356283476016,
+      "price_change_24h": 296.190196693723,
+      "trend_signal": "GROWING"
+    },
+    {
+      "timestamp": "2025-11-17T04:11:22.972704",
+      "holder_count": 193,
+      "holder_change_count": -14,
+      "holder_change_pct": -6.763285024154589,
+      "tx_count_24h": 3134,
+      "volume_24h": 200511.28702830285,
+      "liquidity_usd": 13787.96064554606,
+      "price_change_24h": 198.18092911835404,
+      "trend_signal": "SHRINKING"
+    }
+  ],
+  "3jo1pUCkzbUKwKr7We2YHNELMdJuPgoDVTES9jv2pump": [
+    {
+      "timestamp": "2025-11-17T04:11:22.972704",
+      "holder_count": 278,
+      "holder_change_count": 0,
+      "holder_change_pct": 0,
+      "tx_count_24h": 2191,
+      "volume_24h": 134449.91197790398,
+      "liquidity_usd": 0.5483608892578402,
+      "price_change_24h": 917.5891946368428,
+      "trend_signal": "GROWING"
+    },
+    {
+      "timestamp": "2025-11-17T05:11:31.400528",
+      "holder_count": 247,
+      "holder_change_count": -31,
+      "holder_change_pct": -11.151079136690647,
+      "tx_count_24h": 2946,
+      "volume_24h": 176296.9342087717,
+      "liquidity_usd": 17421.64825399415,
+      "price_change_24h": 551.1890203638342,
+      "trend_signal": "GROWING"
+    },
+    {
+      "timestamp": "2025-11-17T06:11:44.064395",
+      "holder_count": 197,
+      "holder_change_count": -50,
+      "holder_change_pct": -20.242914979757085,
+      "tx_count_24h": 3329,
+      "volume_24h": 194374.66299654235,
+      "liquidity_usd": 13155.763386006081,
+      "price_change_24h": 315.5940228462798,
+      "trend_signal": "SHRINKING"
+    },
+    {
+      "timestamp": "2025-11-17T07:11:58.139812",
+      "holder_count": 174,
+      "holder_change_count": -23,
+      "holder_change_pct": -11.6751269035533,
+      "tx_count_24h": 3450,
+      "volume_24h": 198679.2466130897,
+      "liquidity_usd": 12735.612953681495,
+      "price_change_24h": 259.66158456951547,
+      "trend_signal": "SHRINKING"
+    },
+    {
+      "timestamp": "2025-11-17T08:12:14.481391",
+      "holder_count": 155,
+      "holder_change_count": -19,
+      "holder_change_pct": -10.919540229885058,
+      "tx_count_24h": 3518,
+      "volume_24h": 202177.689278223,
+      "liquidity_usd": 12735.612953681495,
+      "price_change_24h": 140.59630082935152,
+      "trend_signal": "SHRINKING"
+    },
+    {
+      "timestamp": "2025-11-17T09:12:27.582242",
+      "holder_count": 144,
+      "holder_change_count": -11,
+      "holder_change_pct": -7.096774193548387,
+      "tx_count_24h": 3557,
+      "volume_24h": 204269.4509361318,
+      "liquidity_usd": 10446.930580039669,
+      "price_change_24h": 95.42375431808205,
+      "trend_signal": "SHRINKING"
+    },
+    {
+      "timestamp": "2025-11-17T10:12:41.180531",
+      "holder_count": 137,
+      "holder_change_count": -7,
+      "holder_change_pct": -4.861111111111112,
+      "tx_count_24h": 3640,
+      "volume_24h": 207676.2247926176,
+      "liquidity_usd": 8821.916198679508,
+      "price_change_24h": 141.6964350329686,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T11:12:49.999249",
+      "holder_count": 119,
+      "holder_change_count": -18,
+      "holder_change_pct": -13.138686131386862,
+      "tx_count_24h": 3687,
+      "volume_24h": 210008.66497997014,
+      "liquidity_usd": 10086.611199981977,
+      "price_change_24h": 56.19208238797516,
+      "trend_signal": "SHRINKING"
+    },
+    {
+      "timestamp": "2025-11-17T12:13:00.772788",
+      "holder_count": 105,
+      "holder_change_count": -14,
+      "holder_change_pct": -11.76470588235294,
+      "tx_count_24h": 3708,
+      "volume_24h": 210993.72023451113,
+      "liquidity_usd": 8202.69841851644,
+      "price_change_24h": 19.490625334702298,
+      "trend_signal": "SHRINKING"
+    },
+    {
+      "timestamp": "2025-11-17T13:13:20.638570",
+      "holder_count": 103,
+      "holder_change_count": -2,
+      "holder_change_pct": -1.9047619047619049,
+      "tx_count_24h": 3715,
+      "volume_24h": 211088.48260287964,
+      "liquidity_usd": 6833.91629503894,
+      "price_change_24h": 14.183647852093003,
+      "trend_signal": "STABLE"
+    }
+  ],
+  "BMXTWKzYd29GTMyyEm3vnVmj5CtU2s8Gquv4hr8CExWD": [
+    {
+      "timestamp": "2025-11-17T05:11:31.400528",
+      "holder_count": 240,
+      "holder_change_count": 0,
+      "holder_change_pct": 0,
+      "tx_count_24h": 1978,
+      "volume_24h": 153233.99056063907,
+      "liquidity_usd": 33265.833414798144,
+      "price_change_24h": 98.43357746290081,
+      "trend_signal": "GROWING"
+    }
+  ],
+  "HgQmejXixfXXMeVgAWnyye12K2iCkhahAEurZEZLpump": [
+    {
+      "timestamp": "2025-11-17T08:12:14.481391",
+      "holder_count": 112,
+      "holder_change_count": 0,
+      "holder_change_pct": 0,
+      "tx_count_24h": 771,
+      "volume_24h": 60696.90196062341,
+      "liquidity_usd": 12180.009422421685,
+      "price_change_24h": 209.38561833664454,
+      "trend_signal": "GROWING"
+    }
+  ],
+  "CknnwuTVsYKBn9TNVjGdCb6ZczL84vDDdNZHVLfwpump": [
+    {
+      "timestamp": "2025-11-17T14:13:38.484649",
+      "holder_count": 252,
+      "holder_change_count": 0,
+      "holder_change_pct": 0,
+      "tx_count_24h": 3080,
+      "volume_24h": 241565.87727208898,
+      "liquidity_usd": 46244.85119446779,
+      "price_change_24h": 1113.5301993749397,
+      "trend_signal": "GROWING"
+    },
+    {
+      "timestamp": "2025-11-17T15:13:48.215447",
+      "holder_count": 223,
+      "holder_change_count": -29,
+      "holder_change_pct": -11.507936507936508,
+      "tx_count_24h": 3337,
+      "volume_24h": 259490.10853844817,
+      "liquidity_usd": 20302.030499141503,
+      "price_change_24h": 1023.2228873701196,
+      "trend_signal": "GROWING"
+    },
+    {
+      "timestamp": "2025-11-17T16:14:06.086320",
+      "holder_count": 235,
+      "holder_change_count": 12,
+      "holder_change_pct": 5.381165919282512,
+      "tx_count_24h": 3588,
+      "volume_24h": 278672.7167722118,
+      "liquidity_usd": 18882.748355983444,
+      "price_change_24h": 1109.986325682753,
+      "trend_signal": "STABLE"
+    },
+    {
+      "timestamp": "2025-11-17T17:14:22.654174",
+      "holder_count": 208,
+      "holder_change_count": -27,
+      "holder_change_pct": -11.48936170212766,
+      "tx_count_24h": 3723,
+      "volume_24h": 286528.1195321928,
+      "liquidity_usd": 18909.957036280444,
+      "price_change_24h": 736.5137537159007,
+      "trend_signal": "SHRINKING"
+    },
+    {
+      "timestamp": "2025-11-17T18:14:40.794906",
+      "holder_count": 210,
+      "holder_change_count": 2,
+      "holder_change_pct": 0.9615384615384616,
+      "tx_count_24h": 3761,
+      "volume_24h": 289941.168078878,
+      "liquidity_usd": 19949.475028703488,
+      "price_change_24h": 731.4639090059896,
       "trend_signal": "STABLE"
     }
   ]
