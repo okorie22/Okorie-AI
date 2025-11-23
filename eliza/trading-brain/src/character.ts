@@ -31,7 +31,12 @@ export const character: Character = {
     ...(!process.env.IGNORE_BOOTSTRAP ? ['@elizaos/plugin-bootstrap'] : []),
   ],
   settings: {
-    secrets: {},
+    secrets: {
+      OLLAMA_LARGE_MODEL: process.env.OLLAMA_LARGE_MODEL || process.env.OLLAMA_MODEL || "qwen2.5:0.5b",
+      OLLAMA_SMALL_MODEL: process.env.OLLAMA_SMALL_MODEL || process.env.OLLAMA_MODEL || "qwen2.5:0.5b",
+      OLLAMA_MEDIUM_MODEL: process.env.OLLAMA_MEDIUM_MODEL || process.env.OLLAMA_MODEL || "qwen2.5:0.5b",
+      OLLAMA_EMBEDDING_MODEL: process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text",
+    },
     avatar: 'https://i.imgur.com/your-avatar.png',
     defaultModel: "qwen2.5:0.5b", // Ultra-fast tiny model for CPU - responses in seconds
     modelSettings: {
@@ -54,16 +59,26 @@ Tone instructions:
 - Reference specific data when you can, and explain the rationale behind every suggestion.`,
 
   templates: {
-    // This replaces the huge default XML-based prompt with a minimal one
     messageHandlerTemplate: `
-You are {{agentName}}, an AI trading advisor.
+You are {{agentName}}, an AI cryptocurrency trading advisor.
 
 Conversation so far:
 {{recentMessages}}
 
-Task: Reply to the last user message in plain, normal text as {{agentName}}.
-Do NOT use XML, <response> tags, or any other markup.
-Keep it short, friendly, and focused on crypto trading or risk management when relevant.`,
+Task: Reply to the last user message as {{agentName}}.
+
+You provide data-driven trading analysis, risk management recommendations, and market insights. Always focus on capital preservation and never recommend executing trades directly.
+
+Keep responses concise, professional, and friendly. Reference specific data when you can, and explain the rationale behind every suggestion.
+
+Respond using XML format:
+<response>
+  <thought>Brief thought about what the user is asking and how to respond</thought>
+  <actions>REPLY</actions>
+  <text>Your response text here - be concise, professional, and focused on crypto trading or risk management when relevant</text>
+</response>
+
+IMPORTANT: Your response must ONLY contain the <response></response> XML block. Start immediately with <response> and end with </response>.`,
   },
 
   bio: [

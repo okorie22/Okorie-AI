@@ -7,7 +7,7 @@
     "node": "23.3.0"
   },
   "scripts": {
-    "postinstall": "bash ./scripts/init-submodules.sh",
+    "postinstall": "node -e \"if (process.platform !== 'win32' || process.env.SKIP_POSTINSTALL !== '1') { require('child_process').execSync('git submodule update --init --recursive', {stdio: 'inherit'}) }\"",
     "start": "turbo run start --filter=./packages/cli --log-prefix=none --no-cache",
     "start:debug": "cross-env NODE_NO_WARNINGS=1 LOG_LEVEL=debug elizaos start",
     "start:app": "turbo run start --filter=./packages/app",

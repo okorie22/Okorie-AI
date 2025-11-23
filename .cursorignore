@@ -1,0 +1,77 @@
+### 🏛️ ANARCHI CAPITALS CREATION - Centralized .cursorignore ###
+# This file consolidates all .cursorignore patterns from across the entire codebase
+# Generated from 2 .cursorignore files found throughout the repository
+
+### 🚀 CURSOR PERFORMANCE OPTIMIZATION ###
+# Exclude heavy directories and files to improve Cursor's indexing and performance
+
+### 📦 BUILD & DISTRIBUTION ###
+.turbo/
+**/dist/**
+**/build/**
+build/
+dist/
+*.egg-info/
+
+### 📚 DEPENDENCIES & CACHE ###
+**/node_modules/**
+**/cache/**
+data/cache/
+src/data/cache/
+
+### 🐍 PYTHON SPECIFIC ###
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+### 🔒 CONFIGURATION FILES ###
+.cursorrules
+*.lock
+codecov.yml
+LICENSE
+
+### 💻 IDE & EDITOR FILES ###
+.idea/
+.vscode/
+*.swp
+*.swo
+
+### 🖥️ OPERATING SYSTEM FILES ###
+.DS_Store
+Thumbs.db
+
+### 📊 DATA & TEMPORARY FILES ###
+temp_data/
+deployment_reports/
+deploy/deployment_reports/
+
+### 🧪 TEST FILES ###
+*_test.py
+
+### 📈 TRADING & CRYPTO DATA ###
+# Large Data Files
+src/data/ohlcv_data/
+src/data/agent_memory/
+src/data/private_data/
+src/data/focus_history.csv
+src/data/discovered_tokens.csv
+src/data/ai_analysis_buys.csv
+src/data/chat_agent/
+
+### 🎵 AUDIO FILES ###
+src/audio/
+
+### 📦 LARGE FILES ###
+*.ico
+*.spec
+
+### 🤖 AI PACKAGES ###
+AI-Trading-Agent-Package/
+

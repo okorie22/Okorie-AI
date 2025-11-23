@@ -1,6 +1,6 @@
 {
   "name": "@elizaos/app",
-  "version": "1.5.11-alpha.4",
+  "version": "1.6.4",
   "type": "module",
   "scripts": {
     "start": "tauri dev",
@@ -11,6 +11,8 @@
     "test": "bun test src/__tests__",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
+    "tauri:build:windows": "tauri build --target x86_64-pc-windows-msvc",
+    "tauri:build:installer": "tauri build --bundles msi,nsis",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write ./src",
     "format:check": "prettier --check ./src",

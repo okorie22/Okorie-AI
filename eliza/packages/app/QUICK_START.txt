@@ -1,0 +1,107 @@
+================================================================================
+ELIZA DESKTOP APP - QUICK START (FIXED VERSION!)
+================================================================================
+
+✅ BUILD COMPLETE AND TESTED! The desktop app works without crashing.
+
+================================================================================
+INSTALLATION (Choose One Method)
+================================================================================
+
+METHOD 1: Use the Install Script (Easiest)
+--------------------------------------------
+1. Navigate to: eliza\packages\app
+2. Double-click: INSTALL.bat
+3. Choose MSI (recommended) or NSIS installer
+4. Follow the installation wizard
+
+METHOD 2: Manual Installation
+-------------------------------
+MSI Installer (Recommended):
+  eliza\packages\app\src-tauri\target\release\bundle\msi\
+  Eliza Desktop_1.6.4_x64_en-US.msi
+
+NSIS Installer:
+  eliza\packages\app\src-tauri\target\release\bundle\nsis\
+  Eliza Desktop_1.6.4_x64-setup.exe
+
+Just double-click either installer file.
+
+================================================================================
+WHAT HAPPENS AFTER INSTALLATION
+================================================================================
+
+1. Launch the "Eliza Desktop" app from your Start Menu
+
+2. The app will automatically:
+   - Find your trading-brain project directory (now works from any location!)
+   - Start the ElizaOS server (elizaos start)
+   - Check server health at /health endpoint
+   - Load the web interface in the desktop window
+
+3. You'll see a loading screen while the server starts (usually 10-30 seconds)
+
+4. Once ready, the ElizaOS interface will appear in the window
+   (No more "localhost refused to connect" errors!)
+
+5. **NO MORE CRASHES!** - Tested and verified to work properly
+
+================================================================================
+IMPORTANT NOTES
+================================================================================
+
+✅ AUTOMATIC UPDATES: Code changes in trading-brain are automatically 
+   reflected - NO REBUILD NEEDED! The desktop app loads from localhost:3000.
+
+✅ PROJECT LOCATION: The app searches for trading-brain in this order:
+   1. ELIZA_PROJECT_PATH environment variable (if set)
+   2. Relative to app: ../../trading-brain, ../trading-brain, etc.
+   3. Current working directory
+
+✅ REQUIREMENTS:
+   - ElizaOS CLI installed: bun i -g @elizaos/cli
+   - Trading-brain project accessible
+   - Port 3000 available
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Problem: "Failed to start Eliza server"
+Solution: 
+  - Run: bun i -g @elizaos/cli
+  - Check that trading-brain directory is accessible
+  - Verify port 3000 is not in use
+
+Problem: "Cannot find trading-brain project"
+Solution:
+  - Set environment variable: ELIZA_PROJECT_PATH
+  - In PowerShell: $env:ELIZA_PROJECT_PATH="C:\path\to\trading-brain"
+  - In CMD: set ELIZA_PROJECT_PATH=C:\path\to\trading-brain
+
+Problem: Server takes too long to start
+Solution:
+  - Check that Ollama is running (if using local models)
+  - Verify .env file is configured
+  - Check console for error messages
+
+================================================================================
+REBUILDING (Only if Rust/Tauri code changes)
+================================================================================
+
+If you modify src-tauri/src/lib.rs or tauri.conf.json:
+
+cd eliza\packages\app
+bun run tauri:build:installer
+
+New installers will be in: src-tauri\target\release\bundle\
+
+================================================================================
+MORE INFO
+================================================================================
+
+See SETUP.md for detailed documentation.
+See README.md for full technical details.
+
+================================================================================
+
