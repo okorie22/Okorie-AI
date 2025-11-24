@@ -54,13 +54,7 @@ This is a **multi-ecosystem AI civilization** where specialized agent collective
 │  │ • AI-powered risk management & portfolio optimization      │   │
 │  │ • DeFi protocol automation                                  │   │
 │  │ • Cross-VPS distributed deployment                          │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ 📊 COMMERCE AGENTS - Economic Intelligence                 │   │
-│  │ • Multi-market data aggregation                            │   │
-│  │ • Strategy metadata analysis                               │   │
-│  │ • Whale tracking & market sentiment                        │   │
-│  └─────────────────────────────────────────────────────────────┘   │
+│  └─────────────────────────────────────────────────────────────┘   │   │
 │  ┌─────────────────────────────────────────────────────────────┐   │
 │  │ 💱 FOREX AGENTS - Traditional Currency Markets             │   │
 │  │ • MT4/MT5 expert advisor integration                       │   │
@@ -186,7 +180,6 @@ Status: ⭐ PRODUCTION READY (Crypto) | 🚧 ACTIVE DEVELOPMENT (Others)
 
 **Economic Foundation of the Civilization:**
 - **Crypto Trading Agents**: Real-time automated trading on Solana with 45,000+ lines of production code
-- **Commerce Intelligence**: Multi-market data aggregation and whale tracking
 - **Traditional Finance**: Forex and stock market automation with MT4/MT5 integration
 - **Data Infrastructure**: Cross-VPS deployment with unified PostgreSQL schema
 
