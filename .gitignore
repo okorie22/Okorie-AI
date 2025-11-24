@@ -175,6 +175,8 @@ tokencache/
 ### 🗄️ DATABASE FILES ###
 
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 *.pglite
