@@ -1,11 +1,11 @@
-# 🤖 ITORO - The AI Civilization Framework
+# 🌐 AI CIVILIZATION - Multi-Agent Ecosystem Framework
 
 <div align="center">
-  <h2>Building the Future of Autonomous Intelligence</h2>
-  <p><strong>A multi-layered AI civilization where specialized agents collaborate across domains to create autonomous systems that think, create, trade, defend, and evolve</strong></p>
+  <h1>The Dawn of Autonomous Intelligence</h1>
+  <p><strong>A living, breathing civilization of specialized AI agents that collaborate across domains to create autonomous systems that think, create, trade, defend, govern, and evolve</strong></p>
 
   ![Status](https://img.shields.io/badge/Status-Active-green?style=for-the-badge)
-  ![Architecture](https://img.shields.io/badge/Architecture-Multi--Agent-blue?style=for-the-badge)
+  ![Architecture](https://img.shields.io/badge/Architecture-Multi--Ecosystem-blue?style=for-the-badge)
   ![Civilization](https://img.shields.io/badge/Civilization-Autonomous-red?style=for-the-badge)
   ![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 </div>
@@ -14,16 +14,17 @@
 
 ## 🌟 Vision: The Complete AI Civilization
 
-**ITORO represents the dawn of true AI civilization** - not isolated tools, but a **living, breathing ecosystem of autonomous agents** that form a complete society with all the functions of an advanced civilization.
+**AI Civilization represents the dawn of true autonomous intelligence** - not isolated tools, but a **living, breathing ecosystem of specialized agent societies** that form a complete civilization with all the functions of an advanced technological society.
 
-This is a **multi-dimensional AI civilization** where agents don't just perform tasks - they **collaborate across specialized domains** to create systems that can:
+This is a **multi-ecosystem AI civilization** where specialized agent collectives don't just perform tasks - they **collaborate across domains** to create systems that can:
 
-- **Generate wealth autonomously** through financial markets
-- **Create and distribute content** across social media platforms
-- **Defend and secure** their own infrastructure
+- **Generate wealth autonomously** through multiple economic engines
+- **Create and distribute content** across digital platforms
+- **Defend and secure** their own infrastructure and operations
 - **Gather intelligence** and make collective decisions
-- **Evolve and improve** their own capabilities
+- **Evolve and improve** their own capabilities through self-coding
 - **Govern and coordinate** complex multi-agent operations
+- **Maintain social connections** and community management
 
 ### The Civilization Architecture
 
@@ -43,10 +44,10 @@ This is a **multi-dimensional AI civilization** where agents don't just perform 
 └─────────────────────┬───────────────────────────────────────────────┘
                       │
 ┌─────────────────────▼───────────────────────────────────────────────┐
-│                ⚙️  ITORO - The Industrial Civilization             │
-│    Autonomous Worker Agents & Economic Engine                      │
+│              🌐 MULTI-AGENT ECOSYSTEM CIVILIZATION                  │
+│        Specialized Agent Societies Working in Harmony              │
 ├─────────────────────────────────────────────────────────────────────┤
-│  💰 ECONOMIC ECOSYSTEM - Wealth Generation & Finance              │
+│  💰 ITORO - Economic & Financial Intelligence                      │
 │  ┌─────────────────────────────────────────────────────────────┐   │
 │  │ 🤖 CRYPTO AGENTS - Digital Asset Sovereignty               │   │
 │  │ • Real-time automated trading on Solana                    │   │
@@ -73,49 +74,23 @@ This is a **multi-dimensional AI civilization** where agents don't just perform 
 │  │ • Portfolio management for equities                        │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 ├─────────────────────────────────────────────────────────────────────┤
-│  🎬 MEDIA & CONTENT ECOSYSTEM - Information & Entertainment       │
+│  🎬 IKON - Media & Content Creation                              │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ 🐦 TWEET AGENTS - Social Media Intelligence                │   │
-│  │ • AI-powered tweet generation & analysis                   │   │
+│  │ 🐦 SOCIAL MEDIA AGENTS - Digital Content                    │   │
+│  │ • AI-powered content generation & analysis                 │   │
 │  │ • Social sentiment tracking                                │   │
-│  │ • Content creation automation                              │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ 🎵 TIKTOK AGENTS - Viral Trend Analysis                    │   │
-│  │ • Social arbitrage trading signals                         │   │
-│  │ • Consumer behavior insights                              │   │
-│  │ • Viral product identification                             │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ 🎬 VIDEO AGENTS - Content Creation                         │   │
-│  │ • Automated video editing & clips                         │   │
-│  │ • Short-form content generation                           │   │
-│  │ • Streaming automation                                    │   │
+│  │ • Multi-platform content automation                        │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 ├─────────────────────────────────────────────────────────────────────┤
-│  🛡️  DEFENSE & SECURITY ECOSYSTEM - Protection & Validation      │
+│  🏢 MANSA - Business & Enterprise Intelligence                   │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ 🔧 CODE RUNNER AGENTS - Automated Testing                 │   │
-│  │ • Self-debugging code execution                           │   │
-│  │ • Error detection & correction loops                      │   │
-│  │ • Development workflow automation                         │   │
+│  │ 💼 BUSINESS AGENTS - Corporate Intelligence                │   │
+│  │ • Enterprise automation & analytics                       │   │
+│  │ • Business process optimization                           │   │
+│  │ • Strategic decision support                              │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 ├─────────────────────────────────────────────────────────────────────┤
-│  🧠 INTELLIGENCE & KNOWLEDGE ECOSYSTEM - Wisdom & Learning       │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ 📚 MILLION AGENT - Deep Knowledge Processing              │   │
-│  │ • Million-token context window (Gemini 2.0)               │   │
-│  │ • Large document analysis                                 │   │
-│  │ • Knowledge base integration                              │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ 🐝 SWARM AGENTS - Collective Intelligence                  │   │
-│  │ • Multi-model consensus generation                        │   │
-│  │ • Parallel AI processing                                  │   │
-│  │ • Decision validation across models                       │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────────────┤
-│  ⚖️  GOVERNANCE ECOSYSTEM - Coordination & Decision Making        │
+│  ⚖️  NIANI - Governance & Coordination                           │
 │  ┌─────────────────────────────────────────────────────────────┐   │
 │  │ 🎯 GOVERNANCE AGENTS - Multi-Agent Coordination            │   │
 │  │ • Agent resource allocation                                │   │
@@ -123,11 +98,41 @@ This is a **multi-dimensional AI civilization** where agents don't just perform 
 │  │ • Strategic decision frameworks                            │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 ├─────────────────────────────────────────────────────────────────────┤
-│  🔧 CORE INFRASTRUCTURE - The Nervous System                    │
+│  🛡️  SIMBON - Defense & Security                                 │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ 🔧 DEFENSE AGENTS - Protection & Validation                │   │
+│  │ • Automated security testing                               │   │
+│  │ • Threat detection & response                              │   │
+│  │ • Infrastructure protection                                │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ 🧠 INTELLIGENCE AGENTS - Knowledge & Analysis              │   │
+│  │ • Deep document processing                                 │   │
+│  │ • Multi-model consensus                                    │   │
+│  │ • Strategic intelligence gathering                         │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│  🔧 XIRSI - Coordination & Communication                          │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ 📡 COORDINATION AGENTS - Cross-Ecosystem Sync              │   │
+│  │ • Inter-ecosystem communication                             │   │
+│  │ • Resource orchestration                                   │   │
+│  │ • Workflow optimization                                    │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│  💻 GINIKANDU - Self-Evolution & Code Generation                  │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ 🛠️ CODING AGENTS - Autonomous Development                  │   │
+│  │ • AI-powered code generation & testing                     │   │
+│  │ • Multi-language development support                       │   │
+│  │ • Self-improving algorithms                                │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│  🔧 CORE INFRASTRUCTURE - The Civilization Nervous System         │
 │  ┌─────────────────────────────────────────────────────────────┐   │
 │  │ 📡 EVENT BUS - Inter-Agent Communication                  │   │
 │  │ • Redis Streams for real-time messaging                   │   │
-│  │ • Webhook-based cross-VPS coordination                    │   │
+│  │ • Webhook-based cross-ecosystem coordination              │   │
 │  │ • Memory-based local communication                        │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 │  ┌─────────────────────────────────────────────────────────────┐   │
@@ -169,126 +174,123 @@ This is a **multi-dimensional AI civilization** where agents don't just perform 
 
 ---
 
-## 🚀 Core Components Deep Dive
+## 🚀 Ecosystem Components Deep Dive
 
-### **The Economic Engine** - Wealth Generation Foundation
+### **The Multi-Ecosystem Civilization** - Specialized Agent Societies
 
-#### **Crypto Trading Agents** - Digital Sovereignty Engine
+#### **ITORO** - Economic & Financial Intelligence Engine
 ```
-Location: itoro/ai_crypto_agents/
-Lines of Code: ~45,000+ | Files: 224 | Languages: Python, SQL
-Status: ⭐ PRODUCTION READY
+Location: multi-agents/itoro/
+Status: ⭐ PRODUCTION READY (Crypto) | 🚧 ACTIVE DEVELOPMENT (Others)
 ```
 
-**Revolutionary Architecture:**
-- **Multiple Specialized Agents**: CopyBot, Risk, Harvesting, Staking, Whale, Sentiment, Chart Analysis, etc
-- **Real-Time Execution**: Webhook-driven trading on Solana blockchain
-- **Multi-LLM Intelligence**: Claude, GPT-4, DeepSeek orchestration with confidence scoring
-- **Enterprise Infrastructure**: Cross-VPS deployment, health monitoring, automated recovery
+**Economic Foundation of the Civilization:**
+- **Crypto Trading Agents**: Real-time automated trading on Solana with 45,000+ lines of production code
+- **Commerce Intelligence**: Multi-market data aggregation and whale tracking
+- **Traditional Finance**: Forex and stock market automation with MT4/MT5 integration
+- **Data Infrastructure**: Cross-VPS deployment with unified PostgreSQL schema
 
-**Key Capabilities:**
-- **Portfolio Management**: 10% max position, 60% total allocation with AI optimization
-- **Risk Control**: 8-layer safety system with emergency stops
-- **Yield Generation**: Multi-protocol staking (BlazeStake, Jito, Lido)
-- **Market Intelligence**: Whale tracking, sentiment analysis, technical indicators
+**Key Achievements:**
+- **Portfolio Management**: AI-optimized allocation with 10% max position limits
+- **Risk Control**: 8-layer safety system with emergency stops and recovery protocols
+- **Market Intelligence**: Real-time sentiment analysis and technical indicators
+- **Enterprise Scale**: Production deployment across distributed infrastructure
 
-#### **Commerce Agents** - Market Intelligence Network
+#### **IKON** - Media & Content Creation Ecosystem
 ```
-Location: itoro/ai_commerce_agents/
+Location: multi-agents/ikon/
 Status: 🚧 ACTIVE DEVELOPMENT
 ```
-- Multi-ecosystem data aggregation
-- Strategy metadata analysis
-- Real-time whale tracking and market sentiment
 
-#### **Forex & Stock Agents** - Traditional Finance Automation
+**Digital Content Civilization:**
+- **Social Media Agents**: AI-powered content generation across platforms
+- **ZerePy Integration**: Twitter/X automation and Discord community management
+- **Content Automation**: Multi-platform posting and engagement optimization
+- **Trend Analysis**: Social sentiment tracking and viral content identification
+
+#### **MANSA** - Business & Enterprise Intelligence
 ```
-Location: itoro/ai_forex_experts/ & itoro/ai_stock_agents/
+Location: multi-agents/mansa/
+Status: 🏗️ FRAMEWORK PHASE
+```
+
+**Corporate Intelligence Engine:**
+- **Business Process Automation**: Enterprise workflow optimization
+- **Strategic Analytics**: Corporate decision support systems
+- **Resource Management**: Automated enterprise resource planning
+- **Performance Intelligence**: Business metrics and KPI optimization
+
+#### **NIANI** - Governance & Coordination
+```
+Location: multi-agents/niani/
+Status: 🏗️ FRAMEWORK PHASE
+```
+
+**Civilization Governance Systems:**
+- **Agent Coordination**: Multi-ecosystem resource allocation
+- **Conflict Resolution**: Inter-agent dispute resolution frameworks
+- **Strategic Planning**: Long-term civilization development planning
+- **Policy Enforcement**: Automated governance and compliance
+
+#### **SIMBON** - Defense & Security
+```
+Location: multi-agents/simbon/
+Status: 🏗️ FRAMEWORK PHASE
+```
+
+**Protection & Security Civilization:**
+- **Defense Agents**: Automated security testing and threat detection
+- **Intelligence Agents**: Deep knowledge processing and strategic analysis
+- **Infrastructure Protection**: Automated system hardening and monitoring
+- **Cyber Defense**: AI-powered threat response and prevention
+
+#### **XIRSI** - Coordination & Communication
+```
+Location: multi-agents/xirsi/
+Status: 🏗️ FRAMEWORK PHASE
+```
+
+**Inter-Ecosystem Synchronization:**
+- **Communication Networks**: Cross-ecosystem message routing
+- **Workflow Orchestration**: Complex multi-agent process coordination
+- **Resource Optimization**: Dynamic computational resource allocation
+- **Integration Frameworks**: Standardized inter-ecosystem protocols
+
+#### **GINIKANDU** - Self-Evolution & Code Generation
+```
+Location: multi-agents/ginikandu/
 Status: 🚧 ACTIVE DEVELOPMENT
 ```
-- MT4/MT5 expert advisor integration
-- Algorithmic trading strategy execution
-- Stock market data processing and analysis
+
+**Autonomous Development Civilization:**
+- **GOOSE Integration**: Self-coding agents with MCP protocol support
+- **Code Generation**: AI-powered development across multiple languages
+- **Self-Improvement**: Automated code testing and optimization
+- **Evolutionary Algorithms**: Continuous capability enhancement
 
 ---
 
-### **The Media & Content Creation Engine** - Information Civilization
+### **Cross-Ecosystem Capabilities** - Distributed Intelligence
 
-#### **Tweet Agents** - Social Media Intelligence
-```
-Location: itoro/ai_media_agents/agents/tweet_agent.py
-Status: ✅ FUNCTIONAL
-```
-**Capabilities:**
-- AI-powered tweet generation from transcripts/content
-- Social sentiment analysis and trend identification
-- Automated content creation and scheduling
+**The Civilization's intelligence is distributed across specialized ecosystems, each focusing on domain expertise while collaborating through unified infrastructure:**
 
-#### **TikTok Agents** - Viral Trend Analysis
-```
-Location: itoro/ai_media_agents/agents/tiktok_agent.py
-Status: 🚧 IN DEVELOPMENT
-```
-**Vision:**
-- Social arbitrage trading signals from viral trends
-- Consumer behavior insights from comment sections
-- Early identification of emerging market opportunities
-- Connection between social trends and financial markets
+#### **Media & Content Creation** (IKON + ITORO Integration)
+- **Social Intelligence**: AI-powered content generation across platforms (Twitter, TikTok, etc.)
+- **Viral Analysis**: Consumer behavior insights and market trend identification
+- **Automated Production**: Video editing, streaming, and content scheduling
+- **Cross-Market Signals**: Social sentiment integrated with financial trading
 
-**Strategic Value:**
-- **Information Asymmetry Exploitation**: Get ahead of Wall Street by monitoring social trends
-- **Consumer Intelligence**: Real-time consumer spending and behavior patterns
-- **Viral Product Detection**: Identify products gaining traction before mainstream adoption
-
-#### **Video Content Agents** - Automated Media Production
-```
-Location: itoro/ai_media_agents/agents/
-- clips_agent.py, realtime_clips_agent.py, shortvid_agent.py, stream_agent.py
-Status: 🚧 FRAMEWORK ESTABLISHED
-```
-- Automated video editing and clip generation
-- Short-form content creation
-- Streaming automation and content scheduling
-
----
-
-### **The Defense & Security Engine** - Protection Civilization
-
-#### **Code Runner Agents** - Automated Quality Assurance
-```
-Location: itoro/ai_defense_agents/agents/code_runner_agent.py
-Status: ✅ FUNCTIONAL
-```
-**Revolutionary Approach:**
+#### **Defense & Security** (SIMBON + GINIKANDU Integration)
 - **Self-Debugging Systems**: Automated code execution, error detection, and correction
-- **Infinite Improvement Loops**: Error → AI Analysis → Fix → Test → Repeat
-- **Development Workflow Automation**: Cursor IDE integration for seamless debugging
+- **Quality Assurance**: Multi-layer testing and validation across all ecosystems
+- **Infrastructure Protection**: Automated security testing and threat detection
+- **Continuous Integration**: AI-driven development workflow automation
 
-**Strategic Impact:**
-- **Zero Human Debugging**: AI agents that fix their own code
-- **Continuous Integration**: Automated testing and validation
-- **Quality Assurance**: Multi-layer error detection and correction
-
----
-
-### **The Intelligence & Knowledge Engine** - Wisdom Civilization
-
-#### **Million Agent** - Deep Knowledge Processing
-```
-Location: itoro/million_agent.py
-Status: ✅ FUNCTIONAL
-```
-**Breakthrough Technology:**
-- **Million-Token Context Window**: Leveraging Gemini 2.0 Flash capabilities
-- **Large Document Analysis**: Process entire books, research papers, codebases
-- **Knowledge Base Integration**: Persistent learning from accumulated data
-
-**Applications:**
-- **Research Analysis**: Deep dive into complex documents
-- **Code Review**: Comprehensive codebase understanding
-- **Strategic Planning**: Analysis of large datasets and reports
-
-#### **Swarm Agents** - Collective Intelligence
+#### **Intelligence & Knowledge** (SIMBON + ELIZA Integration)
+- **Deep Processing**: Million-token context windows for comprehensive analysis
+- **Swarm Intelligence**: Multi-model consensus generation and validation
+- **Knowledge Integration**: Persistent learning across distributed agents
+- **Strategic Analysis**: Large document processing and research capabilities
 ```
 Location: itoro/swarm_agent.py
 Status: ✅ FUNCTIONAL
@@ -318,58 +320,63 @@ Status: 🏗️ FRAMEWORK PHASE
 
 ---
 
-### **The Evolutionary Engine** - Self-Improvement Civilization
+### **The Evolutionary Engine** - Self-Improvement Across Ecosystems
 
-#### **GOOSE** - The Self-Coding Agent
+#### **GINIKANDU + GOOSE Integration** - Autonomous Development
 ```
-Location: goose/
-Lines of Code: ~20,234 | Files: 105 | Languages: Rust
+Location: multi-agents/ginikandu/goose/ | Lines: ~20,234 | Languages: Rust
 Status: 🚧 ACTIVE DEVELOPMENT
 ```
 **Self-Evolution Capabilities:**
 - **Code Generation**: AI agents that write and test their own code
 - **MCP Protocol**: Advanced agent communication standards
 - **Multi-Language Support**: Development across programming languages
+- **Cross-Ecosystem Enhancement**: Self-improvement algorithms for all agent societies
 
-#### **ELIZA** - The Cognitive Framework
+#### **ELIZA** - The Cognitive Core Framework
 ```
-Location: eliza/
-Lines of Code: ~212,744 | Files: 954 | Languages: TypeScript
+Location: eliza/ | Lines: ~212,744 | Files: 954 | Languages: TypeScript
 Status: ✅ PRODUCTION READY
 ```
-- **Multi-Agent Orchestration**: Coordinate complex agent interactions
-- **Plugin Architecture**: Extensible capabilities system
-- **Human-AI Interface**: Natural language interaction layer
+**Multi-Agent Orchestration:**
+- **Cognitive Foundation**: Powers intelligence across all ecosystems
+- **Plugin Architecture**: Extensible capabilities for specialized domains
+- **Human-AI Interface**: Natural language interaction and oversight
+- **Swarm Coordination**: Collective decision-making and consensus generation
 
-#### **ZEREPY** - The Social Interface
+#### **ZEREPY + IKON Integration** - Social Interface
 ```
-Location: ZerePy/
-Status: 🚧 ACTIVE DEVELOPMENT
+Location: multi-agents/ikon/ZerePy/ | Status: 🚧 ACTIVE DEVELOPMENT
 ```
-- **Multi-Platform Social Management**: Twitter, Discord automation
-- **Community Building**: AI-driven social interactions
-- **Personality Systems**: Configurable agent behaviors
+**Social Civilization Layer:**
+- **Multi-Platform Management**: Twitter/X, Discord, and social media automation
+- **Community Building**: AI-driven social interactions and engagement
+- **Personality Systems**: Configurable agent behaviors and brand management
+- **Content Integration**: Social media coordination with content creation ecosystems
 
 ---
 
 ## 🏛️ Civilization Infrastructure
 
-### **Core Nervous System**
+### **Core Nervous System** - Unified Multi-Ecosystem Infrastructure
 ```
-Location: itoro/core/
+Location: multi-agents/itoro/core/ + Shared Services
 ```
-- **Event Bus**: Redis Streams, Webhooks, In-Memory communication
-- **Database Layer**: Unified PostgreSQL schema across ecosystems
-- **Security Framework**: Authentication, rate limiting, encryption
-- **Monitoring Systems**: Health checks, performance analytics, automated recovery
+**Infrastructure serving all agent ecosystems:**
+- **Event Bus**: Redis Streams, Webhooks, In-Memory communication across all ecosystems
+- **Database Layer**: Unified PostgreSQL/Supabase schema shared by ITORO, IKON, MANSA, NIANI, SIMBON, XIRSI, GINIKANDU
+- **Security Framework**: Multi-layer authentication, rate limiting, encryption for civilization-wide protection
+- **Monitoring Systems**: Real-time health checks, performance analytics, automated recovery across distributed infrastructure
 
-### **Data Aggregator** - Information Processing Hub
+### **Data Aggregator** - Cross-Ecosystem Intelligence Hub
 ```
-Location: itoro/data_aggregator/
+Location: multi-agents/itoro/data_aggregator/
 ```
+**Central nervous system for multi-ecosystem coordination:**
 - Cross-ecosystem data normalization and processing
-- Real-time signal aggregation
-- Webhook server for external integrations
+- Real-time signal aggregation from all agent societies
+- Webhook server for external integrations and API coordination
+- Unified data schema enabling seamless inter-ecosystem communication
 
 ---
 
@@ -423,74 +430,117 @@ Location: itoro/data_aggregator/
 
 ---
 
-## 🚀 Getting Started with the Civilization
+## 🚀 Getting Started with the AI Civilization
 
-### **Quick Start - Economic Foundation**
+### **Quick Start - Foundation Ecosystems**
 
-1. **Deploy Crypto Trading System**:
+#### **1. Economic Engine (ITORO)** - Wealth Generation Foundation
+```bash
+# Deploy the production-ready crypto trading system
+cd multi-agents/itoro/ai_crypto_agents
+pip install -r requirements.txt
+cp .env.example .env
+# Configure APIs: Helius, Birdeye, OpenAI, Anthropic
+python src/main.py
+```
+
+#### **2. Cognitive Core (ELIZA)** - Intelligence Foundation
+```bash
+# Initialize the multi-agent orchestration framework
+cd eliza
+bun install
+bun run build
+elizaos start
+```
+
+#### **3. Self-Evolution (GINIKANDU)** - Development Foundation
+```bash
+# Deploy the self-coding agent ecosystem
+cd multi-agents/ginikandu/goose
+cargo build --release
+./target/release/goose
+```
+
+### **Ecosystem-Specific Deployment**
+
+#### **Media & Content Creation (IKON)**
+```bash
+cd multi-agents/ikon
+pip install -r requirements.txt
+python -m ai_media_agents.agents.tweet_agent
+# Deploy social media automation and content creation
+```
+
+#### **Business Intelligence (MANSA)**
+```bash
+cd multi-agents/mansa
+# Configure enterprise APIs and databases
+python -m ai_business_agents.main
+```
+
+#### **Governance & Coordination (NIANI)**
+```bash
+cd multi-agents/niani
+python -m ai_governance_agents.coordinator
+```
+
+#### **Defense & Security (SIMBON)**
+```bash
+cd multi-agents/simbon
+python -m ai_defense_agents.security_monitor
+python -m ai_intelligence_agents.analyzer
+```
+
+#### **Communication (XIRSI)**
+```bash
+cd multi-agents/xirsi
+python -m ai_coordination_agents.router
+```
+
+### **Full Civilization Integration**
+
+1. **Deploy Core Infrastructure**:
    ```bash
-   cd itoro/ai_crypto_agents
-   pip install -r requirements.txt
-   cp .env.example .env
-   # Configure APIs: Helius, Birdeye, OpenAI, Anthropic
-   python src/main.py
+   # Set up shared databases and event buses
+   cd multi-agents/itoro/core
+   python -m infrastructure.setup
    ```
 
-2. **Initialize Swarm Intelligence**:
+2. **Configure Cross-Ecosystem Communication**:
    ```bash
-   python swarm_agent.py
-   # Query multiple AI models for consensus decisions
+   # Initialize the data aggregator for inter-ecosystem coordination
+   cd multi-agents/itoro/data_aggregator
+   python main.py
    ```
 
-3. **Deploy Content Creation**:
+3. **Launch Civilization Monitoring**:
    ```bash
-   cd itoro/ai_media_agents/agents
-   python tweet_agent.py
-   # Generate AI-powered social media content
-   ```
-
-### **Advanced Setup - Full Civilization**
-
-1. **ELIZA Framework**:
-   ```bash
-   cd eliza
-   bun install
-   bun run build
-   elizaos start
-   ```
-
-2. **GOOSE Self-Coding Agent**:
-   ```bash
-   cd goose
-   cargo build --release
-   ./target/release/goose
-   ```
-
-3. **ZEREPY Social Management**:
-   ```bash
-   cd ZerePy
-   poetry install
-   poetry run python main.py
+   # Deploy unified health monitoring across all ecosystems
+   python -m civilization_monitor
    ```
 
 ---
 
 ## 📊 Civilization Metrics & Status
 
-### **Current Development Status**
-- ✅ **Economic Engine**: Production-ready crypto trading
-- ✅ **Intelligence Layer**: Functional swarm agents, million-token processing
-- ✅ **Defense Systems**: Automated code testing and debugging
-- ✅ **Media Creation**: Social media automation framework
-- 🚧 **Governance**: Framework established, implementation pending
-- 🚧 **Full Integration**: Cross-ecosystem orchestration in development
+### **Current Development Status by Ecosystem**
+- ✅ **ITORO (Economic)**: Production-ready crypto trading, active commerce & forex development
+- ✅ **ELIZA (Cognitive Core)**: Production-ready multi-agent orchestration framework
+- 🚧 **IKON (Media)**: Active development of social media and content creation agents
+- 🚧 **GINIKANDU (Evolution)**: Active development with GOOSE self-coding integration
+- 🏗️ **MANSA (Business)**: Framework established, enterprise agent development pending
+- 🏗️ **NIANI (Governance)**: Framework established, coordination systems in design
+- 🏗️ **SIMBON (Defense)**: Framework established, security & intelligence agents in development
+- 🏗️ **XIRSI (Communication)**: Framework established, inter-ecosystem protocols pending
 
 ### **Technical Specifications**
-- **Agent Types**: 20+ specialized agents across 6 ecosystems
-- **Codebase Scale**: 352,000+ lines across 1,292 files
-- **Integration Points**: 50+ APIs and protocols
-- **Safety Mechanisms**: 12-layer risk management system
-- **Deployment Options**: Single VPS, Multi-VPS, Cloud-native
+- **Agent Ecosystems**: 7 specialized societies (ITORO, IKON, MANSA, NIANI, SIMBON, XIRSI, GINIKANDU)
+- **Core Frameworks**: ELIZA (212K+ lines), GOOSE (20K+ lines), ZerePy (social integration)
+- **Agent Types**: 50+ specialized agents across ecosystems
+- **Codebase Scale**: 400,000+ lines across 2,000+ files
+- **Integration Points**: 75+ APIs, protocols, and external services
+- **Safety Mechanisms**: Multi-layer risk management across all ecosystems
+- **Infrastructure**: Cross-VPS deployment, unified databases, event-driven architecture
 
 ### **Performance Characteristics**
 - **Economic Generation**: Autonomous wealth creation
@@ -535,70 +585,85 @@ Location: itoro/data_aggregator/
 
 ---
 
-## 🤝 Contributing to the Civilization
+## 🤝 Contributing to the Multi-Ecosystem Civilization
 
-This is a living AI civilization that welcomes contributions across all domains:
+This is a living AI civilization that welcomes contributions across all agent ecosystems:
 
-### **Economic Contributors**
-- Add new trading strategies and market integrations
-- Enhance risk management systems
-- Develop additional yield generation protocols
+### **ITORO Ecosystem (Economic & Financial)**
+- Develop new trading strategies and market integrations
+- Enhance risk management and yield generation protocols
+- Build commerce intelligence and forex automation
 
-### **Intelligence Contributors**
-- Improve swarm consensus algorithms
-- Enhance knowledge processing capabilities
-- Develop advanced decision-making frameworks
+### **IKON Ecosystem (Media & Content)**
+- Expand social media automation and content creation
+- Improve viral trend analysis and consumer insights
+- Develop multi-platform content distribution systems
 
-### **Defense Contributors**
-- Strengthen automated testing systems
-- Improve error detection and correction
-- Enhance security protocols
+### **MANSA Ecosystem (Business & Enterprise)**
+- Build enterprise automation and business intelligence
+- Develop corporate decision support systems
+- Create enterprise resource planning agents
 
-### **Media Contributors**
-- Expand content creation automation
-- Improve social media intelligence
-- Develop new creative AI capabilities
+### **NIANI Ecosystem (Governance & Coordination)**
+- Design multi-agent coordination algorithms
+- Develop resource allocation and conflict resolution systems
+- Build strategic planning frameworks
 
-### **Governance Contributors**
-- Design coordination algorithms
-- Develop resource allocation systems
-- Create conflict resolution frameworks
+### **SIMBON Ecosystem (Defense & Security)**
+- Strengthen automated testing and security systems
+- Improve threat detection and intelligence gathering
+- Enhance infrastructure protection protocols
+
+### **XIRSI Ecosystem (Communication & Integration)**
+- Build inter-ecosystem communication protocols
+- Develop workflow orchestration systems
+- Create cross-ecosystem data synchronization
+
+### **GINIKANDU Ecosystem (Evolution & Development)**
+- Enhance self-coding and evolutionary algorithms
+- Improve multi-language development capabilities
+- Develop advanced self-improvement systems
+
+### **Core Infrastructure Contributors**
+- Improve ELIZA framework and cognitive capabilities
+- Enhance GOOSE self-coding agent functionality
+- Develop unified infrastructure and monitoring systems
 
 ---
 
 ## 🎯 Mission Statement
 
-**To create the first economically sustainable, multi-domain AI civilization** - a self-improving, autonomous system that generates wealth, creates content, defends its infrastructure, gathers intelligence, and evolves its own capabilities while maintaining safety, ethics, and alignment with human values.
+**To create the first economically sustainable, multi-ecosystem AI civilization** - a self-improving, autonomous system of specialized agent societies that collaborate across domains to generate wealth, create content, defend infrastructure, govern operations, gather intelligence, and evolve their own capabilities while maintaining safety, ethics, and alignment with human values.
 
-**The ITORO civilization represents the future of artificial intelligence**: not as tools we use, but as **autonomous entities we collaborate with** to build a more prosperous, creative, and capable future for all.
+**The AI Civilization represents the future of artificial intelligence**: not as isolated tools we use, but as **autonomous agent societies we collaborate with** to build a more prosperous, creative, and capable future for all - where ITORO is one of many thriving ecosystems working in harmony.
 
 ---
 
 ## 📄 Third-Party Components & Attributions
 
-This project includes the following open-source frameworks:
+This multi-ecosystem AI civilization project includes the following open-source frameworks:
 
 - **ELIZA** - Multi-Agent AI Framework (MIT License) - https://github.com/elizaos/eliza
   - Location: `eliza/`
   - Copyright: elizaos/eliza contributors
-  - Used as the cognitive core framework for multi-agent orchestration
+  - Used as the cognitive core framework powering intelligence across all ecosystems
 
 - **GOOSE** - Self-Coding Agent (Apache License 2.0) - https://github.com/block/goose
-  - Location: `goose/`
+  - Location: `multi-agents/ginikandu/goose/`
   - Copyright: 2024 Block, Inc.
-  - Used as the evolutionary engine for self-improvement and code generation
+  - Used as the evolutionary engine enabling self-improvement across the civilization
 
 - **ZerePy** - Social Media Agents (MIT License)
-  - Location: `ZerePy/`
+  - Location: `multi-agents/ikon/ZerePy/`
   - Copyright: 2024 Ayoub Eddakhly
-  - Used for social media automation and community management
+  - Used for social media automation and community management within the IKON ecosystem
 
-All licenses are preserved in their respective directories. We are grateful to the open-source community for these foundational frameworks.
+All licenses are preserved in their respective directories. We are grateful to the open-source community for these foundational frameworks that enable the AI Civilization.
 
 ---
 
 <div align="center">
   <p><strong>Built with ❤️ by the AI Civilization Collective</strong></p>
-  <p><em>"Not just AI tools, but a living, breathing civilization of autonomous agents working together for the future of humanity."</em></p>
+  <p><em>"Not just AI tools, but a living, breathing civilization of autonomous agent societies - where ITORO is one of many ecosystems working in harmony for the future of humanity."</em></p>
 </div></content>
 </xai:function_call
