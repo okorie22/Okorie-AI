@@ -1,0 +1,25 @@
+# Forex Experts Requirements
+# ===========================
+
+# MT4/MT5 Integration
+MetaTrader5==5.0.45
+
+# Data Processing
+pandas==2.1.4
+numpy==1.26.2
+
+# Technical Analysis
+ta-lib==0.4.28
+
+# API Integration
+requests==2.31.0
+websocket-client==1.6.4
+
+# Configuration
+python-dotenv==1.0.0
+
+# Utilities
+python-dateutil==2.8.2
+
+# Testing
+pytest==7.4.3
