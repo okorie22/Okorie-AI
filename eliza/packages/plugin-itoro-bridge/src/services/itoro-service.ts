@@ -97,7 +97,8 @@ export class ITOROBridgeService extends Service {
       this.dbService = new SupabaseDatabaseService();
       const dbConfigs: Record<string, any> = {};
 
-      // Configure paper trading database
+      // Configure ALL local SQLite databases
+      // Paper trading database
       const paperDBPath = process.env.PAPER_TRADING_DB_PATH || 'multi-agents/itoro/ai_crypto_agents/data/paper_trading.db';
       dbConfigs['paper_trading'] = {
         type: 'sqlite',
@@ -105,23 +106,65 @@ export class ITOROBridgeService extends Service {
         isPaperTrading: true
       };
 
-      // Configure live trading database if available
-      const liveDBPath = process.env.LIVE_TRADING_DB_PATH;
-      if (liveDBPath) {
+      // Portfolio history database (paper trading)
+      const portfolioHistoryPaperPath = process.env.PORTFOLIO_HISTORY_PAPER_DB_PATH || 'multi-agents/itoro/ai_crypto_agents/data/portfolio_history_paper.db';
+      dbConfigs['portfolio_history_paper'] = {
+        type: 'sqlite',
+        path: portfolioHistoryPaperPath,
+        isPaperTrading: true
+      };
+
+      // DeFi positions database
+      const defiPositionsPath = process.env.DEFI_POSITIONS_DB_PATH || 'multi-agents/itoro/ai_crypto_agents/src/data/defi_positions.db';
+      dbConfigs['defi_positions'] = {
+        type: 'sqlite',
+        path: defiPositionsPath,
+        isPaperTrading: true
+      };
+
+      // Entry prices database
+      const entryPricesPath = process.env.ENTRY_PRICES_DB_PATH || 'multi-agents/itoro/ai_crypto_agents/src/data/entry_prices.db';
+      dbConfigs['entry_prices'] = {
+        type: 'sqlite',
+        path: entryPricesPath,
+        isPaperTrading: true
+      };
+
+      // Execution tracker database
+      const executionTrackerPath = process.env.EXECUTION_TRACKER_DB_PATH || 'multi-agents/itoro/ai_crypto_agents/src/data/execution_tracker.db';
+      dbConfigs['execution_tracker'] = {
+        type: 'sqlite',
+        path: executionTrackerPath,
+        isPaperTrading: true
+      };
+
+      // Configure live trading databases (when available)
+      const liveTradingDBPath = process.env.LIVE_TRADING_DB_PATH;
+      if (liveTradingDBPath) {
         dbConfigs['live_trading'] = {
           type: 'sqlite',
-          path: liveDBPath,
+          path: liveTradingDBPath,
           isPaperTrading: false
         };
       }
 
-      // Configure Supabase database if available (using same env vars as working agents)
+      // Live portfolio history database
+      const portfolioHistoryLivePath = process.env.PORTFOLIO_HISTORY_LIVE_DB_PATH;
+      if (portfolioHistoryLivePath) {
+        dbConfigs['portfolio_history_live'] = {
+          type: 'sqlite',
+          path: portfolioHistoryLivePath,
+          isPaperTrading: false
+        };
+      }
+
+      // Configure Supabase cloud database (contains both paper and live data)
       if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE) {
         dbConfigs['supabase'] = {
           type: 'supabase',
           url: process.env.SUPABASE_URL,
           serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE,
-          isPaperTrading: false // Will be determined by data source
+          isPaperTrading: false // Cloud contains both paper and live data
         };
       }
 

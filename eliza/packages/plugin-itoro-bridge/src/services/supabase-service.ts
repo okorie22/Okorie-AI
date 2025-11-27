@@ -177,9 +177,14 @@ export class SupabaseDatabaseService {
 
     const dbPath = path.resolve(config.path);
     if (!fs.existsSync(dbPath)) {
-      logger.warn(`SQLite database file not found: ${dbPath}. Creating empty database file.`);
-      // Create an empty file if it doesn't exist
-      fs.writeFileSync(dbPath, '');
+      logger.warn(`SQLite database file not found: ${dbPath}. Database will be unavailable.`);
+      // Create a mock connection object to prevent other code from failing
+      this.sqliteConnections.set(name, {
+        close: () => {},
+        prepare: () => ({ all: () => [], run: () => {} }),
+        exec: () => {}
+      } as any);
+      return;
     }
 
     try {
@@ -400,34 +405,45 @@ export class SupabaseDatabaseService {
   }
 
   /**
-   * Query risk metrics from Supabase
+   * Query risk metrics from Supabase using REST API
    */
   private async queryRiskMetricsFromSupabase(dbName: string, userId?: string): Promise<RiskMetrics> {
-    const client = this.supabaseClients.get(dbName);
-    if (!client) {
-      throw new Error(`Supabase client not found: ${dbName}`);
-    }
-
-    const { data, error } = await client
-      .from('risk_metrics')
-      .select('*')
-      .eq('user_id', userId || 'default')
-      .order('timestamp', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (error) {
-      logger.warn(`Risk metrics query failed for ${dbName}: ${error.message}`);
+    const restConfig = this.supabaseClients.get(dbName) as any;
+    if (!restConfig) {
+      logger.warn(`Supabase REST config not found: ${dbName}`);
       return this.getDefaultRiskMetrics();
     }
 
-    return {
-      max_drawdown: data.max_drawdown || 0,
-      sharpe_ratio: data.sharpe_ratio || 0,
-      volatility: data.volatility || 0,
-      value_at_risk: data.value_at_risk || 0,
-      timestamp: data.timestamp
-    };
+    try {
+      const queryUrl = `${restConfig.baseUrl}/portfolio_history?select=max_drawdown,sharpe_ratio,volatility,value_at_risk,timestamp&order=timestamp.desc&limit=1`;
+
+      const response = await fetch(queryUrl, {
+        method: 'GET',
+        headers: restConfig.headers,
+        signal: AbortSignal.timeout(30000)
+      });
+
+      if (!response.ok) {
+        logger.warn(`Risk metrics query failed for ${dbName}: HTTP ${response.status}`);
+        return this.getDefaultRiskMetrics();
+      }
+
+      const data = await response.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const metrics = data[0];
+        return {
+          max_drawdown: metrics.max_drawdown || 0,
+          sharpe_ratio: metrics.sharpe_ratio || 0,
+          volatility: metrics.volatility || 0,
+          value_at_risk: metrics.value_at_risk || 0,
+          timestamp: metrics.timestamp || new Date().toISOString()
+        };
+      }
+    } catch (error) {
+      logger.warn(`Risk metrics query error for ${dbName}:`, error instanceof Error ? error.message : String(error));
+    }
+
+    return this.getDefaultRiskMetrics();
   }
 
   /**
@@ -595,6 +611,260 @@ export class SupabaseDatabaseService {
     this.sqliteConnections.clear();
     this.supabaseClients.clear();
     this.initialized = false;
+  }
+
+  /**
+   * Get portfolio history from cloud
+   */
+  async getPortfolioHistory(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'portfolio_history', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get portfolio balances from cloud
+   */
+  async getPortfolioBalances(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'portfolio_balances', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get sentiment data from cloud
+   */
+  async getSentimentData(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'sentiment_data', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get whale data from cloud
+   */
+  async getWhaleData(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'whale_data', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get whale history from cloud
+   */
+  async getWhaleHistory(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'whale_history', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get whale schedules from cloud
+   */
+  async getWhaleSchedules(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'whale_schedules', limit, 'created_at', false);
+  }
+
+  /**
+   * Get artificial memory from cloud
+   */
+  async getArtificialMemory(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'artificial_memory', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get chart analysis from cloud
+   */
+  async getChartAnalysis(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'chart_analysis', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get execution tracking from cloud
+   */
+  async getExecutionTracking(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'execution_tracking', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get live trades from cloud
+   */
+  async getLiveTrades(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'live_trades', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get staking transactions from cloud
+   */
+  async getStakingTransactions(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'staking_transactions', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get staking positions from cloud
+   */
+  async getStakingPositions(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'staking_positions', limit, 'created_at', false);
+  }
+
+  /**
+   * Get entry prices from cloud
+   */
+  async getEntryPrices(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'entry_prices', limit, 'last_updated', false);
+  }
+
+  /**
+   * Get AI analysis from cloud
+   */
+  async getAIAnalysis(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'ai_analysis', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get change events from cloud
+   */
+  async getChangeEvents(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'change_events', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get agent shared data from cloud
+   */
+  async getAgentSharedData(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'agent_shared_data', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get log backups from cloud
+   */
+  async getLogBackups(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'log_backups', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get database backups from cloud
+   */
+  async getDatabaseBackups(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'database_backups', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get RBI strategy results from cloud
+   */
+  async getRBIStrategyResults(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'rbi_strategy_results', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get paper trading portfolio from cloud
+   */
+  async getPaperTradingPortfolio(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'paper_trading_portfolio', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get paper trading transactions from cloud
+   */
+  async getPaperTradingTransactions(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'paper_trading_transactions', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get paper trading balances from cloud
+   */
+  async getPaperTradingBalances(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'paper_trading_balances', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get onchain network metrics from cloud
+   */
+  async getOnchainNetworkMetrics(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'onchain_network_metrics', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get onchain health scores from cloud
+   */
+  async getOnchainHealthScores(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'onchain_health_scores', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get OI data from cloud
+   */
+  async getOIData(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'oi_data', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get OI analytics from cloud
+   */
+  async getOIAnalytics(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'oi_analytics', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get funding rates from cloud
+   */
+  async getFundingRates(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'funding_rates', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get funding analytics from cloud
+   */
+  async getFundingAnalytics(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'funding_analytics', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get liquidation events from cloud
+   */
+  async getLiquidationEvents(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'liquidation_events', limit, 'timestamp', false);
+  }
+
+  /**
+   * Get liquidation analytics from cloud
+   */
+  async getLiquidationAnalytics(limit: number = 100): Promise<any[]> {
+    return this.queryCloudTable('supabase', 'liquidation_analytics', limit, 'timestamp', false);
+  }
+
+  /**
+   * Generic method to query cloud tables using REST API
+   */
+  private async queryCloudTable(dbName: string, tableName: string, limit: number, orderBy: string, ascending: boolean = false): Promise<any[]> {
+    const restConfig = this.supabaseClients.get(dbName) as any;
+    if (!restConfig || !restConfig.baseUrl || !restConfig.headers) {
+      logger.warn(`Supabase REST config not found: ${dbName}`);
+      return [];
+    }
+
+    try {
+      // Build REST API query URL
+      let queryUrl = `${restConfig.baseUrl}/${tableName}?select=*`;
+
+      if (orderBy) {
+        queryUrl += `&order=${orderBy}.${ascending ? 'asc' : 'desc'}`;
+      }
+
+      if (limit > 0) {
+        queryUrl += `&limit=${limit}`;
+      }
+
+      const response = await fetch(queryUrl, {
+        method: 'GET',
+        headers: restConfig.headers,
+        signal: AbortSignal.timeout(30000) // 30 second timeout
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          logger.warn(`Table ${tableName} does not exist in Supabase`);
+          return [];
+        }
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      logger.warn(`Cloud table query error for ${tableName}:`, error instanceof Error ? error.message : String(error));
+      return [];
+    }
   }
 
   /**
