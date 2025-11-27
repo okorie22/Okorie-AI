@@ -1,0 +1,22 @@
+/**
+ * Auto-generated file - DO NOT EDIT
+ * Generated at build time by generate-version.ts
+ * This file contains build-time constants to avoid runtime package.json resolution
+ */
+
+export const CLI_VERSION = '1.5.11-alpha.4';
+export const CLI_NAME = '@elizaos/cli';
+export const CLI_DESCRIPTION = 'elizaOS CLI - Manage your AI agents and plugins';
+
+// Build metadata
+export const BUILD_TIME = '2025-11-26T05:16:26.199Z';
+export const BUILD_ENV = 'production';
+
+// Export as default for convenience
+export default {
+  version: CLI_VERSION,
+  name: CLI_NAME,
+  description: CLI_DESCRIPTION,
+  buildTime: BUILD_TIME,
+  buildEnv: BUILD_ENV,
+};

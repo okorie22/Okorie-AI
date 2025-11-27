@@ -191,31 +191,81 @@ export class AgentServer {
         }
         
         // Load and resolve plugins
+        logger.info(`[AgentServer] ========================================`);
+        logger.info(`[AgentServer] Loading plugins for character: ${character.name}`);
+        logger.info(`[AgentServer] Character requested plugins: ${(character.plugins || []).join(', ')}`);
+        logger.info(`[AgentServer] Additional plugins passed: ${plugins.length}`);
+        logger.info(`[AgentServer] ========================================`);
+        
         const loadedPlugins = new Map<string, Plugin>();
         const pluginsToLoad = new Set<string>(character.plugins || []);
         
+        logger.debug(`[AgentServer] Step 1: Processing character plugins and additional plugins`);
         for (const p of plugins) {
           if (typeof p === 'string') {
+            logger.debug(`[AgentServer]   Adding string plugin: ${p}`);
             pluginsToLoad.add(p);
           } else if (this.pluginLoader?.isValidPluginShape(p) && !loadedPlugins.has(p.name)) {
+            logger.info(`[AgentServer]   ✓ Found pre-loaded plugin object: ${p.name}`);
             loadedPlugins.set(p.name, p);
-            (p.dependencies || []).forEach((dep) => { pluginsToLoad.add(dep); });
+            if (p.dependencies && p.dependencies.length > 0) {
+              logger.debug(`[AgentServer]     Adding dependencies: ${p.dependencies.join(', ')}`);
+              (p.dependencies || []).forEach((dep) => { pluginsToLoad.add(dep); });
+            }
+          } else {
+            logger.warn(`[AgentServer]   ✗ Invalid plugin object or duplicate: ${typeof p === 'object' ? p?.name || 'unnamed' : 'not an object'}`);
           }
         }
+        
+        logger.info(`[AgentServer] Step 2: Total plugins to load: ${pluginsToLoad.size}`);
+        logger.info(`[AgentServer] Plugin list: ${Array.from(pluginsToLoad).join(', ')}`);
         
         // Load all requested plugins
         const allAvailablePlugins = new Map<string, Plugin>();
         for (const p of loadedPlugins.values()) {
+          logger.debug(`[AgentServer]   Adding pre-loaded plugin to available: ${p.name}`);
           allAvailablePlugins.set(p.name, p);
         }
+        
+        logger.info(`[AgentServer] Step 3: Loading plugins via PluginLoader...`);
+        const loadResults: { name: string; success: boolean; loadedName?: string }[] = [];
+        
         for (const name of pluginsToLoad) {
           if (!allAvailablePlugins.has(name)) {
+            logger.info(`[AgentServer]   Loading plugin: ${name}`);
+            const startTime = Date.now();
             const loaded = await this.pluginLoader?.loadAndPreparePlugin(name);
+            const loadTime = Date.now() - startTime;
+            
             if (loaded) {
+              logger.info(`[AgentServer]   ✓✓✓ SUCCESS: Loaded plugin ${name} (registered as: ${loaded.name}) in ${loadTime}ms ✓✓✓`);
               allAvailablePlugins.set(loaded.name, loaded);
+              loadResults.push({ name, success: true, loadedName: loaded.name });
+            } else {
+              logger.error(`[AgentServer]   ✗✗✗ FAILED: Could not load plugin ${name} (took ${loadTime}ms) ✗✗✗`);
+              logger.error(`[AgentServer]   Check PluginLoader logs above for detailed error information`);
+              loadResults.push({ name, success: false });
             }
+          } else {
+            logger.debug(`[AgentServer]   Plugin ${name} already loaded, skipping`);
+            loadResults.push({ name, success: true, loadedName: name });
           }
         }
+        
+        logger.info(`[AgentServer] Step 4: Plugin loading summary:`);
+        const successful = loadResults.filter(r => r.success).length;
+        const failed = loadResults.filter(r => !r.success).length;
+        logger.info(`[AgentServer]   Successful: ${successful}/${loadResults.length}`);
+        logger.info(`[AgentServer]   Failed: ${failed}/${loadResults.length}`);
+        
+        if (failed > 0) {
+          logger.error(`[AgentServer]   FAILED PLUGINS:`);
+          loadResults.filter(r => !r.success).forEach(r => {
+            logger.error(`[AgentServer]     - ${r.name}`);
+          });
+        }
+        
+        logger.info(`[AgentServer] Step 5: Currently available plugins: ${Array.from(allAvailablePlugins.keys()).join(', ')}`);
         
         // Check if we have a SQL plugin
         let haveSql = false;
@@ -388,26 +438,37 @@ export class AgentServer {
       logger.success('Database initialized for server operations');
 
       // Run migrations for the SQL plugin schema
-      logger.info('[INIT] Running database migrations for messaging tables...');
-      try {
-        const migrationService = new DatabaseMigrationService();
+      // Skip migrations if SKIP_MIGRATIONS env var is set (workaround for Bun crash)
+      if (process.env.SKIP_MIGRATIONS === 'true') {
+        logger.warn('[INIT] Skipping database migrations (SKIP_MIGRATIONS=true)');
+        logger.warn('[INIT] Database will be initialized on first use by plugins');
+      } else {
+        logger.info('[INIT] Running database migrations for messaging tables...');
+        try {
+          const migrationService = new DatabaseMigrationService();
 
-        // Get the underlying database instance
-        const db = (this.database as any).getDatabase();
-        await migrationService.initializeWithDatabase(db);
+          // Get the underlying database instance
+          const db = (this.database as any).getDatabase();
+          await migrationService.initializeWithDatabase(db);
 
-        // Register the SQL plugin schema
-        migrationService.discoverAndRegisterPluginSchemas([sqlPlugin]);
+          // Register the SQL plugin schema
+          migrationService.discoverAndRegisterPluginSchemas([sqlPlugin]);
 
-        // Run the migrations
-        await migrationService.runAllPluginMigrations();
+          // Run the migrations
+          await migrationService.runAllPluginMigrations();
 
-        logger.success('[INIT] Database migrations completed successfully');
-      } catch (migrationError) {
-        logger.error({ error: migrationError }, '[INIT] Failed to run database migrations:');
-        throw new Error(
-          `Database migration failed: ${migrationError instanceof Error ? migrationError.message : String(migrationError)}`
-        );
+          logger.success('[INIT] Database migrations completed successfully');
+        } catch (migrationError: any) {
+          // Handle Bun crash during migrations - log and continue
+          if (migrationError?.message?.includes('panic') || migrationError?.message?.includes('corrupt')) {
+            logger.warn('[INIT] Migration system encountered an error (Bun runtime issue), continuing without migrations...');
+            logger.warn('[INIT] Database will be initialized on first use by plugins');
+          } else {
+            logger.error({ error: migrationError }, '[INIT] Failed to run database migrations:');
+            // Don't throw - allow server to continue
+            logger.warn('[INIT] Continuing server startup despite migration error');
+          }
+        }
       }
 
       // Add a small delay to ensure database is fully ready

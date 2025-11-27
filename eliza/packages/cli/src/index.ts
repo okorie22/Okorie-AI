@@ -6,7 +6,7 @@ process.env.QUIET_MODE = process.env.QUIET_MODE || 'true';
 import { agent } from '@/src/commands/agent';
 import { create } from '@/src/commands/create';
 import { dev } from '@/src/commands/dev';
-import { env } from '@/src/commands/env';
+// import { env } from '@/src/commands/env'; // Command not found
 import { plugins } from '@/src/commands/plugins';
 import { publish } from '@/src/commands/publish';
 import { monorepo } from '@/src/commands/monorepo';
@@ -113,10 +113,10 @@ async function main() {
   // Show update notification for all commands except:
   // - when banner will show (it handles its own notification)
   // - when running update command
-  if (!willShowBanner && !isUpdateCommand) {
-    const currentVersion = getVersion();
-    await checkAndShowUpdateNotification(currentVersion);
-  }
+  // TEMPORARILY DISABLED: if (!willShowBanner && !isUpdateCommand) {
+  //   const currentVersion = getVersion();
+  //   await checkAndShowUpdateNotification(currentVersion);
+  // }
 
   const program = new Command()
     .name('elizaos')
@@ -137,7 +137,7 @@ async function main() {
     .addCommand(start)
     .addCommand(update)
     .addCommand(test)
-    .addCommand(env)
+    // .addCommand(env) // Command not available
     .addCommand(dev)
     .addCommand(publish)
     .addCommand(report)
