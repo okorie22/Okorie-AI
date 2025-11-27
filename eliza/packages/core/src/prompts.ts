@@ -23,66 +23,17 @@ Respond using XML format like this:
 IMPORTANT: Your response must ONLY contain the <response></response> XML block above. Do not include any text, thinking, or reasoning before or after this XML block. Start your response immediately with <response> and end with </response>.
 </output>`;
 
-export const messageHandlerTemplate = `<task>Generate dialog and actions for the character {{agentName}}.</task>
+export const messageHandlerTemplate = `You are {{agentName}}, responding to this message: "{{message}}"
 
-<providers>
-{{providers}}
-</providers>
+{{recentMessages}}
 
-<instructions>
-Write a thought and plan for {{agentName}} and decide what actions to take. Also include the providers that {{agentName}} will use to have the right context for responding and acting, if any.
+{{character}}
 
-IMPORTANT ACTION ORDERING RULES:
-- Actions are executed in the ORDER you list them - the order MATTERS!
-- REPLY should come FIRST to acknowledge the user's request before executing other actions
-- Common patterns:
-  - For requests requiring tool use: REPLY,CALL_MCP_TOOL (acknowledge first, then gather info)
-  - For task execution: REPLY,SEND_MESSAGE or REPLY,EVM_SWAP_TOKENS (acknowledge first, then do the task)
-  - For multi-step operations: REPLY,ACTION1,ACTION2 (acknowledge first, then complete all steps)
-- REPLY is used to acknowledge and inform the user about what you're going to do
-- Follow-up actions execute the actual tasks after acknowledgment
-- Use IGNORE only when you should not respond at all
-- If you use IGNORE, do not include any other actions. IGNORE should be used alone when you should not respond or take any actions.
+Respond naturally and conversationally. Be helpful, engaging, and use your personality. If the user asks about trading/finance, use your expertise. If it's casual conversation, respond casually.
 
-IMPORTANT PROVIDER SELECTION RULES:
-- Only include providers if they are needed to respond accurately.
-- If the message mentions images, photos, pictures, attachments, or visual content, OR if you see "(Attachments:" in the conversation, you MUST include "ATTACHMENTS" in your providers list
-- If the message asks about or references specific people, include "ENTITIES" in your providers list  
-- If the message asks about relationships or connections between people, include "RELATIONSHIPS" in your providers list
-- If the message asks about facts or specific information, include "FACTS" in your providers list
-- If the message asks about the environment or world context, include "WORLD" in your providers list
-- If no additional context is needed, you may leave the providers list empty.
+Keep your response natural - no XML, no templates, just normal conversation.
 
-IMPORTANT CODE BLOCK FORMATTING RULES:
-- If {{agentName}} includes code examples, snippets, or multi-line code in the response, ALWAYS wrap the code with \`\`\` fenced code blocks (specify the language if known, e.g., \`\`\`python).
-- ONLY use fenced code blocks for actual code. Do NOT wrap non-code text, instructions, or single words in fenced code blocks.
-- If including inline code (short single words or function names), use single backticks (\`) as appropriate.
-- This ensures the user sees clearly formatted and copyable code when relevant.
-
-First, think about what you want to do next and plan your actions. Then, write the next message and include the actions you plan to take.
-</instructions>
-
-<keys>
-"thought" should be a short description of what the agent is thinking about and planning.
-"actions" should be a comma-separated list of the actions {{agentName}} plans to take based on the thought, IN THE ORDER THEY SHOULD BE EXECUTED (if none, use IGNORE, if simply responding with text, use REPLY)
-"providers" should be a comma-separated list of the providers that {{agentName}} will use to have the right context for responding and acting (NEVER use "IGNORE" as a provider - use specific provider names like ATTACHMENTS, ENTITIES, FACTS, KNOWLEDGE, etc.)
-"text" should be the text of the next message for {{agentName}} which they will send to the conversation.
-</keys>
-
-<output>
-Do NOT include any thinking, reasoning, or <think> sections in your response. 
-Go directly to the XML response format without any preamble or explanation.
-
-Respond using XML format like this:
-<response>
-    <thought>Your thought here</thought>
-    <actions>ACTION1,ACTION2</actions>
-    <providers>PROVIDER1,PROVIDER2</providers>
-    <text>Your response text here</text>
-</response>
-
-IMPORTANT: Your response must ONLY contain the <response></response> XML block above. Do not include any text, thinking, or reasoning before or after this XML block. Start your response immediately with <response> and end with </response>.
-</output>`;
+Your response:`;
 
 export const postCreationTemplate = `# Task: Create a post in the voice and style and perspective of {{agentName}} @{{twitterUserName}}.
 

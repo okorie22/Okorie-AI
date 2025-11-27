@@ -858,49 +858,19 @@ async function runSingleShotCore({ runtime, message, state }): Promise<StrategyR
 
   let responseContent: Content | null = null;
 
-  // Retry if missing required fields
-  let retries = 0;
-  const maxRetries = 3;
+  // Get direct natural language response from Ollama - no XML, no templates
+  const response = await runtime.useModel(ModelType.TEXT_LARGE, { prompt });
 
-  while (retries < maxRetries && (!responseContent?.thought || !responseContent?.actions)) {
-    const response = await runtime.useModel(ModelType.TEXT_LARGE, { prompt });
+  runtime.logger.debug({ response }, '[Bootstrap] *** Raw LLM Response ***');
 
-    runtime.logger.debug({ response }, '[Bootstrap] *** Raw LLM Response ***');
-
-    // Attempt to parse the XML response
-    const parsedXml = parseKeyValueXml(response);
-    runtime.logger.debug({ parsedXml }, '[Bootstrap] *** Parsed XML Content ***');
-
-    // Map parsed XML to Content type, handling potential missing fields
-    if (parsedXml) {
-      responseContent = {
-        ...parsedXml,
-        thought: parsedXml.thought || '',
-        actions: parsedXml.actions || ['IGNORE'],
-        providers: parsedXml.providers || [],
-        text: parsedXml.text || '',
-        simple: parsedXml.simple || false,
-      };
-    } else {
-      runtime.logger.warn('[Bootstrap] XML parsing failed; falling back to plain text response');
-      responseContent = {
-        thought: '',
-        actions: ['REPLY'],
-        providers: [],
-        text: response,
-        simple: true,
-      };
-      break;
-    }
-
-    retries++;
-    if (!responseContent?.thought || !responseContent?.actions) {
-      runtime.logger.warn(
-        { response, parsedXml, responseContent },
-        '[Bootstrap] *** Missing required fields (thought or actions), retrying... ***'
-      );
-    }
-  }
+  // Use the raw response directly - no parsing, no templates
+  responseContent = {
+    thought: 'Responding naturally to user message',
+    actions: ['REPLY'],
+    providers: [],
+    text: response,
+    simple: true,
+  };
 
   if (!responseContent) {
     return { responseContent: null, responseMessages: [], state, mode: 'none' };
