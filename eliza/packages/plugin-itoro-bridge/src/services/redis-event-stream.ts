@@ -29,41 +29,122 @@ export class RedisEventStreamService {
   private subscriber: RedisClientType | null = null;
   private eventHandlers: Map<string, EventHandler[]> = new Map();
   private connected = false;
+  private connecting = false;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 5000;
 
   /**
-   * Connect to Redis
+   * Connect to Redis (optional - won't throw if Redis unavailable)
    */
   async connect(redisUrl: string): Promise<void> {
+    // Prevent multiple simultaneous connection attempts
+    if (this.connecting) {
+      logger.debug('Redis connection already in progress, skipping');
+      return;
+    }
+
+    if (this.connected) {
+      logger.debug('Redis already connected, skipping');
+      return;
+    }
+
+    this.connecting = true;
+
     try {
       logger.info('Connecting to Redis event stream:', redisUrl);
 
-      // Create main client for publishing
-      this.client = createClient({ url: redisUrl });
+      // Create main client - remove socket timeouts that don't work reliably
+      this.client = createClient({
+        url: redisUrl,
+        // Remove socket timeout - it doesn't work reliably
+        socket: {
+          // Basic connection settings without problematic timeouts
+          keepAlive: 30000,
+          reconnectStrategy: (retries) => {
+            if (retries > 3) {
+              logger.warn('Redis reconnection attempts exceeded, giving up');
+              return new Error('Max reconnection attempts reached');
+            }
+            return Math.min(retries * 100, 3000);
+          }
+        }
+      });
       this.client.on('error', (error) => {
-        logger.error('Redis client error:', error);
+        // Silent - Redis unavailable is expected in development
+        if (this.connected) {
+          logger.debug('Redis client error (already connected):', error.message);
+        }
       });
 
       // Create subscriber client
-      this.subscriber = createClient({ url: redisUrl });
+      this.subscriber = createClient({
+        url: redisUrl,
+        socket: {
+          keepAlive: 30000,
+          reconnectStrategy: (retries) => {
+            if (retries > 3) {
+              logger.warn('Redis reconnection attempts exceeded, giving up');
+              return new Error('Max reconnection attempts reached');
+            }
+            return Math.min(retries * 100, 3000);
+          }
+        }
+      });
       this.subscriber.on('error', (error) => {
-        logger.error('Redis subscriber error:', error);
+        // Silent - Redis unavailable is expected in development
+        if (this.connected) {
+          logger.debug('Redis subscriber error (already connected):', error.message);
+        }
       });
 
-      // Connect both clients
-      await Promise.all([
-        this.client.connect(),
-        this.subscriber.connect()
-      ]);
+      // Wrap connection in timeout using setTimeout
+      const connectWithTimeout = async (): Promise<void> => {
+        return new Promise(async (resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Redis connection timeout after 5 seconds'));
+          }, 5000);
+
+          try {
+            // Connect both clients concurrently
+            await Promise.all([
+              this.client!.connect(),
+              this.subscriber!.connect()
+            ]);
+            clearTimeout(timeout);
+            resolve();
+          } catch (error) {
+            clearTimeout(timeout);
+            reject(error);
+          }
+        });
+      };
+
+      // Attempt connection with timeout
+      await connectWithTimeout();
 
       this.connected = true;
       this.reconnectAttempts = 0;
       logger.info('Successfully connected to Redis event stream');
     } catch (error) {
-      logger.error('Failed to connect to Redis:', error);
-      throw error;
+      this.connected = false;
+      // Clean up failed connections
+      try {
+        if (this.client) {
+          await this.client.disconnect().catch(() => {});
+          this.client = null;
+        }
+        if (this.subscriber) {
+          await this.subscriber.disconnect().catch(() => {});
+          this.subscriber = null;
+        }
+      } catch (cleanupError) {
+        // Ignore cleanup errors
+      }
+      logger.warn('Redis connection failed (non-fatal), continuing without real-time events:', error.message);
+      // Don't throw error - allow system to continue without Redis
+    } finally {
+      this.connecting = false;
     }
   }
 
@@ -84,6 +165,7 @@ export class RedisEventStreamService {
     }
 
     this.connected = false;
+    this.connecting = false;
     this.eventHandlers.clear();
   }
 

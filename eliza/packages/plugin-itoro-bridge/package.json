@@ -35,11 +35,11 @@
   ],
   "dependencies": {
     "@elizaos/core": "workspace:*",
-    "zod": "3.24.2",
     "@supabase/supabase-js": "^2.39.0",
+    "better-sqlite3": "^12.4.6",
+    "node-fetch": "^3.3.0",
     "redis": "^4.6.0",
-    "better-sqlite3": "^9.0.0",
-    "node-fetch": "^3.3.0"
+    "zod": "3.24.2"
   },
   "devDependencies": {
     "@elizaos/cli": "workspace:*",
@@ -57,4 +57,3 @@
     "zod": "3.24.2"
   }
 }
-

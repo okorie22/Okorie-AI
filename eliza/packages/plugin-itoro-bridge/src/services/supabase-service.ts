@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+// Removed Supabase client import - using direct REST API calls like working Python agents
 import { logger } from '@elizaos/core';
 import Database from 'better-sqlite3';
 import path from 'path';
@@ -85,48 +85,86 @@ export class SupabaseDatabaseService {
       return;
     }
 
-    try {
-      logger.info('Initializing Supabase Database Service');
+    let sqliteInitialized = false;
+    let supabaseInitialized = false;
 
-      for (const [name, config] of Object.entries(configs)) {
-        if (config.type === 'supabase') {
-          await this.initializeSupabaseClient(name, config);
-        } else if (config.type === 'sqlite') {
+    logger.info('Initializing Database Service (SQLite + Supabase REST API)');
+
+    // Always try SQLite first (reliable)
+    for (const [name, config] of Object.entries(configs)) {
+      if (config.type === 'sqlite') {
+        try {
           await this.initializeSQLiteConnection(name, config);
+          sqliteInitialized = true;
+          logger.info(`✓ SQLite database ${name} initialized`);
+        } catch (error) {
+          logger.error(`✗ Failed to initialize SQLite ${name}:`, error);
         }
       }
+    }
 
+    // Try Supabase REST API but don't fail if it doesn't work (like working Python agents)
+    for (const [name, config] of Object.entries(configs)) {
+      if (config.type === 'supabase') {
+        try {
+          await this.initializeSupabaseClient(name, config);
+          supabaseInitialized = true;
+          logger.info(`✓ Supabase REST API ${name} initialized`);
+        } catch (error) {
+          logger.warn(`⚠ Supabase REST API ${name} not available, continuing with SQLite only:`, error.message);
+        }
+      }
+    }
+
+    // Mark as initialized if we have at least SQLite
+    if (sqliteInitialized) {
       this.initialized = true;
-      logger.info('Supabase Database Service initialized successfully');
-    } catch (error) {
-      logger.error('Failed to initialize Supabase Database Service:', error);
-      throw error;
+      const sources = supabaseInitialized ? 'SQLite + Supabase REST API' : 'SQLite only';
+      logger.info(`Database Service initialized successfully (${sources})`);
+    } else {
+      throw new Error('Failed to initialize any database connections');
     }
   }
 
   /**
-   * Initialize Supabase client
+   * Initialize Supabase REST API connection (like working Python agents)
    */
   private async initializeSupabaseClient(name: string, config: DatabaseConfig): Promise<void> {
     if (!config.url || !config.serviceRoleKey) {
       throw new Error(`Supabase configuration incomplete for ${name}`);
     }
 
-    const client = createClient(config.url, config.serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
+    // Store REST API configuration instead of client
+    const restConfig = {
+      baseUrl: `${config.url}/rest/v1`,
+      headers: {
+        'Authorization': `Bearer ${config.serviceRoleKey}`,
+        'apikey': config.serviceRoleKey,
+        'Content-Type': 'application/json',
       }
-    });
+    };
 
-    // Test connection
-    const { error } = await client.from('health_check').select('count').limit(1);
-    if (error && !error.message.includes('relation "health_check" does not exist')) {
-      throw new Error(`Failed to connect to Supabase database ${name}: ${error.message}`);
+    // Test connection using direct REST API call (like working Python agents)
+    try {
+      const testUrl = `${restConfig.baseUrl}/paper_trading_portfolio?select=id&limit=1`;
+      const response = await fetch(testUrl, {
+        method: 'GET',
+        headers: restConfig.headers,
+        signal: AbortSignal.timeout(10000) // 10 second timeout like Python agents
+      });
+
+      if (!response.ok && !response.statusText.includes('relation "paper_trading_portfolio" does not exist')) {
+        throw new Error(`Supabase REST API test failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'TimeoutError') {
+        throw new Error(`Supabase connection timeout for ${name}`);
+      }
+      throw new Error(`Failed to connect to Supabase REST API for ${name}: ${error instanceof Error ? error.message : String(error)}`);
     }
 
-    this.supabaseClients.set(name, client);
-    logger.info(`Supabase client initialized for ${name}`);
+    this.supabaseClients.set(name, restConfig as any);
+    logger.info(`Supabase REST API initialized for ${name}`);
   }
 
   /**

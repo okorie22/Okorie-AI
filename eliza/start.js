@@ -75,14 +75,12 @@ async function loadPlugins() {
   }
 
   try {
-    console.log('⚠ Temporarily skipping ITORO bridge plugin due to SQLite issues');
-    console.log('⚠ Bridge plugin will be loaded after SQLite is fixed');
-    // const itoroModule = await import('@elizaos/plugin-itoro-bridge');
-    // const itoro = itoroModule.default || itoroModule.itoroBridgePlugin;
-    // if (itoro) {
-    //   plugins.push(itoro);
-    //   console.log(`✓ ITORO bridge plugin: ${itoro.name}`);
-    // }
+    const itoroModule = await import('@elizaos/plugin-itoro-bridge');
+    const itoro = itoroModule.default || itoroModule.itoroBridgePlugin;
+    if (itoro) {
+      plugins.push(itoro);
+      console.log(`✓ ITORO bridge plugin: ${itoro.name}`);
+    }
   } catch (error) {
     console.error('✗ Failed to load ITORO bridge plugin:', error.message);
   }

@@ -90,6 +90,7 @@
     "@elizaos/plugin-anthropic": "^1.5.12",
     "@elizaos/plugin-ollama": "^1.2.4",
     "@elizaos/plugin-openai": "^1.5.18",
+    "better-sqlite3": "^12.4.6",
     "helmet": "^8.1.0",
     "js-yaml": "^4.1.0",
     "zod": "^4.1.13"

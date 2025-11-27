@@ -1,5 +1,6 @@
 import type { IAgentRuntime, Character } from '@elizaos/core';
 import { AgentRuntime, logger } from '@elizaos/core';
+import sqlPlugin from '@elizaos/plugin-sql';
 import { EventBridge } from './communication/event-bridge';
 import { MessageRouter } from './communication/message-router';
 
@@ -52,7 +53,7 @@ export class AgentManager {
       // Create new runtime instance for the agent
       const agentRuntime = new AgentRuntime({
         character: characterConfig,
-        plugins: [], // Agent-specific plugins can be added here
+        plugins: [sqlPlugin], // Essential plugins for agent runtime
         settings: {
           ...this.runtime.settings,
           agentId,

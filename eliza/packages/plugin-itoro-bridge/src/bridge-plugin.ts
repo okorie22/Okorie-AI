@@ -95,12 +95,9 @@ export const itoroBridgePlugin: Plugin = {
     ITORO_WEBHOOK_URL: process.env.ITORO_WEBHOOK_URL,
     ITORO_WEBHOOK_SECRET: process.env.ITORO_WEBHOOK_SECRET,
 
-    // Supabase Databases
-    SUPABASE_PAPER_TRADING_URL: process.env.SUPABASE_PAPER_TRADING_URL,
-    SUPABASE_PAPER_TRADING_ANON_KEY: process.env.SUPABASE_PAPER_TRADING_ANON_KEY,
-    SUPABASE_LIVE_TRADING_URL: process.env.SUPABASE_LIVE_TRADING_URL,
-    SUPABASE_LIVE_TRADING_ANON_KEY: process.env.SUPABASE_LIVE_TRADING_ANON_KEY,
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    // Supabase Databases (using same env vars as working agents)
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE: process.env.SUPABASE_SERVICE_ROLE,
 
     // Local Database Paths
     PAPER_TRADING_DB_PATH: process.env.PAPER_TRADING_DB_PATH || 'multi-agents/itoro/ai_crypto_agents/data/paper_trading.db',

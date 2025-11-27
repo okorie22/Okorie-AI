@@ -115,24 +115,13 @@ export class ITOROBridgeService extends Service {
         };
       }
 
-      // Configure Supabase databases if available
-      if (process.env.SUPABASE_PAPER_TRADING_URL && process.env.SUPABASE_PAPER_TRADING_ANON_KEY) {
-        dbConfigs['supabase_paper'] = {
+      // Configure Supabase database if available (using same env vars as working agents)
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE) {
+        dbConfigs['supabase'] = {
           type: 'supabase',
-          url: process.env.SUPABASE_PAPER_TRADING_URL,
-          anonKey: process.env.SUPABASE_PAPER_TRADING_ANON_KEY,
-          serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-          isPaperTrading: true
-        };
-      }
-
-      if (process.env.SUPABASE_LIVE_TRADING_URL && process.env.SUPABASE_LIVE_TRADING_ANON_KEY) {
-        dbConfigs['supabase_live'] = {
-          type: 'supabase',
-          url: process.env.SUPABASE_LIVE_TRADING_URL,
-          anonKey: process.env.SUPABASE_LIVE_TRADING_ANON_KEY,
-          serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-          isPaperTrading: false
+          url: process.env.SUPABASE_URL,
+          serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE,
+          isPaperTrading: false // Will be determined by data source
         };
       }
 
@@ -142,10 +131,17 @@ export class ITOROBridgeService extends Service {
       this.ragEngine = new RAGEngine(this.dbService);
       await this.ragEngine.initialize();
 
-      // Initialize Redis event stream
+      // Initialize Redis event stream (optional - won't crash if Redis unavailable)
       this.redisStream = new RedisEventStreamService();
       const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-      await this.redisStream.connect(redisUrl);
+
+      // Connect to Redis synchronously with timeout
+      try {
+        await this.redisStream.connect(redisUrl);
+        logger.info('✓ Redis event stream connected');
+      } catch (error) {
+        logger.warn('⚠ Redis event stream unavailable, continuing without real-time events:', error.message);
+      }
 
       // Initialize data aggregator
       this.dataAggregator = new UnifiedDataAggregator(this.dbService);
@@ -155,9 +151,14 @@ export class ITOROBridgeService extends Service {
       this.cryptoSync = new CryptoAgentSyncService(this.dbService);
       await this.cryptoSync.initialize(paperDBPath);
 
-      // Initialize event bus connector
+      // Initialize event bus connector AFTER Redis is connected
       this.eventBusConnector = new EventBusConnector(this.redisStream);
-      await this.eventBusConnector.initialize();
+      try {
+        await this.eventBusConnector.initialize();
+        logger.info('✓ Event bus connector initialized');
+      } catch (error) {
+        logger.warn('⚠ Event bus connector failed, continuing without real-time events:', error.message);
+      }
 
       // Initialize agent status monitor
       this.agentStatusMonitor = new AgentStatusMonitor(
@@ -165,14 +166,24 @@ export class ITOROBridgeService extends Service {
         this.dbService,
         this.redisStream
       );
-      await this.agentStatusMonitor.initialize();
+      try {
+        await this.agentStatusMonitor.initialize();
+        logger.info('✓ Agent status monitor initialized');
+      } catch (error) {
+        logger.warn('⚠ Agent status monitor failed:', error.message);
+      }
 
       // Initialize live data feed service
       this.liveDataFeed = new LiveDataFeedService(
         this.agentStatusMonitor,
         this.redisStream
       );
-      await this.liveDataFeed.initialize();
+      try {
+        await this.liveDataFeed.initialize();
+        logger.info('✓ Live data feed initialized');
+      } catch (error) {
+        logger.warn('⚠ Live data feed failed:', error.message);
+      }
 
       // Start periodic sync if enabled
       const enableSync = process.env.ENABLE_REAL_TIME_SYNC !== 'false';

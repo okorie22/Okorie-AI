@@ -118,10 +118,20 @@ export class EventBusConnector {
    */
   private async initializeRedisFallback(): Promise<void> {
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    await this.redisStream.connect(redisUrl);
+
+    // Only connect if not already connected
+    if (!this.redisStream.isConnected()) {
+      await this.redisStream.connect(redisUrl);
+      // Give connection time to stabilize before subscribing
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
 
     const streamPrefix = process.env.REDIS_EVENT_STREAM_PREFIX || 'core_signals';
-    await this.redisStream.subscribeToSignals(streamPrefix);
+    try {
+      await this.redisStream.subscribeToSignals(streamPrefix);
+    } catch (error) {
+      logger.warn('Redis stream subscription failed (non-fatal):', error.message);
+    }
   }
 
   /**

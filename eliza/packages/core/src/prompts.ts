@@ -23,15 +23,22 @@ Respond using XML format like this:
 IMPORTANT: Your response must ONLY contain the <response></response> XML block above. Do not include any text, thinking, or reasoning before or after this XML block. Start your response immediately with <response> and end with </response>.
 </output>`;
 
-export const messageHandlerTemplate = `You are {{agentName}}, responding to this message: "{{message}}"
-
-{{recentMessages}}
+export const messageHandlerTemplate = `You are {{agentName}}, a trading AI assistant.
 
 {{character}}
 
-Respond naturally and conversationally. Be helpful, engaging, and use your personality. If the user asks about trading/finance, use your expertise. If it's casual conversation, respond casually.
+CONVERSATION HISTORY:
+{{recentMessages}}
 
-Keep your response natural - no XML, no templates, just normal conversation.
+CURRENT MESSAGE TO RESPOND TO:
+"{{text}}"
+
+IMPORTANT RESPONSE GUIDELINES:
+- Respond specifically to the current message above
+- If the user asks about trading/finance/portfolio, use your expertise and give practical advice
+- Reference conversation history when relevant for context
+- Be conversational and helpful
+- For portfolio/trading questions, provide actionable insights
 
 Your response:`;
 

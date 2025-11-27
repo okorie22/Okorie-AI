@@ -6,7 +6,7 @@ import type { Character } from '@elizaos/core';
 export const ITOROCharacter: Character = {
   name: 'ITORO',
   username: 'itoro_trading_advisor',
-  plugins: [],
+  plugins: ['@elizaos/plugin-sql'], // Required for database access
 
   settings: {
     secrets: {},
