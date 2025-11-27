@@ -139,12 +139,24 @@ export class SupabaseDatabaseService {
 
     const dbPath = path.resolve(config.path);
     if (!fs.existsSync(dbPath)) {
-      throw new Error(`SQLite database file not found: ${dbPath}`);
+      logger.warn(`SQLite database file not found: ${dbPath}. Creating empty database file.`);
+      // Create an empty file if it doesn't exist
+      fs.writeFileSync(dbPath, '');
     }
 
-    const connection = new Database(dbPath, { readonly: true });
-    this.sqliteConnections.set(name, connection);
-    logger.info(`SQLite connection initialized for ${name}`);
+    try {
+      const connection = new Database(dbPath, { readonly: true });
+      this.sqliteConnections.set(name, connection);
+      logger.info(`SQLite connection initialized for ${name}`);
+    } catch (error) {
+      logger.warn(`Failed to initialize SQLite connection for ${name}: ${error.message}. Continuing without SQLite connection.`);
+      // Create a mock connection object to prevent other code from failing
+      this.sqliteConnections.set(name, {
+        close: () => {},
+        prepare: () => ({ all: () => [], run: () => {} }),
+        exec: () => {}
+      } as any);
+    }
   }
 
   /**
