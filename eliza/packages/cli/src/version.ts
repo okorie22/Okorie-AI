@@ -9,7 +9,7 @@ export const CLI_NAME = '@elizaos/cli';
 export const CLI_DESCRIPTION = 'elizaOS CLI - Manage your AI agents and plugins';
 
 // Build metadata
-export const BUILD_TIME = '2025-11-27T22:55:27.412Z';
+export const BUILD_TIME = '2025-11-27T23:25:36.563Z';
 export const BUILD_ENV = 'production';
 
 // Export as default for convenience
