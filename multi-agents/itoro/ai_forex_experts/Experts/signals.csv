@@ -1,6 +1,0 @@
-id,symbol,side,type,price,sl,tp,comment
-1,XAUUSD.SV,BUY,MARKET,0,0,0,Test market buy mapped to broker symbol
-2,EURUSDm,SELL,MARKET,0,0,0,Test market sell EURUSD suffix mapping
-3,GOLD,BUY,LIMIT,2350.00,0,0,Gold alias limit order (adjust if needed)
-4,SILVER,SELL,STOP,29.50,0,0,Silver alias stop order (adjust if needed)
-5,USDJPY,BUY,MARKET,0,0,0,JPY example fixed pips
