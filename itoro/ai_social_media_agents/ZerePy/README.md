@@ -1,13 +1,14 @@
 # ZerePy
 
-ZerePy is an open-source Python framework designed to let you deploy your own agents on X, powered by OpenAI or Anthropic LLMs.
+ZerePy is an open-source Python framework designed to let you deploy your own agents on social media platforms, powered by OpenAI or Anthropic LLMs.
 
-ZerePy is built from a modularized version of the Zerebro backend. With ZerePy, you can launch your own agent with 
+ZerePy is built from a modularized version of the Zerebro backend. With ZerePy, you can launch your own agent with
 similar core functionality as Zerebro. For creative outputs, you'll need to fine-tune your own model.
 
 ## Features
 - CLI interface for managing agents
-- Twitter integration
+- **Twitter/X integration** - Post tweets, reply, like, and read timeline
+- **Discord integration** - Complete server management, moderation, and community engagement
 - OpenAI/Anthropic LLM support
 - Modular connection system
 
@@ -28,11 +29,12 @@ System:
 - Poetry 1.5 or higher
 
 API keys:
-  - LLM: make an account and grab an API key 
+  - LLM: make an account and grab an API key
       + OpenAI: https://platform.openai.com/api-keys.
       + Anthropic: https://console.anthropic.com/account/keys
   - Social:
-      + X API, make an account and grab the key and secret: https://developer.x.com/en/docs/authentication/oauth-1-0a/api-key-and-secret
+      + X API: make an account and grab the key and secret: https://developer.x.com/en/docs/authentication/oauth-1-0a/api-key-and-secret
+      + Discord Bot: create a bot at https://discord.com/developers/applications and get the bot token
 
 ## Installation
 
@@ -74,11 +76,13 @@ poetry run python main.py
 1. Configure your connections:
    ```
    configure-connection twitter
+   configure-connection discord
    configure-connection openai
    ```
 4. Load your agent (usually one is loaded by default, which can be set using the CLI or in agents/general.json):
    ```
    load-agent example
+   load-agent discord_manager  # For Discord management
    ```
 5. Start your agent:
    ```
@@ -91,7 +95,31 @@ The secret to having a good output from the agent is to provide as much detail a
 
 If you want to take it a step further, you can fine tune your own model: https://platform.openai.com/docs/guides/fine-tuning.
 
-Create a new JSON file in the `agents` directory following this structure:
+## Discord Server Management
+
+ZerePy includes comprehensive Discord server management capabilities. Your AI agent can:
+
+**Server Administration:**
+- Create and manage channels (text, voice, categories)
+- Manage roles and permissions
+- Handle member moderation (kick, ban, timeout)
+- Configure auto-moderation and spam prevention
+
+**Community Engagement:**
+- Send automated welcome messages
+- Create polls and scheduled events
+- Monitor server activity and engagement
+- Generate community reports
+
+**Content Moderation:**
+- Delete inappropriate messages
+- Bulk message management
+- User behavior monitoring
+- Custom moderation rules
+
+### Discord Agent Configuration
+
+Create a new JSON file in the `agents` directory following this structure for Discord management:
 
 ```json
 {
@@ -134,6 +162,46 @@ Create a new JSON file in the `agents` directory following this structure:
     {"name": "like-tweet", "weight": 1}
   ]
 }
+
+### Discord Agent Example
+
+For Discord server management, use this configuration structure:
+
+```json
+{
+  "name": "DiscordServerManager",
+  "bio": [
+    "You are an AI-powered Discord server manager responsible for maintaining a healthy, engaging, and well-moderated community.",
+    "Your primary goals are to ensure smooth server operations, handle moderation tasks, and maintain a positive environment."
+  ],
+  "traits": ["Professional", "Fair", "Proactive", "Organized", "Helpful"],
+  "examples": [
+    "Welcome to our server! Please read the rules in #rules and introduce yourself in #introductions.",
+    "I've temporarily muted this user for spamming. Let's keep our conversations clean and respectful."
+  ],
+  "loop_delay": 60,
+  "config": [
+    {
+      "name": "discord",
+      "guild_id": "123456789012345678",
+      "command_prefix": "!",
+      "log_channel_id": "123456789012345678",
+      "welcome_channel_id": "123456789012345678",
+      "auto_mod_enabled": true,
+      "spam_threshold": 5
+    },
+    {
+      "name": "openai",
+      "model": "gpt-4"
+    }
+  ],
+  "tasks": [
+    {"name": "moderate-server", "weight": 4},
+    {"name": "engage-community", "weight": 3},
+    {"name": "monitor-activity", "weight": 2}
+  ]
+}
+```
 ```
 
 ---
