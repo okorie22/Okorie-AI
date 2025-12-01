@@ -9,6 +9,7 @@ similar core functionality as Zerebro. For creative outputs, you'll need to fine
 - CLI interface for managing agents
 - **Twitter/X integration** - Post tweets, reply, like, and read timeline
 - **Discord integration** - Complete server management, moderation, and community engagement
+- **YouTube integration** - Full channel management, video uploads, analytics, and live streaming
 - OpenAI/Anthropic LLM support
 - Modular connection system
 
@@ -35,6 +36,7 @@ API keys:
   - Social:
       + X API: make an account and grab the key and secret: https://developer.x.com/en/docs/authentication/oauth-1-0a/api-key-and-secret
       + Discord Bot: create a bot at https://discord.com/developers/applications and get the bot token
+      + YouTube API: create OAuth 2.0 credentials at https://console.developers.google.com/ and enable YouTube Data API v3
 
 ## Installation
 
@@ -77,12 +79,14 @@ poetry run python main.py
    ```
    configure-connection twitter
    configure-connection discord
+   configure-connection youtube
    configure-connection openai
    ```
 4. Load your agent (usually one is loaded by default, which can be set using the CLI or in agents/general.json):
    ```
    load-agent example
    load-agent discord_manager  # For Discord management
+   load-agent youtube_manager  # For YouTube management
    ```
 5. Start your agent:
    ```
@@ -204,5 +208,80 @@ For Discord server management, use this configuration structure:
 ```
 ```
 
+## YouTube Channel Management
+
+ZerePy includes comprehensive YouTube channel management capabilities. Your AI agent can:
+
+**Video Management:**
+- Upload videos with custom metadata, thumbnails, and scheduling
+- Update video titles, descriptions, tags, and privacy settings
+- Delete videos and manage video library
+- Set custom thumbnails and optimize video presentation
+
+**Playlist Management:**
+- Create and manage playlists with custom descriptions
+- Add/remove videos from playlists with position control
+- Organize content for better viewer navigation
+- Bulk playlist operations
+
+**Community Engagement:**
+- Moderate comments with approval/rejection/deletion
+- Reply to comments automatically or manually
+- Monitor comment analytics and engagement patterns
+- Bulk comment moderation operations
+
+**Analytics & Optimization:**
+- Comprehensive channel and video performance metrics
+- Audience demographics and geographic data
+- Revenue analytics and monetization insights
+- Content strategy recommendations based on data
+
+**Live Streaming:**
+- Schedule and manage live broadcasts
+- Monitor live chat and audience interaction
+- Stream analytics and performance tracking
+- Automated stream management and moderation
+
+**Channel Administration:**
+- Update channel branding, banner, and description
+- Manage channel settings and privacy options
+- Feature channels and optimize channel layout
+- Bulk operations across multiple videos
+
+### YouTube Agent Configuration
+
+For YouTube channel management, use this configuration structure:
+
+```json
+{
+  "name": "YouTubeChannelManager",
+  "bio": [
+    "I am an AI-powered YouTube channel manager responsible for content strategy, engagement, and growth optimization.",
+    "My goals include uploading high-quality content, managing community interactions, analyzing performance, and maximizing channel growth."
+  ],
+  "traits": ["Strategic", "Data-driven", "Community-focused", "Creative", "Analytical"],
+  "loop_delay": 300,
+  "config": [
+    {
+      "name": "youtube",
+      "auto_upload_enabled": true,
+      "comment_moderation": "auto",
+      "analytics_reporting": true,
+      "live_stream_management": true
+    },
+    {
+      "name": "openai",
+      "model": "gpt-4"
+    }
+  ],
+  "tasks": [
+    {"name": "analyze_performance", "weight": 4},
+    {"name": "moderate_comments", "weight": 3},
+    {"name": "engage_community", "weight": 3}
+  ]
+}
+```
+
 ---
+
 Made with ♥ @Blorm.xyz
