@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from src.connection_manager import ConnectionManager
-from src.helpers import print_h_bar
+from src.helpers import print_h_bar, find_env_file
 
 REQUIRED_FIELDS = ["name", "bio", "traits", "examples", "loop_delay", "config", "tasks"]
 
@@ -32,14 +32,12 @@ class ZerePyAgent:
             self.loop_delay = agent_dict["loop_delay"] 
             self.connection_manager = ConnectionManager(agent_dict["config"])
             
-            # Extract Twitter config
+            # Extract Twitter config (optional for multi-platform agents)
             twitter_config = next((config for config in agent_dict["config"] if config["name"] == "twitter"), None)
-            if not twitter_config:
-                raise KeyError("Twitter configuration is required")
 
             # TODO: These should probably live in the related task parameters
-            self.tweet_interval = twitter_config.get("tweet_interval", 900)
-            self.own_tweet_replies_count = twitter_config.get("own_tweet_replies_count", 2)
+            self.tweet_interval = twitter_config.get("tweet_interval", 900) if twitter_config else 900
+            self.own_tweet_replies_count = twitter_config.get("own_tweet_replies_count", 2) if twitter_config else 2
 
             self.is_llm_set = False
             
@@ -64,11 +62,10 @@ class ZerePyAgent:
             raise ValueError("No configured LLM provider found")
         self.model_provider = llm_providers[0]
         
-        # Load Twitter username for self-reply detection
-        load_dotenv()
+        # Load Twitter username for self-reply detection (optional)
+        find_env_file()
         self.username = os.getenv('TWITTER_USERNAME', '').lower()
-        if not self.username:
-                raise ValueError("Twitter username is required")
+        # Twitter username is optional - only needed if using Twitter tasks
 
     def _construct_system_prompt(self) -> str:
         """Construct the system prompt from agent configuration"""

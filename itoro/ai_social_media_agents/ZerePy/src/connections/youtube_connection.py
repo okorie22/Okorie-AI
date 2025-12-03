@@ -280,13 +280,16 @@ class YouTubeConnection(BaseConnection):
                     logger.error("Missing environment variables: YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET")
                 return False
 
-            # Try to initialize service
-            self._init_youtube_service()
+            # Check if OAuth token file exists (indicates successful configuration)
+            token_path = Path.home() / '.zerepy' / 'youtube_token.pickle'
+            if not token_path.exists():
+                if verbose:
+                    logger.info("YouTube OAuth token not found - run 'configure-connection youtube' to set up")
+                return False
 
-            # Test by getting channel info
-            self._get_channel_info()
-
-            logger.debug("YouTube configuration is valid")
+            # Quick validation: just check if token file exists and env vars are set
+            # Don't actually connect during is_configured() check to avoid blocking CLI
+            logger.debug("YouTube configuration is valid (token file exists)")
             return True
 
         except Exception as e:

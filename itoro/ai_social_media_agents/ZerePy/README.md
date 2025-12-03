@@ -33,6 +33,7 @@ API keys:
   - LLM: make an account and grab an API key
       + OpenAI: https://platform.openai.com/api-keys.
       + Anthropic: https://console.anthropic.com/account/keys
+      + DeepSeek: https://platform.deepseek.com/ (uses DEEPSEEK_KEY)
   - Social:
       + X API: make an account and grab the key and secret: https://developer.x.com/en/docs/authentication/oauth-1-0a/api-key-and-secret
       + Discord Bot: create a bot at https://discord.com/developers/applications and get the bot token

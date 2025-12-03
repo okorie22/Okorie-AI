@@ -6,6 +6,7 @@ from src.connections.openai_connection import OpenAIConnection
 from src.connections.twitter_connection import TwitterConnection
 from src.connections.discord_connection import DiscordConnection
 from src.connections.youtube_connection import YouTubeConnection
+from src.connections.deepseek_connection import DeepSeekConnection
 
 logger = logging.getLogger("connection_manager")
 
@@ -23,6 +24,8 @@ class ConnectionManager:
             return DiscordConnection
         elif class_name == "youtube":
             return YouTubeConnection
+        elif class_name == "deepseek":
+            return DeepSeekConnection
         elif class_name == "anthropic":
             return AnthropicConnection
         elif class_name == "openai":
@@ -122,22 +125,61 @@ class ConnectionManager:
                 
             action = connection.actions[action_name]
             
-            # Count required parameters
-            required_params_count = sum(1 for param in action.parameters if param.required)
-            
-            # Check if we have enough parameters
-            if len(params) != required_params_count:
-                param_names = [param.name for param in action.parameters if param.required]
-                logging.error(f"\nError: Expected {required_params_count} required parameters for {action_name}: {', '.join(param_names)}")
-                return None
-            
-            # Convert list of params to kwargs dictionary
+            # Parse parameters - support both key=value and positional formats
             kwargs = {}
-            param_index = 0
+
+            # Check if parameters contain key=value pairs
+            has_key_value_pairs = any('=' in str(param) for param in params)
+
+            if has_key_value_pairs:
+                # Parse key=value pairs
+                for param_str in params:
+                    param_str = str(param_str).strip()
+                    if '=' in param_str:
+                        try:
+                            key, value = param_str.split('=', 1)
+                            key = key.strip()
+                            value = value.strip()
+
+                            # Handle quoted values
+                            if (value.startswith('"') and value.endswith('"')) or \
+                               (value.startswith("'") and value.endswith("'")):
+                                value = value[1:-1]  # Remove quotes
+
+                            kwargs[key] = value
+                        except ValueError:
+                            logging.error(f"\nError: Invalid key=value parameter format: {param_str}")
+                            return None
+                    else:
+                        logging.error(f"\nError: Mixed parameter formats. Use either all positional or all key=value: {param_str}")
+                        return None
+            else:
+                # Use positional parameters (backward compatibility)
+                required_params_count = sum(1 for param in action.parameters if param.required)
+
+                # Check if we have enough parameters
+                if len(params) != required_params_count:
+                    param_names = [param.name for param in action.parameters if param.required]
+                    logging.error(f"\nError: Expected {required_params_count} required parameters for {action_name}: {', '.join(param_names)}")
+                    logging.info("You can also use key=value format: agent-action {connection} {action} key1=value1 key2=value2")
+                    return None
+
+                # Convert list of params to kwargs dictionary
+                param_index = 0
+                for param in action.parameters:
+                    if param.required:
+                        kwargs[param.name] = params[param_index]
+                        param_index += 1
+
+            # Validate that all required parameters are provided
+            missing_params = []
             for param in action.parameters:
-                if param.required:
-                    kwargs[param.name] = params[param_index]
-                    param_index += 1
+                if param.required and param.name not in kwargs:
+                    missing_params.append(param.name)
+
+            if missing_params:
+                logging.error(f"\nError: Missing required parameters: {', '.join(missing_params)}")
+                return None
             
             return connection.perform_action(action_name, kwargs)
             

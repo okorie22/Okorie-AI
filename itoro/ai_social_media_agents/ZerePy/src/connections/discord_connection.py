@@ -1,12 +1,13 @@
 import os
 import logging
 import asyncio
+import threading
 import discord
 from typing import Dict, Any, List, Optional
 from discord.ext import commands
-from dotenv import set_key, load_dotenv
+from dotenv import set_key
 from src.connections.base_connection import BaseConnection, Action, ActionParameter
-from src.helpers import print_h_bar
+from src.helpers import print_h_bar, find_env_file
 
 logger = logging.getLogger("connections.discord_connection")
 
@@ -64,7 +65,6 @@ class DiscordConnection(BaseConnection):
     def _get_credentials(self) -> Dict[str, str]:
         """Get Discord bot token from environment with validation"""
         logger.debug("Retrieving Discord bot token")
-        load_dotenv()
 
         token = os.getenv('DISCORD_BOT_TOKEN')
         if not token:
@@ -89,6 +89,10 @@ class DiscordConnection(BaseConnection):
         """Test bot connection and permissions"""
         try:
             await bot.login(self._get_credentials()['token'])
+            
+            # Actually connect the bot to Discord to populate guild cache
+            await bot.connect(reconnect=False)
+            await bot.wait_until_ready(timeout=10)
 
             # Get the target guild
             guild = bot.get_guild(int(self.config["guild_id"]))
@@ -216,15 +220,22 @@ class DiscordConnection(BaseConnection):
         logger.debug("Checking Discord configuration status")
         try:
             credentials = self._get_credentials()
-
-            # Test the configuration asynchronously
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                result = loop.run_until_complete(self._test_bot_connection(self._create_bot()))
-                return result
-            finally:
-                loop.close()
+            
+            # Quick check: just verify token exists and looks valid
+            token = credentials.get('token', '')
+            if not token or len(token) < 20:
+                if verbose:
+                    logger.error("Discord bot token not found or invalid")
+                return False
+            
+            # Token format check (Discord tokens start with specific patterns)
+            if not (token.startswith('MT') or token.startswith('OD') or token.startswith('Nz')):
+                if verbose:
+                    logger.warning("Discord token format may be invalid")
+            
+            # For quick checks, just verify token exists
+            # Full connection test is done during configure() or when actually using the bot
+            return True
 
         except Exception as e:
             if verbose:
@@ -462,7 +473,36 @@ class DiscordConnection(BaseConnection):
         # Call the appropriate method based on action name
         method_name = action_name.replace('-', '_')
         method = getattr(self, method_name)
-        return asyncio.run(method(**kwargs))
+
+        # Run Discord operations in a separate thread with its own event loop
+        # This prevents conflicts with the CLI's event loop and heartbeat blocking
+        result_container = {'result': None, 'exception': None}
+        
+        def run_in_thread():
+            # Create a new event loop for this thread
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                result_container['result'] = new_loop.run_until_complete(method(**kwargs))
+            except Exception as e:
+                result_container['exception'] = e
+            finally:
+                # Don't close the loop immediately - let Discord cleanup
+                # The loop will be cleaned up when thread ends
+                pass
+        
+        # Run in a separate thread to avoid event loop conflicts
+        thread = threading.Thread(target=run_in_thread, daemon=True)
+        thread.start()
+        thread.join(timeout=30)  # 30 second timeout
+        
+        if thread.is_alive():
+            raise DiscordAPIError("Discord operation timed out after 30 seconds")
+        
+        if result_container['exception']:
+            raise result_container['exception']
+        
+        return result_container['result']
 
     # Message Management Actions
     async def send_message(self, channel_id: str, content: str,
@@ -982,6 +1022,93 @@ class DiscordConnection(BaseConnection):
         except Exception as e:
             raise DiscordAPIError(f"Failed to get server info: {str(e)}")
 
+    async def get_channel_activity(self, channel_id: str = None, hours_back: int = 24, **kwargs) -> dict:
+        """Get activity statistics for channels"""
+        try:
+            guild, bot = await self._ensure_bot_ready()
+
+            # Calculate time threshold
+            from datetime import datetime, timedelta
+            time_threshold = datetime.utcnow() - timedelta(hours=hours_back)
+
+            channels_to_analyze = []
+            if channel_id:
+                # Analyze specific channel
+                channel = guild.get_channel(int(channel_id))
+                if not channel:
+                    raise DiscordAPIError(f"Channel {channel_id} not found")
+                if not isinstance(channel, discord.TextChannel):
+                    raise DiscordAPIError(f"Channel {channel_id} is not a text channel")
+                channels_to_analyze = [channel]
+            else:
+                # Analyze all text channels
+                channels_to_analyze = [c for c in guild.channels if isinstance(c, discord.TextChannel)]
+
+            total_messages = 0
+            unique_users = set()
+            channel_stats = []
+
+            # Check permissions for reading message history
+            bot_member = guild.get_member(bot.user.id)
+            if not bot_member:
+                raise DiscordAPIError("Bot member not found in guild")
+
+            for channel in channels_to_analyze:
+                try:
+                    # Check if bot can read messages in this channel
+                    permissions = channel.permissions_for(bot_member)
+                    if not permissions.read_messages or not permissions.read_message_history:
+                        logger.warning(f"Bot lacks permission to read message history in {channel.name}")
+                        continue
+
+                    # Get recent messages
+                    messages = []
+                    async for message in channel.history(limit=1000, after=time_threshold):
+                        messages.append(message)
+
+                    message_count = len(messages)
+                    users_in_channel = set(msg.author.id for msg in messages)
+
+                    # Calculate activity metrics
+                    if message_count > 0:
+                        avg_messages_per_hour = message_count / hours_back
+                        most_recent_message = max(messages, key=lambda m: m.created_at)
+                        oldest_message = min(messages, key=lambda m: m.created_at)
+
+                        channel_stats.append({
+                            "channel_id": str(channel.id),
+                            "channel_name": channel.name,
+                            "message_count": message_count,
+                            "unique_users": len(users_in_channel),
+                            "avg_messages_per_hour": round(avg_messages_per_hour, 2),
+                            "most_recent_message": most_recent_message.created_at.isoformat(),
+                            "oldest_message": oldest_message.created_at.isoformat(),
+                            "user_ids": list(users_in_channel)
+                        })
+
+                        total_messages += message_count
+                        unique_users.update(users_in_channel)
+
+                except Exception as e:
+                    logger.warning(f"Failed to analyze channel {channel.name}: {str(e)}")
+                    continue
+
+            return {
+                "analyzed_channels": len(channel_stats),
+                "total_messages": total_messages,
+                "total_unique_users": len(unique_users),
+                "hours_analyzed": hours_back,
+                "channels": channel_stats,
+                "summary": {
+                    "most_active_channel": max(channel_stats, key=lambda c: c["message_count"])["channel_name"] if channel_stats else None,
+                    "least_active_channel": min(channel_stats, key=lambda c: c["message_count"])["channel_name"] if channel_stats else None,
+                    "avg_messages_per_channel": round(total_messages / len(channel_stats), 2) if channel_stats else 0
+                }
+            }
+
+        except Exception as e:
+            raise DiscordAPIError(f"Failed to get channel activity: {str(e)}")
+
     async def get_member_info(self, user_id: str, **kwargs) -> dict:
         """Get detailed information about a server member"""
         try:
@@ -1019,19 +1146,37 @@ class DiscordConnection(BaseConnection):
     # Helper method to ensure bot is ready
     async def _ensure_bot_ready(self) -> tuple:
         """Ensure bot is initialized and connected"""
+        # Check if bot exists but is closed - reset if so
+        if self.bot and self.bot.is_closed():
+            self.bot = None
+        
         if not self.bot:
             self.bot = self._create_bot()
 
+        # Check if bot is already connected and ready
+        if not self.bot.is_ready():
             # Start the bot if not already running
-            if not self.bot.is_ready():
-                try:
-                    await self.bot.login(self._get_credentials()['token'])
-                    # We won't call start() here as it would run the event loop
-                except Exception as e:
-                    raise DiscordAPIError(f"Failed to initialize bot: {str(e)}")
+            try:
+                await self.bot.login(self._get_credentials()['token'])
+                await self.bot.connect(reconnect=False)
+                await self.bot.wait_until_ready(timeout=10)
+            except Exception as e:
+                raise DiscordAPIError(f"Failed to initialize bot: {str(e)}")
 
         guild = self.bot.get_guild(int(self.config["guild_id"]))
         if not guild:
             raise DiscordAPIError(f"Guild {self.config['guild_id']} not found")
 
         return guild, self.bot
+
+    async def _cleanup_bot(self):
+        """Disconnect bot after action completes (optional cleanup)"""
+        if self.bot:
+            try:
+                if self.bot.is_ready() and not self.bot.is_closed():
+                    await self.bot.close()
+                logger.debug("Discord bot disconnected successfully")
+            except Exception as e:
+                logger.warning(f"Error disconnecting bot: {e}")
+        # Note: We don't set self.bot = None here to avoid race conditions
+        # The bot will be checked for closed state in _ensure_bot_ready()

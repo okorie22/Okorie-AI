@@ -1,6 +1,7 @@
 import sys
 import json
 import logging
+import shlex
 from dataclasses import dataclass
 from typing import Callable, Dict, List
 from pathlib import Path
@@ -65,7 +66,9 @@ class ZerePyCLI:
             Command(
                 name="agent-action",
                 description="Runs a single agent action.",
-                tips=["Format: agent-action {connection} {action}",
+                tips=["Format: agent-action {connection} {action} [parameters]",
+                      "Parameters can be positional: channel_id content",
+                      "Or key=value format: channel_id=123 content=\"Hello World\"",
                       "Use 'list-connections' to see available connections.",
                       "Use 'list-actions' to see available actions."],
                 handler=self.agent_action,
@@ -230,7 +233,46 @@ class ZerePyCLI:
 
     def _handle_command(self, input_string: str) -> None:
         """Parse and handle a command input"""
-        input_list = input_string.split()
+        try:
+            # Use shlex.split() to properly handle quoted strings with spaces
+            input_list = shlex.split(input_string)
+        except ValueError as e:
+            # If shlex parsing fails (e.g., unmatched quotes), fall back to simple split
+            logger.error(f"Error parsing command: {e}")
+            logger.info("Tip: Make sure quotes are properly matched")
+            input_list = input_string.split()
+        
+        if not input_list:
+            return
+        
+        # Post-process to handle key=value pairs where quoted value was split
+        # shlex should handle this, but if it doesn't, we need to rejoin split values
+        processed_list = []
+        i = 0
+        while i < len(input_list):
+            token = input_list[i]
+            # Check if this is a key=value pair
+            if '=' in token:
+                key, value_part = token.split('=', 1)
+                # Check if next token exists and doesn't have '=' - might be continuation
+                if i + 1 < len(input_list) and '=' not in input_list[i + 1]:
+                    # This might be a split quoted value - collect continuation tokens
+                    value_parts = [value_part] if value_part else []
+                    i += 1
+                    # Collect all following tokens that don't have '=' as part of the value
+                    while i < len(input_list) and '=' not in input_list[i]:
+                        value_parts.append(input_list[i])
+                        i += 1
+                    # Join with spaces and create single key=value token
+                    if value_parts:
+                        processed_list.append(f"{key}={' '.join(value_parts)}")
+                    else:
+                        processed_list.append(token)
+                    continue
+            processed_list.append(token)
+            i += 1
+        
+        input_list = processed_list
         command_string = input_list[0].lower()
 
         try:
