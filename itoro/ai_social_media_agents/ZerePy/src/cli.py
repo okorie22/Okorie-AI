@@ -246,7 +246,7 @@ class ZerePyCLI:
             return
         
         # Post-process to handle key=value pairs where quoted value was split
-        # shlex should handle this, but if it doesn't, we need to rejoin split values
+        # Only join if shlex actually split a quoted value (value is empty or very short)
         processed_list = []
         i = 0
         while i < len(input_list):
@@ -254,8 +254,12 @@ class ZerePyCLI:
             # Check if this is a key=value pair
             if '=' in token:
                 key, value_part = token.split('=', 1)
-                # Check if next token exists and doesn't have '=' - might be continuation
-                if i + 1 < len(input_list) and '=' not in input_list[i + 1]:
+                # Only join if:
+                # 1. Value part is empty or very short (suggests it was split)
+                # 2. Next token exists and doesn't have '='
+                # 3. We haven't seen another key=value pair yet
+                if (not value_part or len(value_part) < 3) and \
+                   i + 1 < len(input_list) and '=' not in input_list[i + 1]:
                     # This might be a split quoted value - collect continuation tokens
                     value_parts = [value_part] if value_part else []
                     i += 1
@@ -266,9 +270,7 @@ class ZerePyCLI:
                     # Join with spaces and create single key=value token
                     if value_parts:
                         processed_list.append(f"{key}={' '.join(value_parts)}")
-                    else:
-                        processed_list.append(token)
-                    continue
+                        continue
             processed_list.append(token)
             i += 1
         

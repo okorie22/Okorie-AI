@@ -487,9 +487,19 @@ class DiscordConnection(BaseConnection):
             except Exception as e:
                 result_container['exception'] = e
             finally:
-                # Don't close the loop immediately - let Discord cleanup
-                # The loop will be cleaned up when thread ends
-                pass
+                # Clean up any pending tasks
+                try:
+                    # Cancel all pending tasks
+                    pending = asyncio.all_tasks(new_loop)
+                    for task in pending:
+                        task.cancel()
+                    # Run until all tasks are cancelled
+                    if pending:
+                        new_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                except Exception:
+                    pass
+                finally:
+                    new_loop.close()
         
         # Run in a separate thread to avoid event loop conflicts
         thread = threading.Thread(target=run_in_thread, daemon=True)
@@ -1159,7 +1169,14 @@ class DiscordConnection(BaseConnection):
             try:
                 await self.bot.login(self._get_credentials()['token'])
                 await self.bot.connect(reconnect=False)
-                await self.bot.wait_until_ready(timeout=10)
+                # Manual wait instead of wait_until_ready(timeout=...) to avoid context manager issues
+                # Wait up to 10 seconds for bot to become ready
+                for _ in range(100):  # 10 seconds max (100 * 0.1s)
+                    if self.bot.is_ready():
+                        break
+                    await asyncio.sleep(0.1)
+                if not self.bot.is_ready():
+                    raise DiscordAPIError("Bot failed to become ready within 10 seconds")
             except Exception as e:
                 raise DiscordAPIError(f"Failed to initialize bot: {str(e)}")
 
