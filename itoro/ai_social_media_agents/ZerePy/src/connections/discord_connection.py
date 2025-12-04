@@ -34,7 +34,10 @@ class DiscordConnection(BaseConnection):
         self._intents.messages = True
         self._intents.reactions = True
         self._intents.voice_states = True
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._bot_lock = threading.Lock()
+        self._bot_thread: Optional[threading.Thread] = None
+        self._bot_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._bot_ready_event = threading.Event()
 
     @property
     def is_llm_provider(self) -> bool:
@@ -85,6 +88,107 @@ class DiscordConnection(BaseConnection):
 
         return bot
 
+    def _start_bot_in_thread(self):
+        """Start the bot in its own thread with its own event loop"""
+        try:
+            self._bot_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._bot_loop)
+
+            # Create bot if needed
+            if not self.bot:
+                self.bot = self._create_bot()
+            
+            # Always add ready event listener to set the ready event
+            # (in case bot was reused, we need to ensure listener exists)
+            @self.bot.event
+            async def on_ready():
+                self._bot_ready_event.set()
+
+            # Start the bot
+            token = self._get_credentials()['token']
+
+            # Use the event loop to run the bot
+            self._bot_loop.run_until_complete(self._run_bot(token))
+
+        except Exception as e:
+            logger.error(f"Error in bot thread: {e}")
+            # Set the event even on error so waiting threads don't hang
+            self._bot_ready_event.set()
+        finally:
+            if self._bot_loop and not self._bot_loop.is_closed():
+                self._bot_loop.close()
+
+    async def _run_bot(self, token: str):
+        """Run the bot until disconnected"""
+        try:
+            await self.bot.login(token)
+            await self.bot.connect(reconnect=True)
+
+            # Don't use wait_until_ready() - let the on_ready event listener handle it
+            # Just wait for the ready event to be set (with timeout)
+            # Give it time for the ready event to fire
+            for i in range(30):  # 3 seconds max
+                if self._bot_ready_event.is_set():
+                    break
+                await asyncio.sleep(0.1)
+            
+            if not self._bot_ready_event.is_set():
+                # Set it manually as fallback
+                self._bot_ready_event.set()
+
+            # Keep the bot running
+            while not self.bot.is_closed():
+                await asyncio.sleep(1)
+
+        except Exception as e:
+            logger.error(f"Error running bot: {e}")
+            # Set event even on error to unblock waiters
+            self._bot_ready_event.set()
+
+    def _ensure_bot_connected(self):
+        """Ensure the bot is connected and ready"""
+        with self._bot_lock:
+            if self.bot and not self.bot.is_closed() and self._bot_ready_event.is_set():
+                return  # Bot is already connected
+
+            # Reset state
+            self._bot_ready_event.clear()
+
+            if self.bot and not self.bot.is_closed():
+                # Try to close existing bot
+                try:
+                    if self._bot_loop:
+                        asyncio.run_coroutine_threadsafe(self.bot.close(), self._bot_loop)
+                except Exception:
+                    pass
+
+            # Start new bot thread
+            self._bot_thread = threading.Thread(target=self._start_bot_in_thread, daemon=True)
+            self._bot_thread.start()
+
+            # Wait for bot to be ready (with timeout)
+            ready = self._bot_ready_event.wait(timeout=30)
+
+            if not ready:
+                raise DiscordAPIError("Bot failed to become ready within 30 seconds")
+
+    def cleanup(self):
+        """Gracefully shutdown the bot connection"""
+        with self._bot_lock:
+            if self.bot and not self.bot.is_closed():
+                try:
+                    if self._bot_loop and not self._bot_loop.is_closed():
+                        # Schedule bot close in the bot's event loop
+                        future = asyncio.run_coroutine_threadsafe(
+                            self.bot.close(), 
+                            self._bot_loop
+                        )
+                        future.result(timeout=5)  # Wait up to 5 seconds
+                except Exception as e:
+                    logger.warning(f"Error during cleanup: {e}")
+            self._bot_ready_event.clear()
+            self.bot = None
+
     async def _test_bot_connection(self, bot: commands.Bot) -> bool:
         """Test bot connection and permissions"""
         try:
@@ -92,7 +196,14 @@ class DiscordConnection(BaseConnection):
             
             # Actually connect the bot to Discord to populate guild cache
             await bot.connect(reconnect=False)
-            await bot.wait_until_ready(timeout=10)
+            # Manual wait instead of wait_until_ready(timeout=...) to avoid context manager issues
+            # Wait up to 10 seconds for bot to become ready
+            for _ in range(100):  # 10 seconds max (100 * 0.1s)
+                if bot.is_ready():
+                    break
+                await asyncio.sleep(0.1)
+            if not bot.is_ready():
+                raise DiscordAPIError("Bot failed to become ready within 10 seconds")
 
             # Get the target guild
             guild = bot.get_guild(int(self.config["guild_id"]))
@@ -470,49 +581,24 @@ class DiscordConnection(BaseConnection):
         if errors:
             raise ValueError(f"Invalid parameters: {', '.join(errors)}")
 
+        # Ensure bot is connected
+        self._ensure_bot_connected()
+
         # Call the appropriate method based on action name
         method_name = action_name.replace('-', '_')
         method = getattr(self, method_name)
 
-        # Run Discord operations in a separate thread with its own event loop
-        # This prevents conflicts with the CLI's event loop and heartbeat blocking
-        result_container = {'result': None, 'exception': None}
-        
-        def run_in_thread():
-            # Create a new event loop for this thread
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            try:
-                result_container['result'] = new_loop.run_until_complete(method(**kwargs))
-            except Exception as e:
-                result_container['exception'] = e
-            finally:
-                # Clean up any pending tasks
-                try:
-                    # Cancel all pending tasks
-                    pending = asyncio.all_tasks(new_loop)
-                    for task in pending:
-                        task.cancel()
-                    # Run until all tasks are cancelled
-                    if pending:
-                        new_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-                except Exception:
-                    pass
-                finally:
-                    new_loop.close()
-        
-        # Run in a separate thread to avoid event loop conflicts
-        thread = threading.Thread(target=run_in_thread, daemon=True)
-        thread.start()
-        thread.join(timeout=30)  # 30 second timeout
-        
-        if thread.is_alive():
+        # Run the action in the bot's event loop
+        try:
+            future = asyncio.run_coroutine_threadsafe(method(**kwargs), self._bot_loop)
+            result = future.result(timeout=30)  # 30 second timeout
+            return result
+        except asyncio.TimeoutError:
             raise DiscordAPIError("Discord operation timed out after 30 seconds")
-        
-        if result_container['exception']:
-            raise result_container['exception']
-        
-        return result_container['result']
+        except Exception as e:
+            logger.error(f"Discord action failed: {e}")
+            raise
+
 
     # Message Management Actions
     async def send_message(self, channel_id: str, content: str,
@@ -521,11 +607,11 @@ class DiscordConnection(BaseConnection):
         """Send a message or embed to a Discord channel"""
         try:
             guild, bot = await self._ensure_bot_ready()
-
+            
             channel = guild.get_channel(int(channel_id))
             if not channel:
                 raise DiscordAPIError(f"Channel {channel_id} not found")
-
+            
             if not isinstance(channel, discord.TextChannel):
                 raise DiscordAPIError(f"Channel {channel_id} is not a text channel")
 
@@ -943,7 +1029,8 @@ class DiscordConnection(BaseConnection):
                 raise DiscordAPIError("Cannot timeout member with higher or equal role")
 
             # Calculate timeout until time
-            timeout_until = discord.utils.utcnow() + discord.utils.utcnow().replace(second=duration_seconds)
+            from datetime import timedelta
+            timeout_until = discord.utils.utcnow() + timedelta(seconds=duration_seconds)
 
             await member.timeout(timeout_until, reason=reason or "Timed out by bot")
 
@@ -1162,16 +1249,17 @@ class DiscordConnection(BaseConnection):
         
         if not self.bot:
             self.bot = self._create_bot()
-
+        
         # Check if bot is already connected and ready
         if not self.bot.is_ready():
             # Start the bot if not already running
             try:
                 await self.bot.login(self._get_credentials()['token'])
                 await self.bot.connect(reconnect=False)
+                
                 # Manual wait instead of wait_until_ready(timeout=...) to avoid context manager issues
                 # Wait up to 10 seconds for bot to become ready
-                for _ in range(100):  # 10 seconds max (100 * 0.1s)
+                for i in range(100):  # 10 seconds max (100 * 0.1s)
                     if self.bot.is_ready():
                         break
                     await asyncio.sleep(0.1)
@@ -1192,7 +1280,6 @@ class DiscordConnection(BaseConnection):
             try:
                 if self.bot.is_ready() and not self.bot.is_closed():
                     await self.bot.close()
-                logger.debug("Discord bot disconnected successfully")
             except Exception as e:
                 logger.warning(f"Error disconnecting bot: {e}")
         # Note: We don't set self.bot = None here to avoid race conditions

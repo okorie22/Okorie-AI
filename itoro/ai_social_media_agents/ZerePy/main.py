@@ -1,6 +1,13 @@
 import os
 import sys
+import logging
 from pathlib import Path
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(message)s'
+)
 
 # Load environment variables from ITORO root .env
 # Workaround for embedded null character issues

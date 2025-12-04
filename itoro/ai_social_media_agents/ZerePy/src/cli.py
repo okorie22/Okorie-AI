@@ -556,6 +556,15 @@ class ZerePyCLI:
 
     def exit(self, input_list: List[str]) -> None:
         """Exit the CLI gracefully"""
+        # Cleanup connections
+        if self.agent:
+            for name, connection in self.agent.connection_manager.connections.items():
+                if hasattr(connection, 'cleanup'):
+                    try:
+                        connection.cleanup()
+                    except Exception as e:
+                        logger.warning(f"Error cleaning up {name} connection: {e}")
+        
         logger.info("\nGoodbye! 👋")
         sys.exit(0)
 
@@ -585,6 +594,7 @@ class ZerePyCLI:
                 print_h_bar()
 
             except KeyboardInterrupt:
+                logger.info("\n\nInterrupted. Use 'exit' to quit gracefully.")
                 continue
             except EOFError:
                 self.exit([])
