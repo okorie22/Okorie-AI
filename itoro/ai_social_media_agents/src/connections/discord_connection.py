@@ -608,16 +608,38 @@ class DiscordConnection(BaseConnection):
         try:
             guild, bot = await self._ensure_bot_ready()
             
+            # Try to get channel from cache first
             channel = guild.get_channel(int(channel_id))
-            if not channel:
-                raise DiscordAPIError(f"Channel {channel_id} not found")
             
-            if not isinstance(channel, discord.TextChannel):
-                raise DiscordAPIError(f"Channel {channel_id} is not a text channel")
+            # If not in cache, fetch it explicitly
+            if not channel:
+                try:
+                    fetched_channel = await bot.fetch_channel(int(channel_id))
+                    # Verify the fetched channel is in the correct guild
+                    if hasattr(fetched_channel, 'guild') and fetched_channel.guild.id != guild.id:
+                        raise DiscordAPIError(f"Channel {channel_id} is not in the configured guild {guild.id}")
+                    channel = fetched_channel
+                except discord.NotFound:
+                    raise DiscordAPIError(f"Channel {channel_id} not found")
+                except discord.Forbidden:
+                    raise DiscordAPIError(f"Bot does not have access to channel {channel_id}")
+            
+            # Log channel info for debugging
+            channel_type = type(channel).__name__
+            channel_name = getattr(channel, 'name', 'N/A')
+            logger.info(f"📝 Attempting to send message to channel: {channel_name} (ID: {channel_id}, Type: {channel_type})")
+            
+            # Check if channel has send_messages method (basic validation)
+            if not hasattr(channel, 'send'):
+                raise DiscordAPIError(f"Channel {channel_id} ({channel_name}) does not support sending messages. Channel type: {channel_type}")
 
-            # Check permissions
-            if not channel.permissions_for(guild.me).send_messages:
-                raise DiscordAPIError("Bot lacks permission to send messages in this channel")
+            # Check permissions - handle both guild.me and channel.guild.me
+            bot_member = guild.me
+            if hasattr(channel, 'guild') and channel.guild.me:
+                bot_member = channel.guild.me
+                
+            if not channel.permissions_for(bot_member).send_messages:
+                raise DiscordAPIError(f"Bot lacks permission to send messages in channel {channel_id} ({channel_name})")
 
             # Create embed if embed parameters provided
             embed = None
@@ -633,8 +655,15 @@ class DiscordConnection(BaseConnection):
                     except ValueError:
                         embed.color = 0x3498db  # Default blue
 
-            # Send message
-            message = await channel.send(content, embed=embed)
+            # Try to send message - Discord will give us the real error if channel type is wrong
+            try:
+                message = await channel.send(content, embed=embed)
+            except discord.HTTPException as e:
+                # If it's a channel type error, provide better context
+                if "Cannot send messages" in str(e) or "50007" in str(e):
+                    channel_type = type(channel).__name__
+                    raise DiscordAPIError(f"Cannot send messages to channel {channel_id} ({channel_name}). Channel type: {channel_type}. Error: {str(e)}")
+                raise
 
             return {
                 "message_id": str(message.id),
@@ -916,18 +945,20 @@ class DiscordConnection(BaseConnection):
                     role_color = discord.Color.default()
 
             # Create role
-            role = await guild.create_role(
-                name=name,
-                color=role_color,
-                permissions=discord.Permissions(permissions) if permissions else None
-            )
+            role_kwargs = {"name": name}
+            if role_color is not None:
+                role_kwargs["color"] = role_color
+            if permissions is not None:
+                role_kwargs["permissions"] = discord.Permissions(permissions)
+            
+            role = await guild.create_role(**role_kwargs)
 
             return {
                 "role_id": str(role.id),
                 "name": role.name,
                 "color": str(role.color) if role.color else None,
                 "position": role.position,
-                "permissions": role.permissions.value
+                "permissions": role.permissions.value if role.permissions else 0
             }
 
         except discord.Forbidden:
@@ -1096,6 +1127,32 @@ class DiscordConnection(BaseConnection):
             emoji_count = len(guild.emojis)
             animated_emojis = len([e for e in guild.emojis if e.animated])
 
+            # Get actual channel information
+            channels = []
+            for channel in guild.channels:
+                if isinstance(channel, discord.TextChannel):
+                    channels.append({
+                        "id": str(channel.id),
+                        "name": channel.name,
+                        "type": "text",
+                        "position": channel.position
+                    })
+                elif isinstance(channel, discord.VoiceChannel):
+                    channels.append({
+                        "id": str(channel.id),
+                        "name": channel.name,
+                        "type": "voice",
+                        "position": channel.position,
+                        "user_limit": channel.user_limit
+                    })
+                elif isinstance(channel, discord.CategoryChannel):
+                    channels.append({
+                        "id": str(channel.id),
+                        "name": channel.name,
+                        "type": "category",
+                        "position": channel.position
+                    })
+
             return {
                 "guild_id": str(guild.id),
                 "name": guild.name,
@@ -1113,7 +1170,8 @@ class DiscordConnection(BaseConnection):
                 "boost_level": guild.premium_tier,
                 "boost_count": guild.premium_subscription_count,
                 "created_at": guild.created_at.isoformat(),
-                "features": guild.features
+                "features": guild.features,
+                "channels": channels  # Add channel information
             }
 
         except Exception as e:
@@ -1240,33 +1298,214 @@ class DiscordConnection(BaseConnection):
         except Exception as e:
             raise DiscordAPIError(f"Failed to get member info: {str(e)}")
 
+    async def create_voice_channel(self, name: str, user_limit: int = None, category_id: str = None, **kwargs) -> dict:
+        """Create a new voice channel"""
+        try:
+            guild, bot = await self._ensure_bot_ready()
+
+            # Check permissions
+            if not guild.me.guild_permissions.manage_channels:
+                raise DiscordAPIError("Bot lacks permission to manage channels")
+
+            # Create voice channel
+            channel_kwargs = {"name": name}
+
+            if user_limit is not None:
+                channel_kwargs["user_limit"] = user_limit
+            
+            if category_id:
+                category = guild.get_channel(int(category_id))
+                if category and isinstance(category, discord.CategoryChannel):
+                    channel_kwargs["category"] = category
+
+            channel = await guild.create_voice_channel(**channel_kwargs)
+
+            return {
+                "channel_id": str(channel.id),
+                "name": channel.name,
+                "type": "voice",
+                "user_limit": channel.user_limit,
+                "category_id": str(channel.category.id) if channel.category else None
+            }
+
+        except discord.Forbidden:
+            raise DiscordAPIError("Bot lacks permission to create voice channels")
+        except Exception as e:
+            raise DiscordAPIError(f"Failed to create voice channel: {str(e)}")
+
+    async def move_member(self, user_id: str, channel_id: str, **kwargs) -> dict:
+        """Move a member to a different voice channel"""
+        try:
+            guild, bot = await self._ensure_bot_ready()
+
+            member = guild.get_member(int(user_id))
+            if not member:
+                raise DiscordAPIError(f"Member {user_id} not found in guild")
+
+            channel = guild.get_channel(int(channel_id))
+            if not channel:
+                raise DiscordAPIError(f"Channel {channel_id} not found")
+            
+            if not isinstance(channel, discord.VoiceChannel):
+                raise DiscordAPIError(f"Channel {channel_id} is not a voice channel")
+
+            # Check permissions
+            if not guild.me.guild_permissions.move_members:
+                raise DiscordAPIError("Bot lacks permission to move members")
+
+            # Move member
+            await member.move_to(channel)
+
+            return {
+                "user_id": str(member.id),
+                "channel_id": str(channel.id),
+                "channel_name": channel.name,
+                "moved": True
+            }
+
+        except discord.Forbidden:
+            raise DiscordAPIError("Bot lacks permission to move members")
+        except Exception as e:
+            raise DiscordAPIError(f"Failed to move member: {str(e)}")
+
+    async def create_scheduled_event(self, name: str, description: str, start_time: str,
+                                   end_time: str = None, channel_id: str = None, location: str = None, **kwargs) -> dict:
+        """Create a scheduled event on the server"""
+        try:
+            guild, bot = await self._ensure_bot_ready()
+
+            # Check permissions
+            if not guild.me.guild_permissions.manage_events:
+                raise DiscordAPIError("Bot lacks permission to manage events")
+
+            # Parse start time
+            from datetime import datetime
+            try:
+                start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+            except ValueError:
+                raise DiscordAPIError(f"Invalid start_time format: {start_time}. Use ISO 8601 format.")
+
+            # Parse end time if provided
+            end_dt = None
+            if end_time:
+                try:
+                    end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+                except ValueError:
+                    raise DiscordAPIError(f"Invalid end_time format: {end_time}. Use ISO 8601 format.")
+
+            # Determine event type and entity
+            if channel_id:
+                channel = guild.get_channel(int(channel_id))
+                if not channel:
+                    raise DiscordAPIError(f"Channel {channel_id} not found")
+                entity_type = discord.ScheduledEventEntityType.voice
+                entity_id = channel.id
+            elif location:
+                entity_type = discord.ScheduledEventEntityType.external
+                entity_id = None
+            else:
+                raise DiscordAPIError("Either channel_id or location must be provided")
+
+            # Create scheduled event
+            event = await guild.create_scheduled_event(
+                name=name,
+                description=description,
+                start_time=start_dt,
+                end_time=end_dt,
+                entity_type=entity_type,
+                location=location if entity_type == discord.ScheduledEventEntityType.external else None,
+                channel=channel if channel_id else None
+            )
+
+            return {
+                "event_id": str(event.id),
+                "name": event.name,
+                "description": event.description,
+                "start_time": event.start_time.isoformat(),
+                "end_time": event.end_time.isoformat() if event.end_time else None,
+                "status": str(event.status),
+                "entity_type": str(event.entity_type)
+            }
+
+        except discord.Forbidden:
+            raise DiscordAPIError("Bot lacks permission to create scheduled events")
+        except Exception as e:
+            raise DiscordAPIError(f"Failed to create scheduled event: {str(e)}")
+
+    async def set_welcome_message(self, channel_id: str, message: str, enabled: bool, **kwargs) -> dict:
+        """Configure automated welcome messages for new members"""
+        try:
+            guild, bot = await self._ensure_bot_ready()
+
+            channel = guild.get_channel(int(channel_id))
+            if not channel:
+                raise DiscordAPIError(f"Channel {channel_id} not found")
+
+            # Store welcome message config (in-memory for now)
+            # In a real implementation, this would be stored in a database or config file
+            if not hasattr(self, '_welcome_config'):
+                self._welcome_config = {}
+            
+            self._welcome_config[guild.id] = {
+                "channel_id": channel_id,
+                "message": message,
+                "enabled": enabled
+            }
+
+            return {
+                "channel_id": channel_id,
+                "message": message,
+                "enabled": enabled,
+                "configured": True
+            }
+
+        except Exception as e:
+            raise DiscordAPIError(f"Failed to set welcome message: {str(e)}")
+
+    async def enable_auto_mod(self, enabled: bool, spam_threshold: int = None, blocked_words: list = None, **kwargs) -> dict:
+        """Configure automatic moderation features"""
+        try:
+            guild, bot = await self._ensure_bot_ready()
+
+            # Store auto-mod config (in-memory for now)
+            # In a real implementation, this would be stored in a database or config file
+            if not hasattr(self, '_auto_mod_config'):
+                self._auto_mod_config = {}
+            
+            self._auto_mod_config[guild.id] = {
+                "enabled": enabled,
+                "spam_threshold": spam_threshold or 5,
+                "blocked_words": blocked_words or []
+            }
+
+            return {
+                "enabled": enabled,
+                "spam_threshold": self._auto_mod_config[guild.id]["spam_threshold"],
+                "blocked_words": self._auto_mod_config[guild.id]["blocked_words"],
+                "configured": True
+            }
+
+        except Exception as e:
+            raise DiscordAPIError(f"Failed to enable auto-mod: {str(e)}")
+
     # Helper method to ensure bot is ready
     async def _ensure_bot_ready(self) -> tuple:
-        """Ensure bot is initialized and connected"""
-        # Check if bot exists but is closed - reset if so
-        if self.bot and self.bot.is_closed():
-            self.bot = None
+        """Ensure bot is initialized and connected (works with persistent bot architecture)"""
+        # With persistent bot architecture, bot is already connected via _ensure_bot_connected()
+        # We just need to wait for it to be ready and get the guild
         
+        # Wait for bot to be ready (it's already connecting in the background thread)
         if not self.bot:
-            self.bot = self._create_bot()
+            raise DiscordAPIError("Bot not initialized - _ensure_bot_connected() should be called first")
         
-        # Check if bot is already connected and ready
+        # Wait up to 10 seconds for the persistent bot to become ready
+        for i in range(100):  # 10 seconds max (100 * 0.1s)
+            if self.bot.is_ready():
+                break
+            await asyncio.sleep(0.1)
+        
         if not self.bot.is_ready():
-            # Start the bot if not already running
-            try:
-                await self.bot.login(self._get_credentials()['token'])
-                await self.bot.connect(reconnect=False)
-                
-                # Manual wait instead of wait_until_ready(timeout=...) to avoid context manager issues
-                # Wait up to 10 seconds for bot to become ready
-                for i in range(100):  # 10 seconds max (100 * 0.1s)
-                    if self.bot.is_ready():
-                        break
-                    await asyncio.sleep(0.1)
-                if not self.bot.is_ready():
-                    raise DiscordAPIError("Bot failed to become ready within 10 seconds")
-            except Exception as e:
-                raise DiscordAPIError(f"Failed to initialize bot: {str(e)}")
+            raise DiscordAPIError("Bot failed to become ready within 10 seconds")
 
         guild = self.bot.get_guild(int(self.config["guild_id"]))
         if not guild:

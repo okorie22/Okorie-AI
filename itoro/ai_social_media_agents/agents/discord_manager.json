@@ -29,7 +29,7 @@
       "command_prefix": "!",
       "auto_join_voice": false,
       "log_channel_id": "1445575379321360527",
-      "welcome_channel_id": "1445575379321360527",
+      "welcome_channel_id": "1446386755879178312",
       "auto_mod_enabled": true,
       "spam_threshold": 5
     },
@@ -43,10 +43,10 @@
     }
   ],
   "tasks": [
-    {"name": "moderate-server", "weight": 4},
-    {"name": "engage-community", "weight": 3},
-    {"name": "monitor-activity", "weight": 2},
-    {"name": "manage-channels", "weight": 1},
-    {"name": "handle-reports", "weight": 2}
+    {"name": "moderate-server", "weight": 5},
+    {"name": "monitor-activity", "weight": 4},
+    {"name": "engage-community", "weight": 4},
+    {"name": "manage-channels", "weight": 2},
+    {"name": "handle-reports", "weight": 3}
   ]
 }

@@ -15,10 +15,10 @@ def load_env_from_root():
     """Load .env from ITORO root directory"""
     try:
         # Try to find ITORO root
-        # Path: ITORO/itoro/ai_social_media_agents/ZerePy/main.py
+        # Path: ITORO/itoro/ai_social_media_agents/main.py
         # Need: ITORO/.env
-        current = Path(__file__).parent  # ZerePy directory
-        itoro_root = current.parent.parent.parent / '.env'  # ITORO/.env
+        current = Path(__file__).parent  # ai_social_media_agents directory
+        itoro_root = current.parent.parent / '.env'  # ITORO/.env
         
         if itoro_root.exists():
             # Read .env file manually to avoid null character issues

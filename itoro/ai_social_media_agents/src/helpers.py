@@ -11,10 +11,10 @@ def find_env_file():
     logger = logging.getLogger(__name__)
     
     # Start from current file location (src/helpers.py)
-    # Path: ITORO/itoro/ai_social_media_agents/ZerePy/src/helpers.py
+    # Path: ITORO/itoro/ai_social_media_agents/src/helpers.py
     # Need: ITORO/.env
-    current = Path(__file__).parent.parent  # ZerePy directory
-    itoro_root = current.parent.parent.parent / '.env'  # ITORO/.env
+    current = Path(__file__).parent.parent  # ai_social_media_agents directory
+    itoro_root = current.parent.parent / '.env'  # ITORO/.env
     
     # Try ITORO root first (most likely location)
     if itoro_root.exists():

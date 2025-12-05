@@ -195,6 +195,10 @@ class YouTubeConnection(BaseConnection):
 
             if response['items']:
                 self._channel_info = response['items'][0]
+                # Log which channel we're accessing for debugging
+                channel_title = self._channel_info.get('snippet', {}).get('title', 'Unknown')
+                channel_id = self._channel_info.get('id', 'Unknown')
+                logger.debug(f"YouTube API authenticated to channel: {channel_title} (ID: {channel_id})")
                 return self._channel_info
             else:
                 raise YouTubeAPIError("No channel found for authenticated user")
@@ -958,14 +962,14 @@ class YouTubeConnection(BaseConnection):
             if not response['items']:
                 raise YouTubeAPIError("No channel data found")
 
-            stats = response['items'][0]['statistics']
+            stats = response['items'][0].get('statistics', {})
 
             # Get channel info for additional context
             channel_info = self._get_channel_info()
 
             return {
-                "channel_id": channel_info['id'],
-                "channel_title": channel_info['snippet']['title'],
+                "channel_id": channel_info.get('id', 'Unknown'),
+                "channel_title": channel_info.get('snippet', {}).get('title', 'Unknown'),
                 "subscriber_count": int(stats.get('subscriberCount', 0)),
                 "video_count": int(stats.get('videoCount', 0)),
                 "view_count": int(stats.get('viewCount', 0)),
@@ -1009,22 +1013,30 @@ class YouTubeConnection(BaseConnection):
         try:
             channel_info = self._get_channel_info()
 
-            return {
-                "channel_id": channel_info['id'],
-                "title": channel_info['snippet']['title'],
-                "description": channel_info['snippet']['description'],
-                "custom_url": channel_info['snippet'].get('customUrl', ''),
-                "published_at": channel_info['snippet']['publishedAt'],
-                "country": channel_info['snippet'].get('country', ''),
-                "default_language": channel_info['snippet'].get('defaultLanguage', ''),
-                "subscriber_count": int(channel_info['statistics'].get('subscriberCount', 0)),
-                "video_count": int(channel_info['statistics'].get('videoCount', 0)),
-                "view_count": int(channel_info['statistics'].get('viewCount', 0)),
-                "privacy_status": channel_info['status']['privacyStatus'],
-                "is_linked": channel_info['status']['isLinked'],
-                "long_uploads_status": channel_info['status']['longUploadsStatus'],
-                "made_for_kids": channel_info['status']['madeForKids']
+            # Extract channel details with safe access
+            channel_title = channel_info.get('snippet', {}).get('title', 'Unknown')
+            channel_id = channel_info.get('id', 'Unknown')
+            
+            logger.info(f"📺 Accessing YouTube channel: {channel_title} (ID: {channel_id})")
+
+            result = {
+                "channel_id": channel_id,
+                "title": channel_title,
+                "description": channel_info.get('snippet', {}).get('description', ''),
+                "custom_url": channel_info.get('snippet', {}).get('customUrl', ''),
+                "published_at": channel_info.get('snippet', {}).get('publishedAt', ''),
+                "country": channel_info.get('snippet', {}).get('country', ''),
+                "default_language": channel_info.get('snippet', {}).get('defaultLanguage', ''),
+                "subscriber_count": int(channel_info.get('statistics', {}).get('subscriberCount', 0)),
+                "video_count": int(channel_info.get('statistics', {}).get('videoCount', 0)),
+                "view_count": int(channel_info.get('statistics', {}).get('viewCount', 0)),
+                "privacy_status": channel_info.get('status', {}).get('privacyStatus', 'unknown'),
+                "is_linked": channel_info.get('status', {}).get('isLinked', False),
+                "long_uploads_status": channel_info.get('status', {}).get('longUploadsStatus', 'unknown'),
+                "made_for_kids": channel_info.get('status', {}).get('madeForKids', False)
             }
+
+            return result
 
         except Exception as e:
             raise YouTubeAPIError(f"Failed to get channel info: {str(e)}")
