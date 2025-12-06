@@ -620,7 +620,7 @@ class DiscordConnection(BaseConnection):
                         raise DiscordAPIError(f"Channel {channel_id} is not in the configured guild {guild.id}")
                     channel = fetched_channel
                 except discord.NotFound:
-                    raise DiscordAPIError(f"Channel {channel_id} not found")
+                raise DiscordAPIError(f"Channel {channel_id} not found")
                 except discord.Forbidden:
                     raise DiscordAPIError(f"Bot does not have access to channel {channel_id}")
             
@@ -657,7 +657,7 @@ class DiscordConnection(BaseConnection):
 
             # Try to send message - Discord will give us the real error if channel type is wrong
             try:
-                message = await channel.send(content, embed=embed)
+            message = await channel.send(content, embed=embed)
             except discord.HTTPException as e:
                 # If it's a channel type error, provide better context
                 if "Cannot send messages" in str(e) or "50007" in str(e):

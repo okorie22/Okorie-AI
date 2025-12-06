@@ -7,6 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from src.connection_manager import ConnectionManager
 from src.helpers import print_h_bar, find_env_file
+from src.memory_manager import MemoryManager
 
 REQUIRED_FIELDS = ["name", "bio", "traits", "examples", "loop_delay", "config", "tasks"]
 
@@ -50,6 +51,9 @@ class ZerePyAgent:
 
             # Set up empty agent state
             self.state = {}
+            
+            # Initialize persistent memory manager (Phase 2.1)
+            self.memory_manager = MemoryManager(agent_name=agent_name)
             
         except Exception as e:
             logger.error("Could not load ZerePy agent")
@@ -129,23 +133,35 @@ class ZerePyAgent:
                     # ROUTE ACTION TO APPROPRIATE PLATFORM HANDLER
                     success = self._execute_platform_action(action_name)
 
-                    # TRACK RECENT ACTIONS with timestamps for context and cooldown awareness
+                    # TRACK RECENT ACTIONS with timestamps, outcomes, and metrics (Phase 1.2)
                     if "recent_actions" not in self.state:
                         self.state["recent_actions"] = []
                     
-                    # Store action with timestamp
-                    self.state["recent_actions"].append({
+                    # Store action with enhanced metadata
+                    action_timestamp = time.time()
+                    action_result = {
                         "action": action_name,
-                        "timestamp": time.time(),
-                        "success": success
-                    })
+                        "timestamp": action_timestamp,
+                        "success": success,
+                        "outcome_summary": "completed" if success else "failed",
+                        "metrics": {}  # Will be populated by specific actions
+                    }
+                    self.state["recent_actions"].append(action_result)
                     # Keep only last 10 actions
                     self.state["recent_actions"] = self.state["recent_actions"][-10:]
                     
                     # Track action execution time for cooldown awareness
                     if "action_timestamps" not in self.state:
                         self.state["action_timestamps"] = {}
-                    self.state["action_timestamps"][action_name] = time.time()
+                    self.state["action_timestamps"][action_name] = action_timestamp
+                    
+                    # Save action to persistent database (Phase 2.2)
+                    self.memory_manager.save_action(
+                        action_name=action_name,
+                        success=success,
+                        outcome=action_result["outcome_summary"],
+                        metrics=action_result["metrics"]
+                    )
 
                     logger.info(f"\n⏳ Waiting {self.loop_delay} seconds before next loop...")
                     print_h_bar()
@@ -173,6 +189,73 @@ class ZerePyAgent:
         # YouTube state
         self.last_analytics_check = 0
         self.last_content_upload = 0
+
+        # Message history tracking (Phase 1.1)
+        if "sent_messages" not in self.state:
+            self.state["sent_messages"] = []
+        
+        # Action result tracking (Phase 1.2)
+        if "action_timestamps" not in self.state:
+            self.state["action_timestamps"] = {}
+        
+        # Load persistent state from database (Phase 2.2)
+        self._load_state()
+    
+    def _save_state(self):
+        """Save current state to persistent storage (Phase 2.2)"""
+        try:
+            # Messages are saved immediately when sent, so we don't need to save them here
+            # But we can save recent actions if needed
+            pass
+        except Exception as e:
+            logger.debug(f"Failed to save state: {e}")
+    
+    def _load_state(self):
+        """Load persistent state from database (Phase 2.2)"""
+        try:
+            # Load recent messages from database into state (last 20)
+            db_messages = self.memory_manager.get_recent_messages(limit=20)
+            if db_messages:
+                # Convert database format to state format
+                self.state["sent_messages"] = [
+                    {
+                        "platform": msg.get("platform"),
+                        "channel_id": msg.get("channel_id"),
+                        "content": msg.get("content"),
+                        "timestamp": msg.get("timestamp"),
+                        "message_type": msg.get("message_type"),
+                        "reactions": msg.get("reactions", 0),
+                        "replies": msg.get("replies", 0),
+                        "engagement_score": msg.get("engagement_score", 0.0)
+                    }
+                    for msg in db_messages
+                ]
+                logger.debug(f"Loaded {len(self.state['sent_messages'])} messages from database")
+            
+            # Load recent actions from database (last 10)
+            db_actions = self.memory_manager.get_recent_actions(limit=10)
+            if db_actions:
+                # Update action timestamps from database
+                for action in db_actions:
+                    action_name = action.get("action_name")
+                    timestamp = action.get("timestamp")
+                    if action_name and timestamp:
+                        self.state["action_timestamps"][action_name] = timestamp
+                
+                # Update recent_actions in state
+                self.state["recent_actions"] = [
+                    {
+                        "action": action.get("action_name"),
+                        "timestamp": action.get("timestamp"),
+                        "success": bool(action.get("success")),
+                        "outcome_summary": action.get("outcome", "completed" if action.get("success") else "failed"),
+                        "metrics": action.get("metrics", {})
+                    }
+                    for action in db_actions
+                ]
+                logger.debug(f"Loaded {len(self.state['recent_actions'])} actions from database")
+        except Exception as e:
+            logger.debug(f"Failed to load state from database: {e}")
 
     def _gather_platform_data(self):
         """Gather data from all configured platforms"""
@@ -311,22 +394,30 @@ class ZerePyAgent:
         current_hour = time.localtime().tm_hour
         context_parts.append(f"Current time: {current_hour}:00 (24-hour format)")
 
-        # Previous actions context with timestamps
+        # Previous actions context with timestamps and outcomes (Phase 1.2)
         if "recent_actions" in self.state and self.state["recent_actions"]:
             recent = self.state["recent_actions"][-3:]  # Last 3 actions
             if recent:
                 action_list = []
+                outcome_list = []
                 current_time = time.time()
                 for action_data in recent:
                     if isinstance(action_data, dict):
                         action_name = action_data.get("action", "unknown")
                         timestamp = action_data.get("timestamp", 0)
+                        success = action_data.get("success", False)
+                        outcome = action_data.get("outcome_summary", "")
                         minutes_ago = int((current_time - timestamp) / 60)
+                        status = "✅" if success else "❌"
                         action_list.append(f"{action_name} ({minutes_ago}m ago)")
+                        if outcome:
+                            outcome_list.append(f"{status} {action_name}: {outcome}")
                     else:
                         # Backward compatibility with old format
                         action_list.append(str(action_data))
                 context_parts.append(f"Recent actions: {', '.join(action_list)}")
+                if outcome_list:
+                    context_parts.append("Recent action outcomes: " + "; ".join(outcome_list))
 
         # Cooldown information for LLM awareness
         cooldown_info = []
@@ -413,11 +504,27 @@ class ZerePyAgent:
                     available_descriptions.append(f"- {task}: {task_descriptions[task]} [AVAILABLE]")
                     available_actions.append(task)
 
+        # Get recent message history for context (Phase 1.1)
+        message_history_context = ""
+        if "sent_messages" in self.state and self.state["sent_messages"]:
+            recent_msgs = self.state["sent_messages"][-5:]  # Last 5 messages
+            if recent_msgs:
+                message_history_context = "\n\nRECENT MESSAGES SENT (for context - avoid repeating similar content):\n"
+                current_time = time.time()
+                for msg in recent_msgs:
+                    content = msg.get("content", "")[:80]  # First 80 chars
+                    platform = msg.get("platform", "unknown")
+                    timestamp = msg.get("timestamp", 0)
+                    hours_ago = int((current_time - timestamp) / 3600) if timestamp else 0
+                    message_history_context += f"- [{platform}] {content}... ({hours_ago}h ago)\n"
+                message_history_context += "\nWhen choosing 'engage-community', ensure the message is unique and different from recent messages.\n"
+
         # Build the decision prompt
         prompt = f"""{system_prompt}
 
 CURRENT CONTEXT:
 {context}
+{message_history_context}
 
 AVAILABLE ACTIONS:
 {chr(10).join(available_descriptions)}
@@ -438,6 +545,8 @@ Consider:
 - Time of day and community patterns
 - My core traits and objectives
 - What actions would best serve community growth and management
+- Recent action outcomes (what worked, what didn't)
+- Message history to avoid repetition
 - CRITICAL: Only choose actions marked [AVAILABLE] - never choose actions marked [ON COOLDOWN]
 
 Respond with ONLY the action name (e.g., "moderate-server", "monitor-activity", "analyze_performance").
@@ -559,9 +668,28 @@ Choose from the available actions that align best with my personality and curren
             logger.info("\n📝 GENERATING NEW TWEET")
             print_h_bar()
 
+            # Get recent Twitter messages to avoid duplicates (Phase 1.1)
+            recent_tweets = []
+            if "sent_messages" in self.state:
+                twitter_messages = [
+                    msg for msg in self.state["sent_messages"][-20:]
+                    if msg.get("platform") == "twitter"
+                ]
+                recent_tweets = twitter_messages[-5:]  # Last 5 tweets
+            
+            # Build message history context
+            history_context = ""
+            if recent_tweets:
+                history_context = "\n\nRECENT TWEETS SENT (DO NOT REPEAT THESE):\n"
+                for msg in recent_tweets:
+                    content = msg.get("content", "")[:100]
+                    hours_ago = int((current_time - msg.get("timestamp", 0)) / 3600) if msg.get("timestamp") else 0
+                    history_context += f"- {content}... ({hours_ago}h ago)\n"
+                history_context += "\nGenerate a NEW, UNIQUE tweet that hasn't been sent before.\n"
+
             prompt = ("Generate an engaging tweet. Don't include any hashtags, links or emojis. Keep it under 280 characters."
                     f"The tweets should be pure commentary, do not shill any coins or projects apart from {self.name}. Do not repeat any of the"
-                    "tweets that were given as example. Avoid the words AI and crypto.")
+                    "tweets that were given as example. Avoid the words AI and crypto." + history_context)
             tweet_text = self.prompt_llm(prompt)
 
             if tweet_text:
@@ -572,6 +700,31 @@ Choose from the available actions that align best with my personality and curren
                     action_name="post-tweet",
                     params=[tweet_text]
                 )
+                
+                # Track sent tweet in history (Phase 1.1) and save to database (Phase 2.2)
+                if "sent_messages" not in self.state:
+                    self.state["sent_messages"] = []
+                
+                message_record = {
+                    "platform": "twitter",
+                    "channel_id": None,  # Twitter doesn't use channels
+                    "content": tweet_text,
+                    "timestamp": current_time,
+                    "message_type": "tweet",
+                    "reactions": 0,
+                    "replies": 0,
+                    "engagement_score": 0.0
+                }
+                self.state["sent_messages"].append(message_record)
+                self.state["sent_messages"] = self.state["sent_messages"][-20:]  # Keep last 20
+                
+                # Save to persistent database
+                self.memory_manager.save_message(
+                    platform="twitter",
+                    content=tweet_text,
+                    message_type="tweet"
+                )
+                
                 self.last_tweet_time = current_time
                 logger.info("\n✅ Tweet posted successfully!")
                 return True
@@ -607,10 +760,30 @@ Choose from the available actions that align best with my personality and curren
 
             logger.info(f"\n💬 GENERATING REPLY to: {tweet.get('text', '')[:50]}...")
 
+            # Get recent replies to avoid duplicates (Phase 1.1)
+            recent_replies = []
+            current_time = time.time()
+            if "sent_messages" in self.state:
+                twitter_replies = [
+                    msg for msg in self.state["sent_messages"][-20:]
+                    if msg.get("platform") == "twitter" and msg.get("message_type") == "reply"
+                ]
+                recent_replies = twitter_replies[-5:]  # Last 5 replies
+            
+            # Build message history context
+            history_context = ""
+            if recent_replies:
+                history_context = "\n\nRECENT REPLIES SENT (DO NOT REPEAT THESE):\n"
+                for msg in recent_replies:
+                    content = msg.get("content", "")[:100]
+                    hours_ago = int((current_time - msg.get("timestamp", 0)) / 3600) if msg.get("timestamp") else 0
+                    history_context += f"- {content}... ({hours_ago}h ago)\n"
+                history_context += "\nGenerate a NEW, UNIQUE reply that hasn't been sent before.\n"
+
             # Customize prompt based on whether it's a self-reply
             base_prompt = (f"Generate a friendly, engaging reply to this tweet: {tweet.get('text')}. Keep it under 280 characters. Don't include any usernames, hashtags, links or emojis. "
                 f"The tweets should be pure commentary, do not shill any coins or projects apart from {self.name}. Do not repeat any of the"
-                "tweets that were given as example. Avoid the words AI and crypto.")
+                "tweets that were given as example. Avoid the words AI and crypto." + history_context)
 
             system_prompt = self._construct_system_prompt()
             reply_text = self.prompt_llm(prompt=base_prompt, system_prompt=system_prompt)
@@ -622,6 +795,31 @@ Choose from the available actions that align best with my personality and curren
                     action_name="reply-to-tweet",
                     params=[tweet_id, reply_text]
                 )
+                
+                # Track sent reply in history (Phase 1.1) and save to database (Phase 2.2)
+                if "sent_messages" not in self.state:
+                    self.state["sent_messages"] = []
+                
+                message_record = {
+                    "platform": "twitter",
+                    "channel_id": None,
+                    "content": reply_text,
+                    "timestamp": current_time,
+                    "message_type": "reply",
+                    "reactions": 0,
+                    "replies": 0,
+                    "engagement_score": 0.0
+                }
+                self.state["sent_messages"].append(message_record)
+                self.state["sent_messages"] = self.state["sent_messages"][-20:]  # Keep last 20
+                
+                # Save to persistent database
+                self.memory_manager.save_message(
+                    platform="twitter",
+                    content=reply_text,
+                    message_type="reply"
+                )
+                
                 logger.info("✅ Reply posted successfully!")
                 return True
         return False
@@ -804,13 +1002,42 @@ Choose from the available actions that align best with my personality and curren
                     else:
                         engagement_type = "general"  # Normal activity - general engagement
 
+            # Get recent message history to avoid duplicates (Phase 1.1)
+            recent_messages = []
+            if "sent_messages" in self.state:
+                # Get last 5 messages from the same platform/channel
+                all_messages = self.state["sent_messages"]
+                welcome_channel_id = None
+                discord_connection = self.connection_manager.connections.get("discord")
+                if discord_connection:
+                    welcome_channel_id = discord_connection.config.get("welcome_channel_id")
+                
+                # Filter messages from same channel/platform
+                channel_messages = [
+                    msg for msg in all_messages[-20:]  # Check last 20 messages
+                    if msg.get("platform") == "discord" and 
+                    (not welcome_channel_id or msg.get("channel_id") == str(welcome_channel_id))
+                ]
+                recent_messages = channel_messages[-5:]  # Last 5 from this channel
+            
+            # Build message history context for LLM
+            history_context = ""
+            if recent_messages:
+                history_context = "\n\nRECENT MESSAGES SENT (DO NOT REPEAT THESE):\n"
+                for msg in recent_messages:
+                    content = msg.get("content", "")[:100]  # First 100 chars
+                    timestamp = msg.get("timestamp", 0)
+                    hours_ago = int((time.time() - timestamp) / 3600) if timestamp else 0
+                    history_context += f"- {content}... ({hours_ago}h ago)\n"
+                history_context += "\nGenerate a NEW, UNIQUE message that hasn't been sent before.\n"
+
             # Generate appropriate message based on activity level
             if engagement_type == "welcome":
-                prompt = f"As {self.name}, generate a welcoming message for a quiet Discord server. Encourage members to introduce themselves and participate. Keep under 300 characters."
+                prompt = f"As {self.name}, generate a welcoming message for a quiet Discord server. Encourage members to introduce themselves and participate. Keep under 300 characters.{history_context}"
             elif engagement_type == "celebration":
-                prompt = f"As {self.name}, generate an enthusiastic message celebrating high community activity. Thank members for their engagement. Keep under 300 characters."
+                prompt = f"As {self.name}, generate an enthusiastic message celebrating high community activity. Thank members for their engagement. Keep under 300 characters.{history_context}"
             else:
-                prompt = f"As {self.name}, generate a friendly, engaging message to keep the community conversation going. Ask an interesting question or share a thought. Keep under 300 characters."
+                prompt = f"As {self.name}, generate a friendly, engaging message to keep the community conversation going. Ask an interesting question or share a thought. Keep under 300 characters.{history_context}"
 
             engagement_message = self.prompt_llm(prompt)
 
@@ -831,6 +1058,32 @@ Choose from the available actions that align best with my personality and curren
                     connection_name="discord",
                     action_name="send-message",
                     params=[welcome_channel_id, engagement_message]
+                )
+
+                # Track sent message in history (Phase 1.1) and save to database (Phase 2.2)
+                if "sent_messages" not in self.state:
+                    self.state["sent_messages"] = []
+                
+                message_record = {
+                    "platform": "discord",
+                    "channel_id": str(welcome_channel_id),
+                    "content": engagement_message,
+                    "timestamp": current_time,
+                    "message_type": engagement_type,
+                    "reactions": 0,  # Will be updated if we track engagement later
+                    "replies": 0,
+                    "engagement_score": 0.0
+                }
+                self.state["sent_messages"].append(message_record)
+                # Keep only last 20 messages to manage memory
+                self.state["sent_messages"] = self.state["sent_messages"][-20:]
+                
+                # Save to persistent database
+                self.memory_manager.save_message(
+                    platform="discord",
+                    content=engagement_message,
+                    channel_id=str(welcome_channel_id),
+                    message_type=engagement_type
                 )
 
                 self.last_engagement_time = current_time
@@ -1195,13 +1448,33 @@ Choose from the available actions that align best with my personality and curren
             subscriber_count = analytics.get("subscriber_count", 0)
             video_count = analytics.get("video_count", 0)
 
+            # Get recent YouTube messages to avoid duplicates (Phase 1.1)
+            recent_posts = []
+            current_time = time.time()
+            if "sent_messages" in self.state:
+                youtube_messages = [
+                    msg for msg in self.state["sent_messages"][-20:]
+                    if msg.get("platform") == "youtube"
+                ]
+                recent_posts = youtube_messages[-5:]  # Last 5 posts
+            
+            # Build message history context
+            history_context = ""
+            if recent_posts:
+                history_context = "\n\nRECENT YOUTUBE POSTS SENT (DO NOT REPEAT THESE):\n"
+                for msg in recent_posts:
+                    content = msg.get("content", "")[:100]
+                    hours_ago = int((current_time - msg.get("timestamp", 0)) / 3600) if msg.get("timestamp") else 0
+                    history_context += f"- {content}... ({hours_ago}h ago)\n"
+                history_context += "\nGenerate a NEW, UNIQUE community post that hasn't been sent before.\n"
+
             # Generate engaging community post based on current metrics
             engagement_prompt = f"""As a YouTube channel manager, create an engaging community post based on these metrics:
 - {subscriber_count} subscribers
 - {video_count} videos
 
 The post should be authentic, encouraging community interaction, and aligned with quality content creation.
-Keep it under 500 characters and make it conversational."""
+Keep it under 500 characters and make it conversational.{history_context}"""
 
             community_post = self.prompt_llm(engagement_prompt)
 
@@ -1213,6 +1486,31 @@ Keep it under 500 characters and make it conversational."""
                         action_name="create_community_post",
                         params=["text=" + community_post]
                     )
+                    
+                    # Track sent post in history (Phase 1.1) and save to database (Phase 2.2)
+                    if "sent_messages" not in self.state:
+                        self.state["sent_messages"] = []
+                    
+                    message_record = {
+                        "platform": "youtube",
+                        "channel_id": None,
+                        "content": community_post,
+                        "timestamp": current_time,
+                        "message_type": "community_post",
+                        "reactions": 0,
+                        "replies": 0,
+                        "engagement_score": 0.0
+                    }
+                    self.state["sent_messages"].append(message_record)
+                    self.state["sent_messages"] = self.state["sent_messages"][-20:]  # Keep last 20
+                    
+                    # Save to persistent database
+                    self.memory_manager.save_message(
+                        platform="youtube",
+                        content=community_post,
+                        message_type="community_post"
+                    )
+                    
                     logger.info("✅ YouTube community post created")
                     logger.info(f"Post: {community_post[:100]}...")
                     return True
