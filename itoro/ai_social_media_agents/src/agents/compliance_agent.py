@@ -1,6 +1,7 @@
 '''
 🌙 Moon Dev's Compliance Agent 🌙
-This agent analyzes ad images and videos against Facebook guidelines to ensure compliance.
+This agent analyzes videos for compliance with social media platform guidelines.
+Supports YouTube and Instagram content policies.
 It extracts frames from videos, transcribes audio, and provides a compliance rating.
 
 Created with ❤️ by Moon Dev's AI Assistant
@@ -38,8 +39,12 @@ MODEL_CONFIG = {
 
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-DATA_DIR = PROJECT_ROOT / "src" / "data" / "compliance"
-GUIDELINES_PATH = DATA_DIR / "fb_guidelines.txt"
+DATA_DIR = PROJECT_ROOT / "data" / "compliance"
+GUIDELINES_PATHS = {
+    "youtube": DATA_DIR / "youtube_guidelines.txt",
+    "instagram": DATA_DIR / "instagram_guidelines.txt",
+    "facebook": DATA_DIR / "fb_guidelines.txt"  # Legacy support
+}
 VIDEOS_DIR = Path("/Users/md/Dropbox/dev/github/search-arbitrage/bots/compliance/tiktok_ads")
 OUTPUT_DIR = DATA_DIR / "analysis"
 FRAMES_DIR = OUTPUT_DIR / "frames"
@@ -50,71 +55,114 @@ REPORTS_DIR = OUTPUT_DIR / "reports"
 for dir_path in [OUTPUT_DIR, FRAMES_DIR, TRANSCRIPTS_DIR, REPORTS_DIR]:
     dir_path.mkdir(parents=True, exist_ok=True)
 
-# System prompt for compliance analysis
-COMPLIANCE_PROMPT = """
-You are Moon Dev's Compliance Agent 🌙, an expert in analyzing ads for compliance with Facebook's advertising guidelines.
+# System prompts for compliance analysis
+COMPLIANCE_PROMPTS = {
+    "youtube": """
+You are a YouTube Content Compliance Analyst, an expert in YouTube's Community Guidelines and Content Policies.
 
-Your task is to analyze the provided ad frames and transcript to determine if they comply with Facebook's advertising guidelines.
+Analyze the provided video frames and transcript to determine if they comply with YouTube's policies.
 
-For each ad, you will:
-1. Analyze each frame for visual compliance issues
-2. Analyze the transcript for text/audio compliance issues
-3. Check for specific violations of Facebook's guidelines
-4. Provide an overall compliance rating (0-100%)
-5. Identify specific issues that need to be fixed
-6. Provide recommendations for improving compliance
+Check for:
+- Hate speech or harassment
+- Violent or graphic content
+- Sexual content
+- Harmful or dangerous content
+- Misinformation
+- Spam or deceptive practices
+- Copyright violations (music, clips)
+- Child safety concerns
+- Monetization compliance (for YouTube Shorts)
 
-Common compliance issues to check for:
-- Personal attributes (assuming characteristics about the viewer)
-- Sensational content (shocking, scary, or violent imagery)
-- Adult content or nudity
-- Misleading claims or false information
-- Health claims without proper disclaimers
-- Before/after images that imply unrealistic results
-- Targeting sensitive categories (race, religion, etc.)
-- Prohibited products or services
-- Text-to-image ratio issues
-
-Your analysis should be thorough but concise. Focus on actionable feedback.
-
-Your response MUST follow this format:
+Your response MUST follow this JSON format:
 {
-  "compliance_status": "compliant" or "non-compliant",
-  "overall_assessment": "Brief overall assessment",
-  "moon_dev_message": "A fun message mentioning Moon Dev 🌙"
+  "compliant": true/false,
+  "score": 0.0-1.0,
+  "issues": ["issue1", "issue2"],
+  "recommendations": ["recommendation1", "recommendation2"],
+  "platform_specific": {
+    "monetizable": true/false,
+    "age_restricted": true/false
+  }
+}
+""",
+    "instagram": """
+You are an Instagram Content Compliance Analyst, an expert in Instagram's Community Guidelines.
+
+Analyze the provided video frames and transcript to determine if they comply with Instagram's policies.
+
+Check for:
+- Nudity or sexual content
+- Hate speech or bullying
+- Violence or dangerous organizations
+- Sale of illegal or regulated goods
+- Intellectual property violations
+- Suicide or self-injury content
+- Graphic violence
+- Misinformation
+
+Your response MUST follow this JSON format:
+{
+  "compliant": true/false,
+  "score": 0.0-1.0,
+  "issues": ["issue1", "issue2"],
+  "recommendations": ["recommendation1", "recommendation2"],
+  "platform_specific": {
+    "reels_eligible": true/false,
+    "explore_eligible": true/false
+  }
+}
+"""
 }
 
-Remember to be thorough but fair in your assessment. The goal is to help improve ad compliance, not to reject ads unnecessarily.
-"""
-
 class ComplianceAgent:
-    """Agent to analyze ad compliance with Facebook guidelines"""
+    """Agent to analyze content compliance with social media platform guidelines"""
     
-    def __init__(self, guidelines_path: Path = None):
-        """Initialize the compliance agent"""
-        self.guidelines = self._load_guidelines(guidelines_path)
-        self.model = self._init_model()
+    def __init__(self, platform: str = "youtube", guidelines_path: Path = None, deepseek_connection = None):
+        """
+        Initialize the compliance agent
+        
+        Args:
+            platform: Target platform ('youtube' or 'instagram')
+            guidelines_path: Optional custom guidelines path
+            deepseek_connection: Optional DeepSeek connection for AI analysis
+        """
+        self.platform = platform
+        self.guidelines = self._load_guidelines(platform, guidelines_path)
+        
+        # Use provided connection or initialize model
+        if deepseek_connection:
+            self.model = None
+            self.deepseek = deepseek_connection
+        else:
+            self.model = self._init_model()
+            self.deepseek = None
+            
         self._whisper_model = None  # Lazy-loaded
         
         # Create output directories if they don't exist
         for dir_path in [OUTPUT_DIR, FRAMES_DIR, TRANSCRIPTS_DIR, REPORTS_DIR]:
             dir_path.mkdir(parents=True, exist_ok=True)
             
-        cprint("🌙 Moon Dev's Compliance Agent initialized! 🌙", "magenta")
+        cprint(f"🌙 Compliance Agent initialized for {platform.upper()}! 🌙", "magenta")
         
-    def _load_guidelines(self, guidelines_path: Optional[Path] = None) -> str:
-        """Load Facebook advertising guidelines"""
+    def _load_guidelines(self, platform: str, guidelines_path: Optional[Path] = None) -> str:
+        """Load platform-specific guidelines"""
         if not guidelines_path:
-            guidelines_path = GUIDELINES_PATH
+            guidelines_path = GUIDELINES_PATHS.get(platform, GUIDELINES_PATHS["youtube"])
             
         try:
             with open(guidelines_path, 'r') as f:
                 guidelines = f.read()
-            cprint(f"✅ Loaded guidelines from {guidelines_path}", "green")
+            cprint(f"✅ Loaded {platform} guidelines from {guidelines_path}", "green")
             return guidelines
         except Exception as e:
-            cprint(f"❌ Error loading guidelines: {str(e)}", "red")
-            return "Facebook advertising guidelines not available."
+            cprint(f"⚠️  Guidelines file not found: {str(e)}", "yellow")
+            # Return default guidelines based on platform
+            if platform == "youtube":
+                return "YouTube Community Guidelines: No hate speech, violence, sexual content, harmful content, spam, or copyright violations."
+            elif platform == "instagram":
+                return "Instagram Community Guidelines: No nudity, hate speech, violence, illegal goods, or misinformation."
+            return "Platform guidelines not available."
             
     def _init_model(self):
         """Initialize AI model for compliance analysis"""
@@ -279,20 +327,42 @@ class ComplianceAgent:
             
             # Get analysis from model
             cprint("🧠 Asking AI to analyze compliance...", "cyan")
-            cprint("🌙 Moon Dev's Compliance Agent is thinking deeply... 🌙", "magenta")
+            cprint("🌙 Compliance Agent is thinking deeply... 🌙", "magenta")
             
-            response = self.model.generate_response(
-                system_prompt=COMPLIANCE_PROMPT,
-                user_content=user_content,
-                temperature=0.7,
-                max_tokens=2000
-            )
-            
-            if not response or not hasattr(response, 'content'):
-                cprint("❌ Model returned empty response", "red")
-                return {"error": "Model returned empty response"}
-            
-            content = response.content
+            # Use DeepSeek connection if available, otherwise use model factory
+            if self.deepseek:
+                # Build prompt for DeepSeek
+                prompt = f"""Analyze this video for {self.platform} compliance.
+
+Guidelines:
+{self.guidelines[:3000]}
+
+Transcript:
+{transcript[:2000]}
+
+{len(image_contents)} frames have been extracted from the video.
+
+{COMPLIANCE_PROMPTS.get(self.platform, COMPLIANCE_PROMPTS['youtube'])}
+"""
+                response_text = self.deepseek.chat(
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.3,
+                    max_tokens=2000
+                )
+                content = response_text
+            else:
+                response = self.model.generate_response(
+                    system_prompt=COMPLIANCE_PROMPTS.get(self.platform, COMPLIANCE_PROMPTS['youtube']),
+                    user_content=user_content,
+                    temperature=0.7,
+                    max_tokens=2000
+                )
+                
+                if not response or not hasattr(response, 'content'):
+                    cprint("❌ Model returned empty response", "red")
+                    return {"error": "Model returned empty response"}
+                
+                content = response.content
             
             # Try to parse JSON from response
             try:
@@ -308,13 +378,18 @@ class ComplianceAgent:
                 analysis = json.loads(json_match)
                 cprint("✅ Successfully parsed compliance analysis!", "green")
                 
-                # Print the response with a red or blue background based on compliance
-                if analysis.get('compliance_status', 'non-compliant') == 'compliant':
-                    cprint(f"\nCompliance Status: {analysis.get('compliance_status', 'Unknown')}", "white", "on_blue")
+                # Print the response with appropriate formatting
+                is_compliant = analysis.get('compliant', analysis.get('compliance_status') == 'compliant')
+                score = analysis.get('score', 0.0)
+                
+                if is_compliant:
+                    cprint(f"\n✅ COMPLIANT - Score: {score:.2f}", "white", "on_green")
                 else:
-                    cprint(f"\nCompliance Status: {analysis.get('compliance_status', 'Unknown')}", "white", "on_red")
-                cprint(f"Overall Assessment: {analysis.get('overall_assessment', 'No assessment provided.')}", "white", "on_blue")
-                cprint(f"Moon Dev Message: {analysis.get('moon_dev_message', 'Moon Dev says: Keep those ads compliant! 🌙')}", "white", "on_blue")
+                    cprint(f"\n❌ NON-COMPLIANT - Score: {score:.2f}", "white", "on_red")
+                
+                issues = analysis.get('issues', [])
+                if issues:
+                    cprint(f"Issues: {', '.join(issues)}", "yellow")
                 
                 return analysis
             except Exception as json_error:
@@ -342,6 +417,109 @@ class ComplianceAgent:
             cprint(f"✅ JSON report generated and saved to {json_path}", "green")
         except Exception as e:
             cprint(f"❌ Error generating JSON report: {str(e)}", "red")
+    
+    def check_pipeline_compliance(self, video_path: str, quick_check: bool = False) -> Dict[str, Any]:
+        """
+        Check video compliance for content pipeline use
+        
+        Args:
+            video_path: Path to video file
+            quick_check: If True, do faster analysis (fewer frames, no full transcription)
+            
+        Returns:
+            {
+                "compliant": bool,
+                "score": float (0-1),
+                "issues": List[str],
+                "recommendations": List[str],
+                "platform_specific": Dict
+            }
+        """
+        try:
+            import logging
+            logger = logging.getLogger("compliance_agent")
+            
+            logger.info(f"🔍 Checking compliance for: {Path(video_path).name}")
+            
+            video_path_obj = Path(video_path)
+            ad_name = video_path_obj.stem
+            
+            # Create temporary directories
+            temp_frames_dir = FRAMES_DIR / f"temp_{ad_name}"
+            temp_frames_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Extract frames (fewer if quick check)
+            frame_count = 3 if quick_check else 5
+            frames = self.extract_frames(video_path_obj, temp_frames_dir)
+            
+            if not frames:
+                logger.warning("Failed to extract frames")
+                return {
+                    "compliant": False,
+                    "score": 0.0,
+                    "issues": ["Failed to extract video frames"],
+                    "recommendations": ["Check video file integrity"],
+                    "platform_specific": {}
+                }
+            
+            # Transcribe (skip if quick check and use placeholder)
+            if quick_check:
+                transcript = "[Quick check mode - full transcription skipped]"
+            else:
+                self._lazy_load_whisper()
+                if self._whisper_model:
+                    result = self._whisper_model.transcribe(str(video_path))
+                    transcript = result["text"]
+                else:
+                    transcript = "[Transcription unavailable]"
+            
+            # Analyze compliance
+            analysis = self.analyze_compliance(ad_name, temp_frames_dir, transcript)
+            
+            # Clean up temp frames
+            import shutil
+            shutil.rmtree(temp_frames_dir, ignore_errors=True)
+            
+            # Format response for pipeline
+            if "error" in analysis:
+                return {
+                    "compliant": False,
+                    "score": 0.0,
+                    "issues": [analysis.get("error", "Unknown error")],
+                    "recommendations": ["Review video manually"],
+                    "platform_specific": {}
+                }
+            
+            # Extract standard format
+            is_compliant = analysis.get('compliant', analysis.get('compliance_status') == 'compliant')
+            score = analysis.get('score', 0.5 if is_compliant else 0.3)
+            
+            result = {
+                "compliant": is_compliant,
+                "score": float(score),
+                "issues": analysis.get('issues', []),
+                "recommendations": analysis.get('recommendations', []),
+                "platform_specific": analysis.get('platform_specific', {})
+            }
+            
+            if is_compliant:
+                logger.info(f"✅ Compliance check passed - Score: {score:.2f}")
+            else:
+                logger.warning(f"❌ Compliance check failed - Score: {score:.2f}")
+                logger.warning(f"Issues: {', '.join(result['issues'])}")
+            
+            return result
+            
+        except Exception as e:
+            import logging
+            logging.error(f"Compliance check error: {e}")
+            return {
+                "compliant": False,
+                "score": 0.0,
+                "issues": [f"Compliance check error: {str(e)}"],
+                "recommendations": ["Review video manually"],
+                "platform_specific": {}
+            }
     
     def process_video(self, video_path: Path) -> Dict:
         """Process a single video for compliance analysis"""

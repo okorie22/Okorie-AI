@@ -144,6 +144,53 @@ class ZerePyCLI:
             )
         )
         
+        ################## CONTENT PIPELINE ##################
+        # Start pipeline monitoring
+        self._register_command(
+            Command(
+                name="start-pipeline",
+                description="Start monitoring for new videos in the content pipeline",
+                tips=["Pipeline will monitor cloud folder for new videos",
+                      "Videos will be automatically processed, edited, and sent for review"],
+                handler=self.start_pipeline,
+                aliases=['pipeline-start']
+            )
+        )
+        
+        # Check pipeline status
+        self._register_command(
+            Command(
+                name="pipeline-status",
+                description="Check the status of content pipeline",
+                tips=["Shows active pipelines and their current state"],
+                handler=self.pipeline_status,
+                aliases=['status']
+            )
+        )
+        
+        # Approve clip
+        self._register_command(
+            Command(
+                name="approve-clip",
+                description="Manually approve a clip for publishing",
+                tips=["Format: approve-clip {video_id}",
+                      "Use 'pipeline-status' to see pending clips"],
+                handler=self.approve_clip,
+                aliases=['approve']
+            )
+        )
+        
+        # Reject clip
+        self._register_command(
+            Command(
+                name="reject-clip",
+                description="Manually reject a clip",
+                tips=["Format: reject-clip {video_id}"],
+                handler=self.reject_clip,
+                aliases=['reject']
+            )
+        )
+        
         ################## CONNECTIONS ################## 
         # List actions command
         self._register_command(
