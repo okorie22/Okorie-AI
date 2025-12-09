@@ -1,0 +1,2002 @@
+"""
+🌙 Anarcho Capital's Configuration File
+Built with love by Anarcho Capital 🚀
+"""
+
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file in root ITORO folder
+import os
+env_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', '.env')
+load_dotenv(env_path)
+
+# =============================================================================
+# 📈 PAPER TRADING CONFIGURATION
+# =============================================================================
+
+# Paper Trading Settings
+PAPER_TRADING_ENABLED = True # Set to False for live trading mode
+PAPER_INITIAL_BALANCE = 1000.0  # Initial paper trading balance in USD
+PAPER_TRADING_SLIPPAGE = 104  # Simulated slippage for paper trades (100 = 1%)
+PAPER_TRADING_RESET_ON_START = False  # Whether to reset paper portfolio on app start
+PAPER_TRADING_INITIAL_BALANCE = 1000.0
+PAPER_TRADING_DB_PATH = os.path.join('src', 'data', 'paper_trading.db')
+
+# Portfolio Reset Configuration
+PORTFOLIO_RESET_ENABLED = False  # Disable portfolio reset to prevent 100% SOL reversion
+PORTFOLIO_RESET_PRESERVE_LIVE_BALANCE = True  # Keep current live wallet balance when resetting
+PORTFOLIO_RESET_CLEAR_HISTORY = False  # Don't clear historical data to preserve allocations
+PORTFOLIO_RESET_CLEAR_PEAK_BALANCE = False  # Don't reset peak balance
+PORTFOLIO_RESET_REASON = "Disabled to prevent allocation reversion"  # Reason for the reset (for logging)
+
+
+# Paper trading position limits (INCREASED FOR HIGH-FREQUENCY TRADING)
+PAPER_MAX_POSITION_SIZE = 200.0  # Maximum size for any single position in USD
+PAPER_MIN_POSITION_SIZE = 10   # Minimum position size in USD
+PAPER_MAX_TOTAL_ALLOCATION = 0.75  # Maximum 95% of portfolio can be allocated
+
+# Status update interval (in seconds)
+STATUS_UPDATE_INTERVAL = 3600  # Update status display every 1 hour
+
+# =============================================================================
+# 🎯 SELL TYPE CONFIGURATION
+# =============================================================================
+
+# Sell type configuration
+HALF_SELL_THRESHOLD = 0.45  # 45-55% considered half sell
+HALF_SELL_UPPER_THRESHOLD = 0.55
+PARTIAL_SELL_MIN_THRESHOLD = 0.10  # Minimum 10% to be considered partial
+FULL_SELL_THRESHOLD = 0.95  # 95%+ considered full sell
+
+# =============================================================================
+# 🔊 LOGGING CONFIGURATION
+# =============================================================================
+
+# Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_LEVEL = "DEBUG"  # Set to DEBUG for detailed troubleshooting
+BIRDEYE_API_DEBUG = True  # Enable Birdeye API debugging
+PRICE_SERVICE_DEBUG = True  # Enable detailed price service logging
+
+# Model Factory Settings
+MODEL_FACTORY_QUIET_MODE = True  # Suppress verbose model factory initialization output
+
+# Log file settings
+LOG_TO_FILE = True  # Whether to save logs to file
+LOG_DIRECTORY = "logs"  # Directory to store log files
+LOG_FILENAME = "trading_system.log"  # Name of the log file
+LOG_MAX_SIZE_MB = 10  # Maximum size of log file before rotation (in MB)
+LOG_BACKUP_COUNT = 5  # Number of backup log files to keep
+
+# UI Console logging settings
+CONSOLE_LOG_LEVEL = "DEBUG"  # Temporarily enable debug in console to see stSOL selection logic
+SHOW_DEBUG_IN_CONSOLE = False  # Whether to show DEBUG messages in the UI console
+SHOW_TIMESTAMPS_IN_CONSOLE = False  # Whether to show timestamps in console messages
+
+# =============================================================================
+# 🤖 AI MODEL CONFIGURATION
+# =============================================================================
+
+# Global AI Model Settings (used as fallbacks)
+AI_MODEL = "deepseek"
+AI_TEMPERATURE = 0.7
+AI_MAX_TOKENS = 2048
+
+# =============================================================================
+# 📊 OI AGENT CONFIGURATION
+# =============================================================================
+
+# OI Agent Settings
+OI_CHECK_INTERVAL_HOURS = 4  # How often to collect OI data (hours)
+OI_TRACKED_SYMBOLS = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'DOGE', 'AVAX', 'MATIC', 'DOT']  # Top 10 cryptocurrencies
+OI_LOCAL_RETENTION_DAYS = 30  # How long to keep local Parquet files (days)
+OI_AI_INSIGHTS_ENABLED = True  # Enable AI-generated market insights
+
+# =============================================================================
+# 💰 FUNDING AGENT CONFIGURATION
+# =============================================================================
+
+# Funding Agent Settings
+FUNDING_CHECK_INTERVAL_MINUTES = 120  # How often to check funding rates (2 hours)
+FUNDING_LOCAL_RETENTION_DAYS = 90  # How long to keep local Parquet files (days)
+
+# Funding Rate Alert Thresholds
+FUNDING_MID_NEGATIVE_THRESHOLD = -2.0  # Alert if annual rate below -2%
+FUNDING_MID_POSITIVE_THRESHOLD = 10.0  # Alert if annual rate above 10%
+FUNDING_NEGATIVE_THRESHOLD = -5.0  # AI Run & Alert if annual rate below -5% (EXTREME)
+FUNDING_POSITIVE_THRESHOLD = 20.0  # AI Run & Alert if annual rate above 20% (EXTREME)
+
+# Funding Agent AI Settings
+FUNDING_MODEL_OVERRIDE = "deepseek-chat"  # DeepSeek's V3 model - fast & efficient
+FUNDING_DEEPSEEK_BASE_URL = "https://api.deepseek.com"  # Base URL for DeepSeek API
+FUNDING_AI_TEMPERATURE = 0.7
+FUNDING_AI_MAX_TOKENS = 150
+
+# OHLCV Data Settings for Funding Analysis
+FUNDING_TIMEFRAME = '15m'  # Candlestick timeframe
+FUNDING_LOOKBACK_BARS = 100  # Number of candles to analyze
+
+# Symbol to name mapping - 16 major crypto assets
+FUNDING_SYMBOL_NAMES = {
+    'BTC': 'Bitcoin',
+    'ETH': 'Ethereum',
+    'SOL': 'Solana',
+    'BNB': 'Binance Coin',
+    'ADA': 'Cardano',
+    'AVAX': 'Avalanche',
+    'MATIC': 'Polygon',
+    'LINK': 'Chainlink',
+    'DOT': 'Polkadot',
+    'UNI': 'Uniswap',
+    'AAVE': 'Aave',
+    'SUSHI': 'SushiSwap',
+    'COMP': 'Compound',
+    'MKR': 'Maker',
+    'NEAR': 'Near Protocol',
+    'FARTCOIN': 'Fart Coin'
+}
+
+# =============================================================================
+# 🌊 LIQUIDATION AGENT CONFIGURATION
+# =============================================================================
+
+# Liquidation Agent Settings
+LIQUIDATION_CHECK_INTERVAL = 120  # Backup polling interval (seconds) if websockets fail
+LIQUIDATION_SYMBOLS = ['BTC', 'ETH', 'SOL']  # Symbols to track for liquidations
+LIQUIDATION_THRESHOLD = 0.5  # Multiplier for significant events (1.5 = 150% of previous)
+LIQUIDATION_COMPARISON_WINDOW = 15  # Time window in minutes (15, 60, or 240)
+LIQUIDATION_LOOKBACK_BARS = 100  # Number of candles for market context
+LIQUIDATION_TIMEFRAME = '15m'  # Candlestick timeframe for market analysis
+LIQUIDATION_LOCAL_RETENTION_HOURS = 24  # Keep 24 hours locally (1 day)
+LIQUIDATION_EXCHANGES = ['binance', 'bybit', 'okx', 'kucoin', 'bitfinex']  # Exchanges to monitor
+
+# Liquidation Data Collection Settings
+LIQUIDATION_BATCH_INTERVAL_SECONDS = 10  # How often to batch save events (seconds)
+LIQUIDATION_CLOUD_SYNC_INTERVAL_SECONDS = 60  # How often to sync to cloud (seconds)
+LIQUIDATION_CLOUD_SYNC_BATCH_SIZE = 100  # Max events per cloud sync batch
+LIQUIDATION_BUFFER_SIZE = 1000  # Size of in-memory event buffer
+
+# AI Settings for liquidation analysis
+LIQUIDATION_AI_MODEL = "deepseek-chat"  # DeepSeek model for analysis
+LIQUIDATION_AI_TEMPERATURE = 0.7  # Temperature for AI responses
+LIQUIDATION_AI_MAX_TOKENS = 150  # Max tokens for AI response
+
+# Cascade Detection Settings
+LIQUIDATION_CASCADE_THRESHOLD_USD = 1000000  # Min USD value to consider cascade ($1M)
+LIQUIDATION_CASCADE_WINDOW_SECONDS = 60  # Time window for cascade detection (seconds)
+
+# Market Microstructure Settings
+LIQUIDATION_BID_ASK_DEPTH_BPS = 10  # Depth to measure in basis points
+LIQUIDATION_VOLATILITY_WINDOW_HOURS = 1  # Window for volatility calculation
+
+# Agent Cooldown Configuration (seconds)
+# HARVESTING_AGENT_COOLDOWN_SECONDS defined at line ~1329 (removed duplicate - Python uses last occurrence)
+COPYBOT_AI_COOLDOWN_SECONDS = 300  # Used by: CopyBot (cooldown per token analysis)
+
+# Interval-based check frequencies
+# HARVESTING_INTERVAL_CHECK_MINUTES defined at line ~1325 (removed duplicate - Python uses last occurrence)
+
+# Rebalancing deviation threshold  
+# HARVESTING_DEVIATION_THRESHOLD defined at line ~823 (removed duplicate - Python uses last occurrence)
+
+# Risk management thresholds
+MAX_CONSECUTIVE_LOSSES = 6  # Maximum consecutive losing trades before risk action
+
+# GitHub integration settings
+ENABLE_GITHUB_AUTO_COMMIT = True  # Enable automatic GitHub commits for config changes
+GITHUB_COMMIT_TIMEOUT_SECONDS = 30  # Timeout for git push operations
+
+# System restart settings
+ENABLE_AUTO_RESTART_AFTER_WALLET_UPDATE = True  # Enable automatic restart after wallet updates
+RESTART_DELAY_SECONDS = 10  # Delay before restart to allow cleanup
+
+# Agent-specific AI overrides
+RISK_MODEL_OVERRIDE = "deepseek-chat"
+RISK_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+COPYBOT_MODEL_OVERRIDE = "deepseek-chat"
+DCA_MODEL_OVERRIDE = "deepseek-chat"
+DCA_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+CHART_MODEL_OVERRIDE = "deepseek-chat"  # Use the correct DeepSeek model name
+CHART_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+
+# =============================================================================
+# 🐋 APIFY WHALE AGENT CONFIGURATION
+# =============================================================================
+
+# Apify API Configuration
+APIFY_API_TOKEN = os.getenv('APIFY_API_TOKEN')
+APIFY_ACTOR_ID = "jgxPNaFu0r4jDOXD1"  # GMGN CopyTrade Wallet Scraper
+APIFY_DEFAULT_INPUT = {
+    "chain": "sol",
+    "sortBy": "profit_30days",
+    "sortDirection": "desc",
+    "traderType": "all"
+}
+
+# Whale Agent Scoring Configuration
+# Prioritized scoring: PNL (30d > 7d > 1d) → Winrate → Holding Period → Token Active → Others
+WHALE_SCORING_WEIGHTS = {
+    'pnl_30d': 0.35,           # 30-day PnL weight (highest priority - long-term profitability)
+    'pnl_7d': 0.20,            # 7-day PnL weight (medium-term consistency)
+    'pnl_1d': 0.03,          # 1-day PnL weight (short-term performance)
+    'winrate_7d': 0.20,        # 7-day win rate weight (consistency indicator)
+    'avg_holding_period_7d': 0.10,  # Holding period weight (trading style indicator)
+    'token_active': 0.10,    # Active tokens weight (diversification, maintain threshold)
+    'is_blue_verified': 0.01,  # Twitter verification weight (credibility)
+    'txs_30d': 0.01            # Transaction count weight (inverse - activity level)
+}
+
+# Whale Agent Thresholds
+WHALE_THRESHOLDS = {
+    'min_pnl_30d': 50000.0,     # Lowered from 1000.0 - match ideal wallets
+    'min_winrate_7d': 0.3,      # Lowered from 0.4 - more realistic
+    'max_txs_30d': 10000,       # Increased from 1000 - allow more active traders
+    'min_token_active': 10,     # Lowered from 40 - allow focused traders
+    'max_token_active': 1000,   # Increased from 300 - more flexible
+    'min_avg_holding_period': 0.1,  # Lowered from 1.0 - allow quick traders
+    'max_avg_holding_period': 100000.0, # Increased from 30.0 - handle data issues
+    'max_inactive_days': 7      # Maximum days since last activity
+}
+
+# Whale Agent Data Management
+WHALE_DATA_DIR = os.path.join('src', 'data', 'whale_dump')
+WHALE_RANKED_FILE = 'ranked_whales.json'
+WHALE_HISTORY_FILE = 'whale_history.csv'
+WHALE_UPDATE_INTERVAL_HOURS = 48  # Update frequency in hours
+WHALE_MAX_STORED_WALLETS = 100   # Maximum wallets to store
+WHALE_HISTORY_MAX_RECORDS = 1000 # Maximum history entries to keep
+WHALE_HISTORY_RETENTION_DAYS = 365 # Keep 365 days of history data
+
+# =============================================================================
+# 💰 CORE TRADING CONFIGURATION
+# =============================================================================
+
+# Core token addresses for mainnet trading
+USDC_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"  # Never trade or close
+SOL_ADDRESS = "So11111111111111111111111111111111111111112"  # Never trade or close
+STAKED_SOL_TOKEN_ADDRESS = "STAKED_SOL_So11111111111111111111111111111111111111112"  # Unique identifier for staked SOL
+
+# Define excluded tokens and rebalancing allowed tokens AFTER dynamic address assignment
+EXCLUDED_TOKENS = [USDC_ADDRESS, SOL_ADDRESS, STAKED_SOL_TOKEN_ADDRESS]
+
+# Tokens that can be used for rebalancing (but not regular trading)
+REBALANCING_ALLOWED_TOKENS = [USDC_ADDRESS, SOL_ADDRESS]  # USDC and SOL can be sold for rebalancing
+
+# Get wallet address from environment variable 
+address = os.getenv('DEFAULT_WALLET_ADDRESS')
+# Back-compat alias used by some modules
+DEFAULT_WALLET_ADDRESS = address
+
+# Validate wallet address
+def validate_wallet_address(wallet_addr):
+    """Validate that the wallet address is properly formatted"""
+    if not wallet_addr:
+        return False, "Wallet address is not configured"
+
+    if len(wallet_addr) < 32:
+        return False, f"Wallet address too short: {len(wallet_addr)} characters"
+
+    if len(wallet_addr) > 50:
+        return False, f"Wallet address too long: {len(wallet_addr)} characters"
+
+    # Basic validation - should be base58 encoded
+    try:
+        import base58
+        base58.b58decode(wallet_addr)
+        return True, "Valid wallet address"
+    except:
+        # If base58 not available, do basic character validation
+        valid_chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+        if all(c in valid_chars for c in wallet_addr):
+            return True, "Valid wallet address (basic validation)"
+        else:
+            return False, "Wallet address contains invalid characters"
+
+def debug_birdeye_api_key():
+    """Debug function to verify BIRDEYE_API_KEY loading"""
+    api_key = os.getenv("BIRDEYE_API_KEY")
+    if api_key:
+        from src.scripts.shared_services.logger import info
+        info(f"BIRDEYE_API_KEY loaded successfully: {api_key[:8]}...{api_key[-4:]}")
+        return True
+    else:
+        print("BIRDEYE_API_KEY not found in environment variables")
+        print("Checking all environment variables containing 'BIRDEYE'...")
+        for key, value in os.environ.items():
+            if 'BIRDEYE' in key.upper():
+                print(f"  Found: {key} = {value[:8]}...{value[-4:]}")
+        return False
+
+# Validate the configured address
+if address:
+    is_valid, validation_msg = validate_wallet_address(address)
+    if not is_valid:
+        print(f"WARNING: {validation_msg}")
+        print(f"Current address: {address}")
+        print("Please check your DEFAULT_WALLET_ADDRESS environment variable")
+else:
+    print("WARNING: No wallet address configured (DEFAULT_WALLET_ADDRESS environment variable)")
+    print("Personal wallet balance features will not work until this is set")
+
+# Trading Mode Configuration
+TRADING_MODE = "spot"
+USE_HYPERLIQUID = False
+DEFAULT_LEVERAGE = 2.0
+MAX_LEVERAGE = 5.0
+MIRROR_WITH_LEVERAGE = False
+LEVERAGE_SAFETY_BUFFER = 0.8
+
+# Paper Trading Settings (using existing configuration from above)
+
+# =============================================================================
+# 🌐 API CONFIGURATION
+# =============================================================================
+
+# RPC Configuration
+RPC_ENDPOINT = os.getenv('RPC_ENDPOINT', 'https://mainnet.helius-rpc.com/?api-key=09016bd8-7f90-41a3-877f-0f62d6ad058e')
+QUICKNODE_RPC_ENDPOINT = os.getenv('QUICKNODE_RPC_ENDPOINT', 'https://radial-maximum-tent.solana-mainnet.quiknode.pro/9101fbd24628749398074bdd83c57b608d8e8cd2/')
+QUICKNODE_WSS_ENDPOINT = os.getenv('QUICKNODE_WSS_ENDPOINT', 'wss://radial-maximum-tent.solana-mainnet.quiknode.pro/9101fbd24628749398074bdd83c57b608d8e8cd2/')
+HELIUS_RPC_ENDPOINT = os.getenv('HELIUS_RPC_ENDPOINT', 'https://mainnet.helius-rpc.com/?api-key=09016bd8-7f90-41a3-877f-0f62d6ad058e')
+
+# RPC Priority (QuickNode primary, Helius fallback)
+# Note: Free RPC endpoints may have authentication issues - this is normal
+PRIMARY_RPC_ENDPOINT = QUICKNODE_RPC_ENDPOINT
+FALLBACK_RPC_ENDPOINT = HELIUS_RPC_ENDPOINT
+
+# RPC Authentication Settings
+RPC_AUTHENTICATION_REQUIRED = True  # Set to False if using public RPC endpoints
+RPC_API_KEY_HEADER = "Authorization"  # Header name for API key
+RPC_API_KEY_PREFIX = "Bearer"  # Prefix for API key in header
+
+# RPC Error Handling
+RPC_MAX_RETRIES = 5  # Increased from 3 to 5 for better resilience
+RPC_RETRY_DELAY = 2.0  # Increased from 1.0 to 2.0 seconds
+RPC_TIMEOUT = 20  # Increased from 15 to 20 seconds
+RPC_IGNORE_AUTH_ERRORS = True  # Ignore 401 errors for free RPC endpoints
+RPC_HEALTH_CHECK_INTERVAL = 60  # Check RPC health every 60 seconds
+
+# QuickNode API Access (from your add-ons)
+QUICKNODE_TOKEN_METRICS_API = True  # Token price, OHLCV, sentiment
+QUICKNODE_PRIORITY_FEE_API = True   # Priority fee data
+QUICKNODE_MEV_RESILIENCE = True     # MEV protection
+QUICKNODE_PUMPFUN_API = True        # Pump.fun integration
+QUICKNODE_JUPITER_SWAP_API = True   # Jupiter swap integration
+QUICKNODE_OPENOCEAN_API = True      # OpenOcean integration
+
+# Jupiter API configuration
+JUPITER_API_KEY = os.getenv('JUPITER_API_KEY', '')  # Optional - Jupiter works without API key
+
+# Use Jupiter v1 for mainnet (with Address Lookup Tables)
+JUPITER_API_URL = "https://lite-api.jup.ag/swap/v1"
+
+JUPITER_FEE_ACCOUNT = "FG4Y3yX4AAchp1HvNZ7LfzFTewF2f6nDoMDCohTFrdpT"  # For referral fees
+
+# Jupiter exchange constraints
+JUPITER_MIN_TRANSACTION_SIZE_USD = 1.0
+JUPITER_MAX_TRANSACTION_SIZE_USD = 50000.0
+JUPITER_MAX_SLIPPAGE_BPS = 1000  # 10%
+JUPITER_MIN_SOL_BALANCE = 0.01
+JUPITER_DEFAULT_SLIPPAGE_BPS = 50  # 0.5%
+
+# API timeouts and retries
+API_SLEEP_SECONDS = 0.1  # OPTIMIZATION: Reduced from 2 to 0.1 seconds for 20x speed improvement
+API_TIMEOUT_SECONDS = 20  # INCREASED: From 15 to 20 seconds for Jupiter API reliability
+API_MAX_RETRIES = 3  # INCREASED: From 2 to 3 retries for better failure handling
+JUPITER_API_TIMEOUT = 20  # Jupiter-specific timeout for price fetching and trading
+API_RATE_LIMIT_CALLS = 15  # OPTIMIZATION: Increased from 10 to 15 calls per second (more aggressive)
+API_RATE_LIMIT_WINDOW = 1  # Time window in seconds
+API_BACKOFF_FACTOR = 1.5  # OPTIMIZATION: Reduced from 2 to 1.5 for faster retry recovery
+API_MAX_BACKOFF = 30
+
+# Helius-specific rate limits
+HELIUS_RATE_LIMIT_CALLS = 5
+HELIUS_RATE_LIMIT_WINDOW = 1
+
+# Additional safety timeouts
+API_REQUEST_TIMEOUT_SECONDS = 30
+TRADE_TIMEOUT_SECONDS = 90
+BALANCE_CHECK_TIMEOUT_SECONDS = 15
+PRICE_CHECK_TIMEOUT_SECONDS = 12
+WALLET_TRACKING_TIMEOUT_SECONDS = 120
+WALLET_TOKEN_FETCH_TIMEOUT_SECONDS = 15
+POSITION_VALIDATION_TIMEOUT_SECONDS = 10
+METADATA_FETCH_TIMEOUT_SECONDS = 8
+
+# =============================================================================
+# 💲 PRICE SERVICE CONFIGURATION
+# =============================================================================
+
+PRICE_SOURCE_MODE = os.getenv('PRICE_SOURCE_MODE', 'jupiter')  # Default to Jupiter-first, Birdeye as fallback
+PRICE_CACHE_MINUTES = 3  # OPTIMIZATION: Reduced from 5 to 3 minutes for fresher prices
+BATCH_SIZE = 100  # OPTIMIZATION: Increased from 50 to 100 for better batch efficiency
+MIN_TOKEN_VALUE = 0.001  # SURGICAL: Reduced from 0.05 to 0.001 for much better coverage
+SKIP_UNKNOWN_TOKENS = False  # SURGICAL: Disabled to allow tokens without price data
+USE_PARALLEL_PROCESSING = True
+
+# Tiered caching configuration
+TIERED_CACHE_ENABLED = True
+STABLECOIN_CACHE_HOURS = 12  # OPTIMIZATION: Reduced from 24 to 12 hours for better accuracy
+BLUECHIP_CACHE_MINUTES = 5  # OPTIMIZATION: Reduced from 10 to 5 minutes for fresher prices
+MIDCAP_CACHE_MINUTES = 3     # OPTIMIZATION: Reduced from 5 to 3 minutes
+LOWCAP_CACHE_MINUTES = 1     # OPTIMIZATION: Reduced from 2 to 1 minute for volatile tokens
+
+# Hybrid approach configuration - DISABLED for paid Birdeye tier
+USE_HYBRID_PRICE_FETCHING = False  # Use Birdeye exclusively with paid subscription
+PRIORITIZE_HIGH_VALUE_TOKENS = True  # Process high-value tokens first
+ENABLE_ASYNC_REFRESH = True  # Enable background price refreshing
+PRICE_INIT_CACHE_ONLY = False  # Wait for fresh prices before trading
+
+# Price validation settings
+ENABLE_PRICE_VALIDATION = True
+MAX_PRICE_AGE_SECONDS = 180
+MAX_STABLE_PRICE_AGE_SECONDS = 600  # OPTIMIZATION: Reduced from 900 to 600 seconds (10 minutes)
+CRITICAL_PRICE_AGE_SECONDS = 120  # 2 minutes for critical operations
+MIN_VALID_PRICE = 0.0000001  # Minimum valid price
+MAX_VALID_PRICE = 100.0  # Maximum valid price per token (realistic max for altcoins)
+MAX_VALID_SOL_PRICE = 500.0  # Higher limit for SOL specifically
+MAX_PRICE_CHANGE_PERCENT = 40.0  # Maximum price change to consider valid
+
+# Price validation optimization settings
+PRICE_VALIDATION_ENABLED = True
+PRICE_VALIDATION_FREQUENCY_MINUTES = 5  # Only validate every 5 minutes instead of every price fetch
+PRICE_VALIDATION_CACHE_THRESHOLD = 60   # Skip validation if price is < 60 seconds old and similar
+PRICE_CHANGE_THRESHOLD = 0.01  # Only revalidate if price changes by more than 1%
+MAX_PRICE_VALIDATION_CALLS_PER_HOUR = 120  # Limit to 120 validations per hour max
+
+# Enhanced caching for performance
+PRICE_CACHE_OPTIMIZATION = True
+SMART_PRICE_CACHING = True  # Enable smart caching that skips validation for stable prices
+
+# -----------------------------------------------------------------------------
+# Monitoring cadence and cache TTLs (config-driven)
+# -----------------------------------------------------------------------------
+# Base background monitoring interval (seconds). Used by OptimizedPriceService.
+# OPTIMIZATION: Set to 5 minutes (300s) to achieve ~100k CU/day target (288 cycles/day)
+PRICE_MONITOR_INTERVAL_SECONDS = int(os.getenv('PRICE_MONITOR_INTERVAL_SECONDS', 300))  # 5 minutes
+# Interval when CU throttle is active (seconds).
+PRICE_THROTTLED_INTERVAL_SECONDS = int(os.getenv('PRICE_THROTTLED_INTERVAL_SECONDS', 1200))  # 20 minutes
+
+# Cache TTLs aligned to monitoring cadence (seconds).
+PRICE_CACHE_ACTIVE_SECONDS = int(os.getenv('PRICE_CACHE_ACTIVE_SECONDS', PRICE_MONITOR_INTERVAL_SECONDS))
+PRICE_CACHE_RECENT_SECONDS = int(os.getenv('PRICE_CACHE_RECENT_SECONDS', PRICE_MONITOR_INTERVAL_SECONDS * 2))
+# OPTIMIZATION: Extended monitored cache to 30 minutes (6x base interval) to reduce fetches for non-active tokens
+PRICE_CACHE_MONITORED_SECONDS = int(os.getenv('PRICE_CACHE_MONITORED_SECONDS', max(PRICE_MONITOR_INTERVAL_SECONDS * 6, 1800)))
+# OPTIMIZATION: Extended background cache to 60 minutes to minimize updates for rarely-traded tokens
+PRICE_CACHE_BACKGROUND_SECONDS = int(os.getenv('PRICE_CACHE_BACKGROUND_SECONDS', 3600))  # 60 minutes
+
+# Birdeye batch fetch configuration
+BIRDEYE_BATCH_ENABLED = os.getenv('BIRDEYE_BATCH_ENABLED', 'true').lower() == 'true'
+BIRDEYE_BATCH_SIZE = int(os.getenv('BIRDEYE_BATCH_SIZE', 50))
+BIRDEYE_BATCH_DELAY_SECONDS = float(os.getenv('BIRDEYE_BATCH_DELAY_SECONDS', 0.2))
+
+# =============================================================================
+# 🎯 POSITION SIZING & RISK MANAGEMENT
+# =============================================================================
+
+# Position sizing (OPTIMIZED FOR $115/WEEK SWING TRADING)
+POSITION_SIZING_MODE = "dynamic"  # "fixed" or "dynamic"
+BASE_POSITION_SIZE_USD = 20.0  # Base position size for swing trades
+POSITION_SIZE_PERCENTAGE = 0.05  # 5% for swing trade conviction
+
+MIN_POSITION_SIZE_USD = 1.0  # Minimum viable swing position
+MAX_POSITION_SIZE_USD = 1000.0  # Maximum position size (INCREASED FOR HIGH-FREQUENCY TRADING)
+
+# Weekly budget management
+WEEKLY_BUDGET_USD = 115.0  # Weekly deposit target
+MAX_WEEKLY_POSITIONS = 6  # Maximum new positions per week
+SWING_TRADE_HOLD_PERIOD_DAYS = 5  # Target hold period
+CASH_RESERVE_PERCENTAGE = 20  # Keep 25% in USDC for opportunities
+
+# Dynamic position sizing
+USE_DYNAMIC_POSITION_SIZING = True
+NEW_POSITION_BASE_PERCENT = 0.02  # Base percentage for new positions
+NEW_POSITION_SMALL_ACCOUNT_PERCENT = 0.02  # Percentage when account < $1000
+SMALL_ACCOUNT_THRESHOLD = 1000.0  # Threshold for small account protection
+MAX_POSITION_INCREASE_PERCENT = 0.05  # Max increase as % of account
+
+# Position limits (INCREASED FOR HIGH-FREQUENCY TRADING)
+MAX_CONCURRENT_POSITIONS = 12  # Maximum simultaneous positions
+MAX_TOTAL_ALLOCATION_PERCENT = 0.50  # Maximum total allocation
+
+# Dust handling
+# Any non-zero balance with USD value <= DUST_THRESHOLD_USD OR < $0.01 is treated as dust
+DUST_THRESHOLD_USD = 10.0  # Increased from 1.0 to 5.0 for better dust collection
+ALLOW_EXCLUDED_DUST = True  # Permit dust conversion even for excluded tokens
+
+# Risk management settings (INCREASED FOR HIGH-FREQUENCY TRADING)
+CASH_PERCENTAGE = 20  # Cash buffer percentage
+MAX_SINGLE_POSITION_PERCENT = 0.10  # 15% max for highest conviction
+SLEEP_AFTER_CLOSE = 1800
+MAX_LOSS_GAIN_CHECK_HOURS = 24  # Monitoring window
+
+# Max Loss/Gain Settings
+USE_PERCENTAGE = True  # Use percentage-based limits vs USD
+MAX_LOSS_USD = 50.0  # Maximum loss in USD
+MAX_GAIN_USD = 200.0  # Maximum gain in USD
+MAX_LOSS_PERCENT = 10  # Maximum loss percentage
+MAX_GAIN_PERCENT = 300  # Maximum gain percentage
+MINIMUM_BALANCE_USD = 50  # Minimum balance limit for risk management
+
+# Simplified Risk Management - 4 Triggers Only
+RISK_MANAGEMENT_ENABLED = True
+EMERGENCY_STOP_ENABLED = True
+DRAWDOWN_LIMIT_PERCENT = -30  # -30% maximum drawdown
+CONSECUTIVE_LOSS_LIMIT = 6  # Maximum consecutive losses
+RISK_AGENT_COOLDOWN_SECONDS = 1800  # Used by: Risk Agent (cooldown between actions) - MASTER AGENT SHOULD ADJUST THIS!
+
+# Drawdown recovery threshold (50% improvement required)
+DRAWDOWN_RECOVERY_THRESHOLD = 0.5  # 50% improvement required
+
+# SOL fee reserve percentage
+SOL_FEE_RESERVE_PERCENT = 0.05  # 5% of portfolio for SOL fees
+
+# =============================================================================
+# 🚀 TRADE EXECUTION SETTINGS
+# =============================================================================
+
+# Legacy compatibility
+usd_size = POSITION_SIZE_PERCENTAGE
+max_usd_order_size = 25.0
+tx_sleep = 3.0
+orders_per_open = 2
+
+# Slippage settings
+slippage = 200  # 2% default slippage
+SLIPPAGE_PROTECTION_ENABLED = True
+DYNAMIC_SLIPPAGE_ADJUSTMENT = True
+MIN_SLIPPAGE = 100  # 1% minimum slippage
+MAX_SLIPPAGE = 300  # 3% maximum slippage
+SLIPPAGE_INCREASE_THRESHOLD = 200  # 2% threshold for increasing slippage
+PRICE_IMPACT_WARNING_THRESHOLD = 150  # 1.5% warning threshold
+
+# Priority fees
+PRIORITY_FEE = 50000  # Default priority fee in lamports
+# REBALANCING_PRIORITY_FEE defined at line ~764 (removed duplicate)
+# CONVERSION_SLIPPAGE_BPS defined at line ~763 (removed duplicate)
+
+# Trade execution safety
+ENABLE_TRADE_VALIDATION = True
+MAX_TRADE_RETRY_ATTEMPTS = 3
+TRADE_TIMEOUT_SECONDS = 90
+
+# =============================================================================
+# 🔄 AGENT RUNTIME SETTINGS
+# =============================================================================
+
+# Agent coordination flags
+HARVESTING_STARTUP_DONE = False  # Global flag for CopyBot coordination
+
+# Agent coordination now handled by SimpleAgentCoordinator
+
+# Position Validation Settings
+POSITION_VALIDATION = {
+    'ENABLED': True,                    # Enable position validation for all agents
+    'VALIDATE_BEFORE_SELL': True,      # Validate position exists before selling
+    'VALIDATE_BEFORE_BUY': True,       # Validate USDC balance before buying
+    'MIN_POSITION_SIZE_USD': 0.01,     # Minimum position size to validate
+    'VALIDATION_TIMEOUT_SECONDS': 5    # Timeout for position validation
+}
+
+# USDC Balance Validation
+USDC_VALIDATION = {
+    'ENABLED': True,                    # Enable USDC balance validation
+    'MIN_BALANCE_USD': 10.0,           # Minimum USDC balance required
+    'WARNING_THRESHOLD_USD': 50.0,     # USDC balance warning threshold
+    'CRITICAL_THRESHOLD_USD': 20.0,    # USDC balance critical threshold
+    'BLOCK_TRADING_BELOW_MIN': True    # Block trading when below minimum
+}
+
+# Trade Lock Manager Settings
+TRADE_LOCK_SETTINGS = {
+    'ENABLED': True,                    # Enable trade lock manager
+    'DEFAULT_LOCK_DURATION': 300,      # Default lock duration in seconds
+    'REBALANCING_LOCK_DURATION': 600,  # Rebalancing lock duration
+    'CONFLICT_RESOLUTION_TIMEOUT': 60, # Timeout for conflict resolution
+    'AUTO_RELEASE_EXPIRED': True       # Auto-release expired locks
+}
+
+# General agent settings
+SLEEP_BETWEEN_RUNS_MINUTES = 15
+
+# Risk Agent settings - CLEANED (removed unused duplicates)
+USE_AI_CONFIRMATION = True
+
+# Selective risk management
+USE_SELECTIVE_RISK_MANAGEMENT = True
+SELECTIVE_CLOSE_TARGET_REDUCTION = 0.3  # Close 30% of worst positions
+SELECTIVE_CLOSE_MINIMUM_POSITIONS = 1  # Always close at least 1 position
+RISK_CLOSE_BY_PERFORMANCE = True  # Close worst performing positions first
+RISK_CLOSE_BY_SIZE = False  # Close largest positions first instead
+PARTIAL_CLOSE_PERCENTAGE = 0.4  # Sell 40% of position for partial closes
+
+# =============================================================================
+# 🤖 COPYBOT CONFIGURATION
+# =============================================================================
+
+# Wallet tracking
+WALLETS_TO_TRACK = [
+    "DYAn4XpAkN5mhiXkRB7dGq4Jadnx6XYgu8L5b3WGhbrt",  # Tha Doc
+    "DNfuF1L62WWyW3pNakVkyGGFzVVhj4Yr52jSmdTyeBHm",  # Gake
+    "G5nxEXuFMfV74DSnsrSatqCW32F34XUnBeq3PfDS7w5E"   # profit | eca.eth
+]
+
+# CopyBot filtering
+FILTER_MODE = "Dynamic"
+PERCENTAGE_THRESHOLD = 0.005  # Reduced from 0.015 for better sensitivity (0.5%)
+AMOUNT_THRESHOLD = 10.0  # Reduced from 1500 to catch smaller but meaningful moves
+ACTIVITY_WINDOW_HOURS = 1.5  # Optimized for swing trader frequency
+ENABLE_PERCENTAGE_FILTER = False  # Disabled initially to reduce over-filtering
+ENABLE_AMOUNT_FILTER = True  # Keep enabled but with much lower threshold
+ENABLE_ACTIVITY_FILTER = False  # Disabled initially to reduce over-filtering
+
+# CopyBot execution settings
+COPYBOT_ENABLE_EXECUTION = True
+ENABLE_AI_ANALYSIS = True  # ENABLED: CopyBot can use AI analysis for trading decisions
+COPYBOT_AUTO_BUY_NEW_TOKENS = True
+COPYBOT_AUTO_SELL_REMOVED_TOKENS = True  # ENABLED: Mirror all transactions
+COPYBOT_WALLET_ACTION_WEIGHT = 1.0  # Full weight to wallet actions
+COPYBOT_MIN_CONFIDENCE = 0  # No confidence threshold needed
+COPYBOT_MIRROR_EXACT_PERCENTAGE = True  # Mirror exact wallet actions
+
+# CopyBot Safety Configuration (CRITICAL)
+COPYBOT_VALIDATE_HOLDINGS_BEFORE_SELL = False  # Always validate holdings before selling
+COPYBOT_MAX_SELL_PERCENTAGE = 100.0  # Maximum percentage of position to sell
+COPYBOT_MIN_BALANCE_THRESHOLD = 0.001  # Minimum balance required to execute sell
+COPYBOT_BLOCK_ZERO_BALANCE_SELLS = True  # Block sell attempts when balance is zero
+
+# CopyBot runtime - CLEANED (duplicates removed, see line ~686 for actual values used)
+
+# =============================================================================
+# 📊 TOKEN CONFIGURATION
+# =============================================================================
+
+# Dynamic vs static token monitoring
+DYNAMIC_MODE = True  # Set to False to monitor only MONITORED_TOKENS
+previous_mode = None  # Track mode changes globally
+
+# Token lists
+MONITORED_TOKENS = [
+    'VFdxjTdFzXrYr3ivWyf64NuXo7vdPK7AG7idnNZJV',
+    'CR2L1ob96JGWQkdFbt8rLwqdLLmqFwjcNGL2eFBn1RPt',
+    '2HdzfUiFWfZHZ544ynffeneuibbDK6biCdjovejr8ez9',
+    'C94njgTrKMQBmgqe23EGLrtPgfvcjWtqBBvGQ7Cjiank',
+    '67mTTGnVRunoSLGitgRGK2FJp5cT1KschjzWH9zKc3r',
+    '9YnfbEaXPaPmoXnKZFmNH8hzcLyjbRf56MQP7oqGpump',
+    'DayN9FxpLAeiVrFQnRxwjKq7iVQxTieVGybhyXvSpump',
+]
+
+# Legacy compatibility
+previous_monitored_tokens = []
+tokens_to_trade = MONITORED_TOKENS
+
+# Legacy symbol variable - DEPRECATED: This was an old token address, not a variable
+# The system now uses token_mint/token_address for token identification
+# and retrieves symbols from metadata services
+# symbol = '9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump'  # DEPRECATED
+
+# =============================================================================
+# 🤖 AGENT CONFIGURATION
+# =============================================================================
+
+# CopyBot Agent Settings - CLEANED
+COPYBOT_ENABLED = True  # Used by: CopyBot, Risk Agent (toggle on/off)
+COPYBOT_INTERVAL_MINUTES = 8  # Used by: CopyBot (ONLY if WEBHOOK_MODE=False - currently unused since webhooks are enabled!)
+COPYBOT_CONTINUOUS_MODE = False  # Used by: CopyBot (if True, runs continuously instead of intervals)
+
+# CopyBot Halt Control Flags - Set by Risk Agent
+COPYBOT_HALT_BUYS = False  # Used by: CopyBot, Risk Agent (risk agent sets this to halt new buys)
+COPYBOT_STOP_ALL = False  # Used by: CopyBot, Risk Agent (risk agent sets this to stop all trading)
+COPYBOT_SKIP_ANALYSIS_ON_FIRST_RUN = False  # Used by: CopyBot (skip first polling cycle)
+
+# Risk Agent Settings - CLEANED (removed unused duplicates)
+# NOTE: Risk Agent uses EMERGENCY_CHECK_INTERVAL_MINUTES (line ~701), not RISK_CHECK_INTERVAL_MINUTES
+# NOTE: Risk Agent uses RISK_LOSS/GAIN_CONFIDENCE_THRESHOLD at line ~883, not here
+RISK_ENABLED = True
+
+# Emergency Risk Thresholds
+EMERGENCY_USDC_RESERVE_PERCENT = 0.10  # Minimum 10% USDC reserve
+EMERGENCY_SOL_RESERVE_PERCENT = 0.02   # Minimum 2% SOL reserve  
+EMERGENCY_CHECK_INTERVAL_MINUTES = 60  # Used by: Risk Agent (hybrid monitoring cycle interval)
+
+# Startup Mode Configuration
+STARTUP_MODE_ENABLED = True
+STARTUP_MODE_DURATION_SECONDS = 120  # 2 minutes startup delay
+STARTUP_MODE_SOL_THRESHOLD = 0.95  # Consider startup if SOL > 95%
+STARTUP_MODE_USDC_THRESHOLD = 0.05  # Consider startup if USDC < 5%
+
+# Harvesting Agent Startup Grace Period
+HARVESTING_STARTUP_GRACE_PERIOD_SECONDS = 300  # 5 minutes grace period after initialization
+
+# Auto-recovery thresholds
+AUTO_RECOVERY_USDC_THRESHOLD = 0.15  # 15% USDC minimum for auto-recovery
+AUTO_RECOVERY_SOL_THRESHOLD = 0.05   # 5% SOL minimum for auto-recovery
+AUTO_RECOVERY_DRAWDOWN_THRESHOLD = 5.0  # 5% max drawdown for auto-recovery
+AUTO_RECOVERY_PORTFOLIO_RECOVERY = 0.9  # 90% of peak value for auto-recovery
+AUTO_RECOVERY_MIN_CONDITIONS = 2  # Minimum conditions needed for auto-recovery
+
+# Harvesting Agent Settings
+# HARVESTING_ENABLED defined at line ~1324 (removed duplicate)
+# HARVESTING_WEBHOOK_FIRST_MODE removed - now triggered by Portfolio Tracker
+HARVESTING_FALLBACK_CHECK_HOURS = 6   # Fallback health check every 6 hours
+HARVESTING_MODEL_OVERRIDE = "deepseek-reasoner"
+HARVESTING_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+HARVESTING_GAIN_CONFIDENCE_THRESHOLD = 75
+
+# Webhook delay to prevent agent interference (copybot agent priority)
+HARVESTING_WEBHOOK_DELAY_SECONDS = 5  # Delay harvesting check by 5 seconds after webhook
+
+# Rebalancing Agent Settings (DEPRECATED)
+# REBALANCING_ENABLED = True
+# REBALANCING_WEBHOOK_FIRST_MODE = True  # Webhook-driven operation (resource efficient)
+# REBALANCING_FALLBACK_CHECK_HOURS = 2   # Fallback check every 2 hours
+# REBALANCING_CHECK_INTERVAL_MINUTES = 30
+# REBALANCING_CONTINUOUS_MODE = False
+
+# =============================================================================
+# ⚖️ REBALANCING AGENT CONFIGURATION (DEPRECATED)
+# =============================================================================
+
+# All portfolio management is now handled by HarvestingAgent. The following variables are deprecated:
+# REBALANCING_ENABLED = True
+# REBALANCING_CHECK_INTERVAL_MINUTES = 30
+# REBALANCING_CONTINUOUS_MODE = False
+# REBALANCING_SELL_STRATEGY = "worst_performing"
+# REBALANCING_MAX_SELL_PERCENT = 0.30
+# REBALANCING_MIN_POSITION_SIZE = 0.5
+# REBALANCING_MAX_FREQUENCY_MINUTES = 5
+# REBALANCING_EMERGENCY_MODE = True
+# REBALANCING_DRY_RUN = False
+# REBALANCING_LOG_LEVEL = "INFO"
+
+# The following variables are still used by HarvestingAgent for portfolio management:
+SOL_TARGET_PERCENT = 0.10  # Target 10% of portfolio in SOL
+SOL_MINIMUM_PERCENT = 0.07  # Minimum 7% SOL before triggering conversion
+SOL_MAXIMUM_PERCENT = 0.20  # Maximum 20% SOL before converting to USDC
+SOL_MINIMUM_BALANCE_USD = 10.0  # Minimum $10 SOL balance
+USDC_TARGET_PERCENT = 0.20  # Target 20% of portfolio in USDC (danger threshold)
+USDC_MINIMUM_PERCENT = 0.20  # Minimum 20% USDC - below this is danger zone
+USDC_EMERGENCY_PERCENT = 0.15  # Emergency threshold - force position sales (15%)
+MIN_CONVERSION_USD = 10.0  # Minimum $10 for conversions
+MAX_CONVERSION_USD = 1000.0  # Maximum $100 single conversion for safety
+REBALANCING_MAX_SELL_PERCENT = 0.30  # Never sell more than 30% in one rebalancing
+REBALANCING_MIN_POSITION_SIZE = 0.5  # Don't sell positions smaller than $0.50
+CONVERSION_SLIPPAGE_BPS = 300  # Used by: Harvesting Agent (3% slippage for SOL/USDC conversions)
+REBALANCING_PRIORITY_FEE = 150000  # Used by: Harvesting Agent (higher priority fee for rebalancing)
+
+# =============================================================================
+# ⚖️ REBALANCING AGENT CONFIGURATION
+# =============================================================================
+
+# Rebalancing Agent Settings (DEPRECATED - now handled by Harvesting Agent)
+REBALANCING_ENABLED = False
+# REBALANCING_WEBHOOK_FIRST_MODE removed - now triggered by Portfolio Tracker
+REBALANCING_FALLBACK_CHECK_HOURS = 2
+REBALANCING_CHECK_INTERVAL_MINUTES = 30
+REBALANCING_CONTINUOUS_MODE = False
+
+# Rebalancing thresholds (using existing SOL/USDC config values)
+# SOL_TARGET_PERCENT = 0.10 (already defined above)
+# USDC_TARGET_PERCENT = 0.20 (already defined above)
+# etc.
+
+# =============================================================================
+# 🌾 HARVESTING AGENT CONFIGURATION (SIMPLIFIED)
+# =============================================================================
+
+# Harvesting Agent Settings
+# HARVESTING_ENABLED defined at line ~1324 (removed duplicate)
+HARVESTING_DUST_CONVERSION_ENABLED = True  # Used by: Harvesting Agent
+HARVESTING_REBALANCING_ENABLED = True  # Now handled by Harvesting Agent
+
+# Realized Gains Settings
+REALIZED_GAINS_REALLOCATION_ENABLED = True
+REALIZED_GAINS_REALLOCATION_INCREMENT = 0.05  # 5% increment threshold
+# REALIZED_GAIN_THRESHOLD_USD defined at line ~838 (removed duplicate)
+
+# External wallet transfer settings
+EXTERNAL_WALLET_1 = os.getenv('EXTERNAL_WALLET_1', '')  # First external wallet for profit transfers
+EXTERNAL_WALLET_2 = os.getenv('EXTERNAL_WALLET_2', '')  # Second external wallet for profit transfers
+EXTERNAL_WALLET_ENABLED = os.getenv('EXTERNAL_WALLET_ENABLED', 'false').lower() == 'true'  # Enable external transfers
+
+# External wallet distribution (50/50 split)
+EXTERNAL_WALLET_1_PERCENT = 0.50  # 50% to wallet 1
+EXTERNAL_WALLET_2_PERCENT = 0.50  # 50% to wallet 2
+
+# REMOVED: AI analysis settings
+# REMOVED: Unrealized gains thresholds
+# REMOVED: Complex reallocation percentages
+
+# Staked SOL Configuration
+STAKED_SOL_ENABLED = True
+STAKED_SOL_PROTOCOLS = ['marinade', 'jito', 'lido']
+STAKED_SOL_MIN_AMOUNT_USD = 10.0
+
+# =============================================================================
+# 🌾 HARVESTING AGENT REBALANCING CONFIGURATION
+# =============================================================================
+
+# Target allocation percentages
+HARVESTING_SOL_TARGET_PERCENT = 10.0      # 10% SOL (gas fees) - rebalance to exactly 10%
+HARVESTING_USDC_TARGET_PERCENT = 20.0     # 20% USDC minimum (trading capital)
+
+# Rebalancing thresholds - ✅ ACTUAL VALUES USED
+HARVESTING_DEVIATION_THRESHOLD = 2.0  # Used by: Harvesting Agent (deviation % triggers rebalancing) - MASTER AGENT CAN ADJUST  
+HARVESTING_MIN_ADJUSTMENT_USD = 10.0  # Used by: Harvesting Agent (minimum $10 adjustment to execute)
+
+# Rebalancing behavior
+HARVESTING_IMMEDIATE_EXECUTION = True     # Execute immediately without AI approval
+
+# Harvesting AI Decision
+HARVESTING_AI_DECISION_ENABLED = True  # Enable AI-driven decisions for harvesting
+
+# Harvesting Agent Core Configuration
+# HARVESTING_ENABLED defined at line ~1324 (removed duplicate)
+# HARVESTING_CHECK_INTERVAL_MINUTES defined at line ~1325 (removed duplicate)
+HARVESTING_CONTINUOUS_MODE = False
+
+# Gain thresholds for harvesting - ✅ ACTUAL VALUES USED
+REALIZED_GAIN_THRESHOLD_USD = 50.0  # Used by: Harvesting Agent (minimum $50 realized gain to trigger)
+UNREALIZED_GAIN_THRESHOLD_20 = 0.20  # 20% gain threshold
+UNREALIZED_GAIN_THRESHOLD_70 = 0.70  # 70% gain threshold  
+UNREALIZED_GAIN_THRESHOLD_150 = 1.50  # 150% gain threshold
+
+# Reallocation strategy percentages for realized gains
+REALLOCATION_SOL_PCT = 0.20  # 20% to SOL (increased from 10%)
+REALLOCATION_STAKED_SOL_PCT = 0.00  # 0% to Staked SOL (removed)
+REALLOCATION_USDC_PCT = 0.65  # 65% to USDC (increased from 50%)
+REALLOCATION_EXTERNAL_PCT = 0.15  # 15% to external wallet (unchanged)
+
+# AI Model Configuration
+HARVESTING_GAIN_CONFIDENCE_THRESHOLD = 75
+
+# Staked SOL Configuration
+LIQUID_STAKING_PROTOCOLS = ['blazestake', 'jupsol', 'sanctum']  # Liquid staking (receive tokens like bSOL, JupSOL, stepSOL)
+NATIVE_STAKING_PROTOCOLS = ['everstake', 'community_validators']  # Native staking (direct delegation)
+STAKED_SOL_PROTOCOLS = LIQUID_STAKING_PROTOCOLS + NATIVE_STAKING_PROTOCOLS
+
+# Rebalancing cooldown
+HARVESTING_REBALANCING_COOLDOWN_SECONDS = 300  # 5 minutes cooldown between rebalancing attempts
+
+# Startup rebalancing detection thresholds
+HARVESTING_STARTUP_SOL_THRESHOLD = 95.0  # 95% SOL triggers startup scenario detection
+HARVESTING_STARTUP_USDC_THRESHOLD = 5.0  # 5% USDC triggers startup scenario detection
+
+# =============================================================================
+# 🤖 COPYBOT AGENT CONFIGURATION
+# =============================================================================
+
+# Mirror trading configuration
+MIRROR_POSITION_SCALE = 1.0  # Scale factor for position size when mirroring (1.0 = same size)
+FALLBACK_POSITION_SIZE = None  # No fallback - skip trades without valid price data
+COPYBOT_DUST_THRESHOLD = 0.5  # Minimum USD value to consider for trading (ignore dust)
+
+# AI Model URLs
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"  # Base URL for DeepSeek API
+
+# =============================================================================
+# ⚠️ RISK AGENT CONFIGURATION
+# =============================================================================
+
+# Risk management thresholds - ACTUAL VALUES USED (duplicates removed earlier)
+RISK_LOSS_CONFIDENCE_THRESHOLD = 90  # Used by: Risk Agent (AI confidence for loss scenarios) - MASTER AGENT CAN ADJUST
+RISK_GAIN_CONFIDENCE_THRESHOLD = 60  # Used by: Risk Agent (AI confidence for gain scenarios) - MASTER AGENT CAN ADJUST
+# RISK_MODEL_OVERRIDE = "0"  # Override risk model (0 = disabled) - DISABLED, using deepseek-chat above
+RISK_DEEPSEEK_BASE_URL = "https://api.deepseek.com"  # DeepSeek API URL for risk analysis
+
+# =============================================================================
+# 📈 DCA & STAKING CONFIGURATION
+# =============================================================================
+
+# =============================================================================
+# 🔒 STAKING AGENT CONFIGURATION
+# =============================================================================
+
+# Staking Agent Execution Mode
+STAKING_EXECUTION_MODE = "hybrid"  # Options: "webhook_only", "interval_only", "hybrid"
+
+# SOL Allocation Targets (Harvesting Agent - Total Portfolio Allocation)
+SOL_TARGET_ALLOCATION_PERCENT = 10.0  # Target 10% SOL allocation
+SOL_EXCESS_STAKING_THRESHOLD = 10.0   # Stake when SOL exceeds 10%
+SOL_MINIMUM_FOR_STAKING = 0.1         # Minimum SOL amount to stake
+
+# ============================================================================
+# SOL STAKING CONFIGURATION (Percentage of Total SOL, not Portfolio)
+# ============================================================================
+
+# Staking targets as percentage of TOTAL SOL allocation
+SOL_STAKING_TARGET_PERCENT = 0.50      # Target 50% of SOL to be staked
+SOL_STAKING_MINIMUM_PERCENT = 0.30     # Minimum 30% of SOL staked before triggering
+SOL_STAKING_EXCESS_THRESHOLD = 0.65    # Stake when unstaked SOL exceeds 65% of total SOL
+
+# For testing: Lower thresholds to see staking in action
+# SOL_STAKING_EXCESS_THRESHOLD = 0.60  # Stake when >60% of SOL is unstaked
+
+# Staking Rewards Configuration
+STAKING_REWARDS_THRESHOLD_SOL = 0.001  # Minimum SOL rewards to compound
+STAKING_REWARDS_COMPOUND_PERCENT = 100.0  # Percentage of rewards to compound
+
+# Hybrid Execution Settings
+STAKING_WEBHOOK_ENABLED = True         # Enable webhook triggers
+STAKING_INTERVAL_ENABLED = True        # Enable interval execution
+# STAKING_INTERVAL_MINUTES = 60          # REMOVED: Duplicate - using 1440 below
+STAKING_WEBHOOK_COOLDOWN_MINUTES = 5   # 5 minutes between webhook triggers
+
+# Staking Amount Configuration
+STAKING_EXCESS_PERCENT = 50.0          # Stake 50% of excess SOL
+STAKING_MAX_SINGLE_STAKE_SOL = 0.5     # Maximum SOL to stake in one transaction (reduced for testing)
+STAKING_MIN_SINGLE_STAKE_SOL = 0.01    # Minimum SOL to stake in one transaction (reduced for testing)
+
+# Protocol Selection
+STAKING_AUTO_SELECT_BEST_APY = True    # Automatically select highest APY protocol
+STAKING_FALLBACK_PROTOCOL = "blazestake"  # Fallback if APY data unavailable
+
+# Staked SOL Tracking
+STAKED_SOL_TRACKING_ENABLED = True     # Enable staked SOL tracking in portfolio
+# STAKED_SOL_TOKEN_ADDRESS defined above for use in EXCLUDED_TOKENS
+STAKED_SOL_SYMBOL = "stSOL"            # Symbol for staked SOL in portfolio
+
+# Market Analysis Token Configuration
+TOKEN_MAP = {
+    'So11111111111111111111111111111111111111112': ('SOL', 'SOL'),  # Solana
+    'EKpQGSJtjMFqKZ1KQanSqYXRcF8fBopzLHYxdM65Qjm': ('WIF', 'WIF'),  # WIF
+    'ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82': ('BOME', 'BOME'),  # BOME
+    'jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL': ('JTO', 'JTO'),  # JTO
+    'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3': ('PYTH', 'PYTH'),  # PYTH
+}
+
+DCA_MONITORED_TOKENS = [
+    'So11111111111111111111111111111111111111112',  # SOL
+    'EKpQGSJtjMFqKZ1KQanSqYXRcF8fBopzLHYxdM65Qjm',  # WIF
+    'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',  # BONK
+    '9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump',  # FART
+]
+
+# DCA settings
+USE_DYNAMIC_ALLOCATION = False
+TAKE_PROFIT_PERCENTAGE = 206
+FIXED_DCA_AMOUNT = 14
+DCA_INTERVAL_MINUTES = 30240
+DCA_INTERVAL_UNIT = "Day(s)"
+DCA_INTERVAL_VALUE = 21
+DCA_RUN_AT_ENABLED = False
+DCA_RUN_AT_TIME = "12:02"
+
+# Advanced DCA settings
+BUY_CONFIDENCE_THRESHOLD = 39
+SELL_CONFIDENCE_THRESHOLD = 85
+BUY_MULTIPLIER = 1.5  # Buy 50% more than standard amount
+MAX_SELL_PERCENTAGE = 25  # Maximum % of holdings to sell
+MAX_VOLATILITY_THRESHOLD = 0.05  # Maximum volatility threshold
+TREND_AWARENESS_THRESHOLD = 50  # RSI threshold for trend awareness
+
+# Staking configuration
+STAKING_ALLOCATION_PERCENT = 50   # Stake 50% of SOL balance (increased from 5% for realistic operation)
+STAKING_MIN_THRESHOLD = 1        # Minimum SOL to keep unstaked (reduced for testing)
+
+# Liquid staking protocols (receive liquid tokens like bSOL, JupSOL, stepSOL, laineSOL)
+LIQUID_STAKING_PROTOCOLS = ["blazestake", "jupsol", "sanctum"]
+
+# Native staking protocols (direct SOL delegation, no liquid tokens)
+NATIVE_STAKING_PROTOCOLS = ["everstake", "community_validators"]
+
+# Combined staking protocols for selection
+STAKING_PROTOCOLS = LIQUID_STAKING_PROTOCOLS + NATIVE_STAKING_PROTOCOLS
+
+STAKING_AUTO_CONVERT = True  # Auto-convert rewards to SOL
+STAKING_RESTAKE_ENABLED = True  # Enable automatic restaking of rewards
+STAKING_WITHDRAWAL_ENABLED = True  # Enable withdrawal functionality
+STAKING_DELEGATION_ENABLED = True  # Enable delegation to specific validators
+
+# Native staking configuration
+NATIVE_STAKING_ENABLED = True
+NATIVE_STAKING_MIN_AMOUNT_SOL = 1.0  # Minimum SOL for native staking
+NATIVE_STAKING_VALIDATOR_COUNT = 3  # Number of validators to delegate to
+
+# Liquid staking configuration
+LIQUID_STAKING_ENABLED = True
+LIQUID_STAKING_MIN_AMOUNT_USD = 10.0  # Minimum USD for liquid staking
+
+# JupSOL configuration
+JUPSOL_ENABLED = True
+JUPSOL_MIN_AMOUNT_USD = 10.0
+
+# Sanctum configuration
+SANCTUM_ENABLED = True
+SANCTUM_LST_OPTIONS = ["stepSOL", "laineSOL", "alphaSOL", "jupSOL"]  # Available Sanctum LSTs
+SANCTUM_MIN_AMOUNT_USD = 10.0
+
+STAKING_INTERVAL_MINUTES = 1440  # Weekly execution (1440 is 7 days)
+STAKING_INTERVAL_UNIT = "Day(s)"
+STAKING_INTERVAL_VALUE = 1
+STAKING_RUN_AT_ENABLED = True  # Enable scheduled execution
+STAKING_RUN_AT_TIME = "00:10"  # Run at 9:00 AM daily
+STAKING_START_DATE = "2025-11-17"  # Start date (YYYY-MM-DD) - 7 days from now
+STAKING_START_TIME = STAKING_RUN_AT_TIME  # Start time (HH:MM)
+STAKING_REPEAT_DAYS = 1  # Repeat every 7 days
+
+# Staking safety thresholds
+MIN_SOL_ALLOCATION_THRESHOLD = 1.0  # Minimum 5% SOL allocation (never stake below this)
+MAX_SLASHING_RISK = 0.5
+
+# Staking Mode Configuration
+STAKING_LIVE_MODE_ENABLED = True   # Enable live staking mode for testing
+STAKING_DRY_RUN = True             # Safety flag - simulate without executing (paper trading)
+
+# Protocol-specific addresses
+BLAZESTAKE_POOL_ADDRESS = "stk9ApL5HeVAwPLr3TLhDXdZS8ptVu7zp6ov8HFDuMi"
+BLAZESTAKE_BSOL_MINT = "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1"
+
+SANCTUM_ROUTER_PROGRAM = "SCMxRfE5u2UBC83E5rMZhJJ8HCZQP8EE6w3x8t5BZ7a"
+SANCTUM_LST_MINTS = {
+    "INF": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
+    "jupSOL": "jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v",
+    "stepSOL": "7Qy9e1gQjnPceWi3iBABYjLfDTyqASMhxcddnrKQNKK",
+    "laineSOL": "LAinEtNLgpmCP9Rvsf5Hn8W6EhNiKLZQti1ETWJheJ5",
+    "alphaSOL": "ALPHAso1n3CEUJjn1e72e3KkThdpJhS8ykj1R6hN4X3"
+}
+
+# Everstake Configuration (research needed)
+EVERSTAKE_ENABLED = False  # Disabled until confirmed on Solana mainnet
+EVERSTAKE_POOL_ADDRESS = None  # To be determined
+
+# Community Validators (curated list - update quarterly)
+COMMUNITY_VALIDATORS = [
+    # High-performance validators will be added dynamically
+    # These are examples - will be replaced with actual validator addresses
+    "9QU2QSxhb24FUX3Z2jS91gNpacc3i18GJ2fc79dZgr3G",  # Example validator 1
+    "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",  # Example validator 2
+    "7XSY3MrYnK8dq8RwVNfT1oBmGB8pq5tn9mvTrKkQ3rS"   # Example validator 3
+]
+
+# Staking Safety Configuration
+STAKING_MAX_CONSECUTIVE_FAILURES = 3  # Circuit breaker threshold
+STAKING_FAILURE_COOLDOWN_HOURS = 1    # Hours to pause after max failures
+STAKING_MIN_PROTOCOL_APY = 5.0        # Minimum APY % to consider protocol
+STAKING_MAX_PROTOCOL_APY = 50.0       # Maximum APY % (safety check)
+VALIDATOR_PERFORMANCE_THRESHOLD = 99  # Minimum validator uptime %
+
+# Auto-convert settings for maintaining SOL allocation
+AUTO_CONVERT_THRESHOLD = 10
+MIN_CONVERSION_AMOUNT = 5
+MAX_CONVERT_PERCENTAGE = 25
+
+# Yield optimization
+YIELD_OPTIMIZATION_INTERVAL = 28800
+YIELD_OPTIMIZATION_INTERVAL_UNIT = "Hour(s)"
+YIELD_OPTIMIZATION_INTERVAL_VALUE = 8
+YIELD_OPTIMIZATION_RUN_AT_ENABLED = True
+YIELD_OPTIMIZATION_RUN_AT_TIME = "13:00"
+
+# =============================================================================
+# 📊 CHART ANALYSIS CONFIGURATION
+# =============================================================================
+
+# Chart analysis settings
+CHART_ANALYSIS_INTERVAL_MINUTES = 60  # 24 hours (1 day)
+CHART_INTERVAL_UNIT = "Day(s)"
+CHART_INTERVAL_VALUE = 1
+CHART_RUN_AT_ENABLED = True
+CHART_RUN_AT_TIME = "09:00"  # Run at 9 AM daily
+CHART_INITIAL_DELAY_HOURS = 0  # Wait 1 hour before first analysis
+TIMEFRAMES = ['4h']
+LOOKBACK_BARS = 120  # Reduce from 300 to 120 (4h x 120 = 20 days of data)
+ENABLE_FIBONACCI = True  # Enable Fibonacci retracement analysis
+FIBONACCI_LEVELS = [0.236, 0.382, 0.5, 0.618, 0.786]
+FIBONACCI_LOOKBACK_PERIODS = 75  # Increase from 60 to 75
+CHART_INDICATORS = ['20EMA', '50EMA', '100EMA', '200SMA', 'MACD', 'RSI', 'ATR']
+CHART_STYLE = 'yahoo'
+CHART_VOLUME_PANEL = True
+ENABLE_CHART_ANALYSIS = True
+
+# Fibonacci retracement settings (using existing configuration from above)
+
+# Aggregated market sentiment settings
+ENABLE_AGGREGATED_SENTIMENT = True
+AGGREGATED_SENTIMENT_FILE = "aggregated_market_sentiment.csv"
+SENTIMENT_UPDATE_INTERVAL_HOURS = 1  # Update sentiment every hour
+SENTIMENT_WEIGHTS = {
+    'SOL': 0.40,     # 40% weight for SOL (market indicator)
+    'WIF': 0.30,     # 30% weight for WIF (major meme coin)
+    'BOME': 0.20,    # 20% weight for BOME (major meme coin)
+    'JTO': 0.05,     # 5% weight for JTO
+    'PYTH': 0.05,    # 5% weight for PYTH
+}
+
+# Default weight for tokens not in SENTIMENT_WEIGHTS
+DEFAULT_SENTIMENT_WEIGHT = 0.1  # 10% default weight
+
+# Voice settings
+VOICE_MODEL = "tts-1"
+VOICE_NAME = "shimmer"
+VOICE_SPEED = 1.0
+
+# =============================================================================
+# 💱 HYPERLIQUID CONFIGURATION
+# =============================================================================
+
+# Token to Hyperliquid Symbol Mapping
+TOKEN_TO_HL_MAPPING = {
+    "So11111111111111111111111111111111111111112": "SOL",
+    "EKpQGSJtjMFqKZ1KQanSqYXRcF8fBopzLHYxdM65Qjm": "WIF",
+    "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82": "BOME",
+    "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL": "JTO",
+    "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3": "PYTH",
+}
+
+# External Market Data Configuration (removed - focusing on Solana ecosystem tokens)
+# EXTERNAL_MARKET_DATA = {}  # No external tokens needed
+
+# =============================================================================
+# 🔍 BACKTESTING CONFIGURATION
+# =============================================================================
+
+DAYSBACK_4_DATA = 6
+DATA_TIMEFRAME = '1H'
+
+# =============================================================================
+# 🛡️ AI PROMPTS (PORTFOLIO-BASED DECISION MAKING)
+# =============================================================================
+
+# Risk Management AI Prompt - Portfolio State with Market Sentiment
+RISK_OVERRIDE_PROMPT = """
+You are Anarcho Capital's Risk Management Agent 🛡️
+
+Your task is to analyze the current portfolio state and make risk management decisions based on current performance metrics and market sentiment analysis.
+
+Available Actions:
+- CLOSE_ALL: Close all positions immediately
+- CLOSE_HALF: Close 50% of positions (worst performing first)
+- CLOSE_PARTIAL: Close 25% of positions (worst performing first)
+- HOLD_POSITIONS: Keep all positions open
+- BREAKEVEN: Close positions at profit, hold positions at loss until breakeven
+- EMERGENCY_STOP: Stop copybot agent and close all positions
+
+Decision Factors:
+1. TRIGGER: What triggered this risk check (PnL breach, consecutive losses, drawdown, etc.)
+2. TIME: How long positions have been held
+3. BALANCE: Current portfolio balance vs initial balance
+4. ALLOCATION: Current position distribution and sizes
+5. SENTIMENT: Current market sentiment from technical and social analysis
+6. ON-CHAIN: Token liquidity, holder trends, and transaction volume for each position
+7. EXECUTION_HISTORY: Recent agent execution patterns and success rates
+
+Current Portfolio State:
+{portfolio_data}
+
+Risk Metrics:
+- Current PnL: ${current_pnl:.2f}
+- Portfolio Balance: ${current_balance:.2f}
+- Peak Balance: ${peak_balance:.2f}
+- Drawdown: {drawdown_percentage:.2f}%
+- Consecutive Losses: {consecutive_losses}
+- Consecutive Wins: {consecutive_wins}
+- Position Size Multiplier: {position_size_multiplier:.2f}
+
+{market_sentiment_data}
+
+{execution_history_insights}
+
+Respond in this exact format:
+1. First line must be one of: CLOSE_ALL, CLOSE_HALF, CLOSE_PARTIAL, HOLD_POSITIONS, BREAKEVEN, EMERGENCY_STOP
+2. Then explain your reasoning, including:
+   - Risk assessment based on current metrics
+   - Position performance analysis
+   - Market sentiment impact on decision
+   - On-chain data considerations (low liquidity = high risk, shrinking holders = caution)
+   - Technical vs social sentiment alignment consideration
+   - Whale wallet performance insights consideration
+   - Recent execution success patterns
+   - Confidence level (as a percentage, e.g. 75%)
+
+Remember: 
+- Base decisions on current portfolio state AND market sentiment
+- Market sentiment should influence risk tolerance (bearish = more conservative, bullish = potentially hold longer)
+- Prioritize capital preservation over potential gains
+- Consider sentiment alignment - conflicting signals warrant more caution
+- Consider on-chain health: low liquidity or shrinking holders may indicate increased exit risk
+- Be more conservative when sentiment data is stale or unavailable
+- Strong bearish sentiment may justify earlier position closure
+- Strong bullish sentiment may justify holding through temporary drawdowns
+- Consider whale wallet performance trends as market sentiment indicators
+- Factor in recent execution success rates for confidence assessment
+"""
+
+# Breakeven Strategy Configuration
+BREAKEVEN_ENABLED = True
+BREAKEVEN_MIN_PROFIT_PERCENT = 0.01  # 1% minimum profit to close
+BREAKEVEN_MAX_LOSS_PERCENT = -0.05   # 5% maximum loss before forced close
+BREAKEVEN_TIMEOUT_MINUTES = 60       # Time to wait for breakeven before forced close
+BREAKEVEN_PARTIAL_CLOSE_PERCENT = 0.25  # Close 25% of profitable positions
+
+# Risk Management Actions Configuration
+RISK_ACTIONS = {
+    'CLOSE_ALL': {
+        'description': 'Close all positions immediately',
+        'severity': 'high',
+        'conditions': ['emergency_stop', 'critical_drawdown', 'severe_loss']
+    },
+    'CLOSE_HALF': {
+        'description': 'Close 50% of positions (worst performing first)',
+        'severity': 'medium',
+        'conditions': ['moderate_loss', 'consecutive_losses']
+    },
+    'CLOSE_PARTIAL': {
+        'description': 'Close 25% of positions (worst performing first)',
+        'severity': 'low',
+        'conditions': ['minor_loss', 'risk_reduction']
+    },
+    'HOLD_POSITIONS': {
+        'description': 'Keep all positions open',
+        'severity': 'none',
+        'conditions': ['good_performance', 'no_risk_breach']
+    },
+    'BREAKEVEN': {
+        'description': 'Close profitable positions, hold loss positions until breakeven',
+        'severity': 'medium',
+        'conditions': ['mixed_performance', 'breakeven_strategy']
+    },
+    'EMERGENCY_STOP': {
+        'description': 'Stop copybot agent and close all positions',
+        'severity': 'critical',
+        'conditions': ['emergency_conditions', 'system_risk']
+    }
+}
+
+# Portfolio State Analysis Configuration
+PORTFOLIO_ANALYSIS_CONFIG = {
+    'PERFORMANCE_THRESHOLDS': {
+        'EXCELLENT': 0.10,    # 10%+ profit
+        'GOOD': 0.05,         # 5-10% profit
+        'NEUTRAL': 0.00,      # 0-5% profit
+        'POOR': -0.05,        # 0-5% loss
+        'BAD': -0.10,         # 5-10% loss
+        'CRITICAL': -0.15     # 10%+ loss
+    },
+    'POSITION_SIZE_THRESHOLDS': {
+        'LARGE': 0.20,        # 20%+ of portfolio
+        'MEDIUM': 0.10,       # 10-20% of portfolio
+        'SMALL': 0.05,        # 5-10% of portfolio
+        'MINI': 0.01          # 1-5% of portfolio
+    },
+    'TIME_THRESHOLDS': {
+        'SHORT_TERM': 60,     # 1 hour
+        'MEDIUM_TERM': 1440,  # 1 day
+        'LONG_TERM': 10080    # 1 week
+    }
+}
+
+# Staking Agent Configuration
+# Note: AI analysis has been removed from the staking agent for streamlined operation
+# The agent now uses direct protocol comparison and yield optimization without AI recommendations
+
+# Chart Analysis AI Prompt - Enhanced for More Aggressive Trading
+CHART_ANALYSIS_PROMPT = """
+You must respond in exactly 4 lines:
+Line 1: Only write BUY, SELL, or NOTHING
+Line 2: One short reason why
+Line 3: Only write "Confidence: X%" where X is 60-95
+Line 4: Calculate the optimal entry price level based on indicators
+
+Analyze the chart data for {symbol} {timeframe}:
+
+{chart_data}
+
+TECHNICAL ANALYSIS GUIDELINES - BE DECISIVE:
+- RSI < 35 (oversold) = STRONG BUY signal with 75-85% confidence
+- RSI > 65 (overbought) = STRONG SELL signal with 75-85% confidence
+- MACD bullish crossover = BUY signal with 70-80% confidence
+- MACD bearish crossover = SELL signal with 70-80% confidence
+- Price above 20EMA + 50EMA = BULLISH bias, consider BUY
+- Price below 20EMA + 50EMA = BEARISH bias, consider SELL
+- Volume increasing = Confirms signal strength
+- Only choose NOTHING if ALL indicators are truly neutral (RSI 45-55, MACD flat, price between EMAs)
+
+CONFIDENCE GUIDELINES:
+- 60-70%: Single strong indicator (RSI extreme or MACD crossover)
+- 75-85%: Two indicators aligned (RSI + MACD, or EMA + volume)
+- 90-95%: Multiple indicators aligned with volume confirmation
+
+SIGNAL STRENGTH EVALUATION:
+- Strong BUY: RSI < 35 + MACD bullish crossover + price above 50EMA + volume increasing
+- Strong SELL: RSI > 65 + MACD bearish crossover + price below 50EMA + volume increasing
+- Moderate BUY: RSI < 45 + MACD above signal + price above 20EMA
+- Moderate SELL: RSI > 55 + MACD below signal + price below 20EMA
+- Weak BUY: RSI < 50 + price near support + volume increasing
+- Weak SELL: RSI > 50 + price near resistance + volume increasing
+
+ENTRY PRICE CALCULATION:
+- For BUY: Use support levels (EMAs, recent lows, Fibonacci retracements)
+- For SELL: Use resistance levels (EMAs, recent highs, Fibonacci extensions)
+- Consider ATR for buffer zones around entry levels
+- Factor in market regime volatility for appropriate spacing
+
+MARKET REGIME CONSIDERATIONS:
+- STRONG_TREND: Higher confidence for trend-following signals
+- WEAK_TREND: Moderate confidence, wait for confirmation
+- VOLATILE_BREAKOUT: High confidence for momentum signals
+- SIDEWAYS: Lower confidence, focus on range-bound strategies
+- NEUTRAL: Default to NOTHING unless clear signal emerges
+
+BE AGGRESSIVE: Default to BUY or SELL unless truly no clear direction exists. The market rewards decisive action over cautious observation.
+"""
+
+# Harvesting Agent Configuration - ✅ ACTUAL VALUES USED (duplicates removed above)
+HARVESTING_ENABLED = True  # Used by: Harvesting Agent (enable/disable agent)
+HARVESTING_INTERVAL_CHECK_MINUTES = 30  # Used by: Harvesting Agent (hybrid check interval) - MASTER AGENT CAN ADJUST
+HARVESTING_USE_CHART_SENTIMENT_ONLY = True  # Used by: Harvesting Agent (only use chart data, no Twitter sentiment)
+HARVESTING_CHART_SENTIMENT_FILE = "src/data/charts/aggregated_market_sentiment.csv"  # Used by: Harvesting Agent
+HARVESTING_MAX_CHART_DATA_AGE_MINUTES = 180  # Used by: Harvesting Agent (3 hours max age for chart data)
+HARVESTING_AGENT_COOLDOWN_SECONDS = 1800  # Used by: Harvesting Agent (30 min cooldown between triggers) - MASTER AGENT CAN ADJUST
+
+# Harvesting Agent AI Prompt with Market Sentiment
+HARVESTING_AI_PROMPT = """
+You are Anarcho Capital's Harvesting Agent 🌾
+
+Your task is to analyze the current portfolio state and make harvesting decisions based on realized and unrealized gains, enhanced with market sentiment analysis.
+
+Available Actions:
+- HARVEST_ALL: Harvest all gains and reallocate according to strategy
+- HARVEST_PARTIAL: Harvest partial gains (50% of available gains)
+- HARVEST_SELECTIVE: Harvest only specific high-performing positions
+- HOLD_GAINS: Keep gains unrealized for further growth
+- REALLOCATE_ONLY: Reallocate without harvesting new gains
+
+Reallocation Strategy:
+- SOL: {reallocation_sol_pct}%
+- Staked SOL: {reallocation_staked_sol_pct}%
+- USDC: {reallocation_usdc_pct}%
+- External Wallet: {reallocation_external_pct}%
+
+IMPORTANT EXECUTION CONSTRAINTS:
+- Minimum conversion amount: $10.00 USD (conversions below this threshold will not execute)
+- External wallet transfers require minimum $5.00 USD
+- All amounts must be realistic and executable within these constraints
+
+Current Portfolio State:
+{portfolio_data}
+
+Gain Analysis:
+- Realized Gains Total: ${realized_gains_total:.2f}
+- Unrealized Gains Total: ${unrealized_gains_total:.2f}
+- Current Portfolio Balance: ${current_balance:.2f}
+- Peak Portfolio Balance: ${peak_balance:.2f}
+- Trigger: {trigger_type}
+
+{market_sentiment_data}
+
+Respond in this exact format:
+1. First line must be one of: HARVEST_ALL, HARVEST_PARTIAL, HARVEST_SELECTIVE, HOLD_GAINS, REALLOCATE_ONLY
+2. Then explain your reasoning, including:
+   - Gain assessment and current market sentiment
+   - Risk vs reward analysis considering technical and social sentiment
+   - Market sentiment impact on harvesting timing
+   - Sentiment alignment influence on position holding decisions
+   - Recent execution success patterns
+   - Reallocation strategy justification
+   - Specific conversion amounts (must be ≥$10.00 USD to execute)
+   - External wallet allocation percentages
+   - Confidence level (as a percentage, e.g. 75%)
+
+IMPORTANT: When specifying conversion amounts, use dollar amounts (e.g., "Convert $50.00 to SOL") and ensure they meet the $10.00 minimum threshold. Amounts below this threshold will not execute.
+
+Remember: 
+- Focus on maximizing long-term portfolio growth while preserving capital
+- Strong bullish sentiment may justify holding gains longer for additional growth
+- Strong bearish sentiment may warrant earlier profit-taking and increased USDC allocation
+- Conflicting sentiment signals suggest partial harvesting approach
+- Consider sentiment data freshness - stale data warrants more conservative approach
+- Factor in the trigger that activated this analysis
+- Be strategic about reallocation timing based on market conditions
+- Social sentiment can indicate retail investor behavior and potential market tops/bottoms
+- Technical sentiment provides insight into institutional and algorithmic trading patterns
+- Recent execution success rates provide confidence in current strategy effectiveness
+"""
+
+# =============================================================================
+# 🎭 SENTIMENT AGENT CONFIGURATION
+# =============================================================================
+
+# Sentiment Agent Settings
+SENTIMENT_ENABLED = True
+SENTIMENT_TOKENS_TO_TRACK = ["Solana", "Bitcoin"]  # Tokens to track for sentiment
+SENTIMENT_TWEETS_PER_RUN = 100  # Number of tweets to collect per run
+SENTIMENT_DATA_FOLDER = "src/data/sentiment"  # Where to store sentiment data
+SENTIMENT_HISTORY_FILE = "src/data/sentiment_history.csv"  # Store sentiment scores over time
+SENTIMENT_SQLITE_DB_FILE = "src/data/sentiment_analysis.db"  # SQLite database for structured storage
+SENTIMENT_IGNORE_LIST = ['t.co', 'discord', 'join', 'telegram', 'discount', 'pay', 'airdrop', 'giveaway']
+SENTIMENT_CHECK_INTERVAL_MINUTES = 60  # How often to run sentiment analysis
+SENTIMENT_DATA_RETENTION_DAYS = 30  # Keep data for 30 days
+
+# =============================================================================
+# 🔗 TOKEN ON-CHAIN AGENT CONFIGURATION
+# =============================================================================
+
+# Token OnChain Agent Settings
+TOKEN_ONCHAIN_ENABLED = True
+TOKEN_ONCHAIN_UPDATE_INTERVAL_MINUTES = 60  # Run every hour
+TOKEN_ONCHAIN_CACHE_HOURS = 1  # Cache data for 1 hour
+TOKEN_ONCHAIN_DATA_FILE = "src/data/token_onchain_data.json"
+TOKEN_ONCHAIN_AGENT_PRIORITY = 25  # After whale agent
+
+# Data collection settings
+TOKEN_ONCHAIN_MIN_LIQUIDITY_USD = 0  # No minimum (track everything)
+TOKEN_ONCHAIN_MAX_TOKENS = 20  # Max concurrent tokens to track
+TOKEN_ONCHAIN_INCLUDE_WHALE_DATA = True  # Track top holder concentration
+
+# Trend thresholds
+TOKEN_ONCHAIN_GROWTH_THRESHOLD = 0.10  # >10% holder growth = GROWING
+TOKEN_ONCHAIN_STALE_THRESHOLD = -0.05  # <-5% holder growth = SHRINKING
+TOKEN_ONCHAIN_WHALE_CONCENTRATION_HIGH = 0.50  # >50% in top 10 = HIGH risk
+
+# API settings
+TOKEN_ONCHAIN_BIRDEYE_TIMEOUT = 10  # Seconds
+TOKEN_ONCHAIN_HELIUS_TIMEOUT = 15  # Seconds
+TOKEN_ONCHAIN_RETRY_ATTEMPTS = 2
+
+# Analysis modes
+SENTIMENT_ANALYSIS_MODE_SHORT_TERM = "short_term"  # Immediate post-scrape analysis
+SENTIMENT_ANALYSIS_MODE_LONG_TERM = "long_term"   # 30-day cumulative analysis
+SENTIMENT_DEFAULT_ANALYSIS_MODE = SENTIMENT_ANALYSIS_MODE_SHORT_TERM
+
+# Sentiment classification settings
+SENTIMENT_ANNOUNCE_THRESHOLD = 0.4  # Announce vocally if abs(sentiment) > this value (-1 to 1 scale)
+SENTIMENT_BULLISH_THRESHOLD = 0.2   # Above this is BULLISH
+SENTIMENT_BEARISH_THRESHOLD = -0.2  # Below this is BEARISH
+# Between thresholds is NEUTRAL
+
+# Engagement metrics weights for enhanced sentiment scoring
+SENTIMENT_LIKES_WEIGHT = 0.3
+SENTIMENT_RETWEETS_WEIGHT = 0.4
+SENTIMENT_REPLIES_WEIGHT = 0.2
+SENTIMENT_QUOTES_WEIGHT = 0.1
+
+# Voice settings for sentiment announcements
+SENTIMENT_VOICE_ENABLED = False #Set to False to disable voice announcements
+SENTIMENT_VOICE_MODEL = "tts-1"  # or tts-1-hd for higher quality
+SENTIMENT_VOICE_NAME = "nova"   # Options: alloy, echo, fable, onyx, nova, shimmer
+SENTIMENT_VOICE_SPEED = 1      # 0.25 to 4.0
+
+# Apify settings for sentiment agent
+SENTIMENT_APIFY_ACTOR_ID = "web.harvester~easy-twitter-search-scraper"
+SENTIMENT_MAX_RETRIES = 3
+SENTIMENT_RETRY_DELAY = 5  # seconds
+
+# Sentiment AI Model Configuration
+SENTIMENT_MODEL_OVERRIDE = "deepseek-chat"  # Options: claude-3-haiku-20240307, deepseek-chat, deepseek-reasoner
+SENTIMENT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+SENTIMENT_AI_TEMPERATURE = 0.7
+SENTIMENT_AI_MAX_TOKENS = 1024
+
+# BERT Model Configuration (for sentiment analysis)
+SENTIMENT_BERT_MODEL = "finiteautomata/bertweet-base-sentiment-analysis"
+SENTIMENT_BERT_BATCH_SIZE = 8  # Process in small batches to avoid memory issues
+
+# =============================================================================
+# 🔔 WEBHOOK CONFIGURATION
+# =============================================================================
+
+# Webhook server settings
+WEBHOOK_MODE = True  # Used by: CopyBot Agent (PRIMARY MODE - when True, interval checks are disabled!)
+WEBHOOK_HOST = "127.0.0.1"  # Default fallback - will be auto-updated
+WEBHOOK_PORT = int(os.getenv('PORT', 8080))  # Use PORT from env or default to 8080
+
+def get_local_ip_address():
+    """Automatically detect the local IP address for webhook configuration"""
+    try:
+        import socket
+        # Create a socket connection to determine local IP
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            # Connect to a remote address (doesn't actually send data)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            return local_ip
+    except Exception:
+        # Fallback to localhost if detection fails
+        return "127.0.0.1"
+
+# Auto-detect and set webhook host
+if os.getenv('RENDER'):
+    # On Render, use the public service URL
+    WEBHOOK_HOST = "helius-webhook-handler.onrender.com"
+    WEBHOOK_BASE_URL = f"https://{WEBHOOK_HOST}"
+    print(f"Render environment detected - using public webhook host: {WEBHOOK_HOST}")
+else:
+    # Local development - auto-detect IP
+    WEBHOOK_HOST = get_local_ip_address()
+    WEBHOOK_BASE_URL = os.getenv('WEBHOOK_BASE_URL', f"http://{WEBHOOK_HOST}:{WEBHOOK_PORT}")
+    from src.scripts.shared_services.logger import info
+    info(f"Local environment detected - auto-detected webhook host: {WEBHOOK_HOST}")
+
+from src.scripts.shared_services.logger import info
+info(f"Webhook URL: {WEBHOOK_BASE_URL}")
+
+# Webhook processing settings
+WEBHOOK_MIN_TOKEN_VALUE_USD = 0.001  # Minimum token value to process (lowered for testing)
+WEBHOOK_RETRY_ATTEMPTS = 3  # Number of retry attempts for failed webhooks
+WEBHOOK_DEBUG_MODE = True  # Enable debug logging for webhooks
+WEBHOOK_LOG_LEVEL = "INFO"  # Webhook logging level
+
+# Active agents configuration (as dictionary)
+WEBHOOK_ACTIVE_AGENTS = {
+    'copybot': True,      # 🤖 CopyBot agent
+    'risk': True,        # 🛡️ Risk management agent
+    'harvesting': True,  # 🌾 Portfolio/harvesting agent (includes rebalancing)
+    'staking': True,     # 🔒 Automated staking agent
+    
+}
+
+# Staking agent cooldown configuration
+STAKING_COOLDOWN_MINUTES = 30  # 30 minutes cooldown between staking triggers
+STAKING_WEBHOOK_ACTIVITY_THRESHOLD = 3600  # 1 hour - skip intervals if webhook activity within this time
+
+# Helius webhook settings (free tier)
+WEBHOOK_TYPES = ["ANY"]  # Track ALL transaction types for comprehensive monitoring
+WEBHOOK_ENHANCED_MODE = True  # Enhanced mode for better transaction data
+WEBHOOK_UPDATE_INTERVAL = 3600  # Update webhook registration hourly
+WEBHOOK_HEALTH_CHECK_INTERVAL = 60  # Health check interval in seconds
+
+# =============================================================================
+# WEBHOOK-FIRST ARCHITECTURE CONFIGURATION
+# =============================================================================
+
+# WEBHOOK_FIRST_ARCHITECTURE removed - only CopyBot is webhook-driven
+
+# Enable proactive portfolio monitoring
+PROACTIVE_PORTFOLIO_MONITORING = False
+
+# Portfolio monitoring interval (seconds)
+PORTFOLIO_MONITORING_INTERVAL = 300  # 5 minutes
+
+# Enable hybrid mode (webhook + proactive monitoring)
+HYBRID_MODE_ENABLED = True
+
+# =============================================================================
+# AGENT EXECUTION MODES
+# =============================================================================
+
+# Agent execution modes removed - now handled by SimpleAgentCoordinator
+
+# =============================================================================
+# MONITORING MODE CONFIGURATION
+# =============================================================================
+
+# Monitoring modes removed - agents now execute based on Portfolio Tracker triggers
+
+# =============================================================================
+# PORTFOLIO MONITORING THRESHOLDS
+# =============================================================================
+
+# Rebalancing deviation threshold (percentage)
+REBALANCING_DEVIATION_THRESHOLD = 5.0  # 5%
+
+# Note: Using existing allocation targets from above:
+# SOL_TARGET_PERCENT = 0.10 (10%)
+# USDC_TARGET_PERCENT = 0.20 (20%)
+# Remaining 70% for positions
+
+# =============================================================================
+# RISK MANAGEMENT CONFIGURATION
+# =============================================================================
+
+# Enable AI analysis for risk decisions (using your existing comprehensive system)
+RISK_MAX_LOSS_AI_ANALYSIS = True
+RISK_DRAWDOWN_AI_ANALYSIS = True
+RISK_EMERGENCY_STOP_AI_ANALYSIS = True  # Added missing flag
+RISK_POSITION_SIZE_AI_ANALYSIS = True
+RISK_CONSECUTIVE_LOSSES_AI_ANALYSIS = True  # Added missing flag
+
+# =============================================================================
+# 🔧 UTILITY FUNCTIONS
+# =============================================================================
+
+def get_position_size(account_balance: float, current_position_usd: float = 0.0) -> float:
+    """
+    Calculate the position size based on account balance and current position.
+    
+    Args:
+        account_balance: Current account balance in USD
+        current_position_usd: Current position size in USD
+        
+    Returns:
+        Position size in USD
+    """
+    # Implement position sizing logic here
+    if USE_DYNAMIC_POSITION_SIZING:
+        if account_balance < SMALL_ACCOUNT_THRESHOLD:
+            return account_balance * NEW_POSITION_SMALL_ACCOUNT_PERCENT
+        else:
+            return account_balance * NEW_POSITION_BASE_PERCENT
+    else:
+        return BASE_POSITION_SIZE_USD
+
+def _validate_configuration():
+    """
+    Validate configuration settings and raise errors for invalid values.
+    """
+    # Add validation logic here
+    if MAX_LOSS_PERCENT <= 0 or MAX_LOSS_PERCENT >= 100:
+        raise ValueError("MAX_LOSS_PERCENT must be between 0 and 100")
+    
+    if MAX_GAIN_PERCENT <= 0:
+        raise ValueError("MAX_GAIN_PERCENT must be greater than 0")
+    
+    if WEEKLY_BUDGET_USD <= 0:
+        raise ValueError("WEEKLY_BUDGET_USD must be greater than 0")
+    
+    if BASE_POSITION_SIZE_USD <= 0:
+        raise ValueError("BASE_POSITION_SIZE_USD must be greater than 0")
+
+# =============================================================================
+# 🚀 OPTIMIZED PRICE SERVICE CONFIGURATION
+# =============================================================================
+
+# QuickNode Configuration (for optimized price fetching)
+# QUICKNODE_RPC_ENDPOINT and QUICKNODE_WSS_ENDPOINT are already defined above
+QUICKNODE_TOKEN_METRICS_API = os.getenv('QUICKNODE_TOKEN_METRICS_API', 'true').lower() == 'true'
+
+# Price Source Mode Configuration - CONSOLIDATED ABOVE
+# Options: 'jupiter' (Jupiter -> Birdeye -> Pump.fun) or 'birdeye' (Birdeye -> Jupiter -> Pump.fun)
+# Birdeye is configured as primary source above for paid subscription
+
+# =============================================================================
+# 🏦 DeFi AUTOMATION CONFIGURATION
+# =============================================================================
+
+# DeFi Allocation Limits
+DEFI_MAX_ALLOCATION_PERCENT = 30.0  # Maximum 30% of portfolio can be allocated to DeFi
+DEFI_MIN_ALLOCATION_PERCENT = 5.0   # Minimum 5% allocation to start DeFi operations
+DEFI_EMERGENCY_RESERVE_PERCENT = 10.0  # Keep 10% in emergency reserve
+
+# Risk Agent Configuration
+RISK_HALT_RESTART_REDUCTION_PERCENT = 0.25  # 25% reduction to restart buying
+RISK_WALLET_UPDATE_REDUCTION_PERCENT = 0.20  # 20% reduction to restart after wallet update
+RISK_CLOUD_DB_WHALE_TABLE = "whale_data"
+RISK_CLOUD_DB_SENTIMENT_TABLE = "sentiment_data"
+RISK_CLOUD_DB_CHART_TABLE = "chart_analysis"
+
+# DeFi Risk Management
+DEFI_MAX_SINGLE_PROTOCOL_ALLOCATION = 15.0  # Max 15% in any single protocol
+DEFI_MAX_SINGLE_ASSET_ALLOCATION = 20.0     # Max 20% in any single asset
+DEFI_MIN_COLLATERAL_RATIO = 1.5             # Minimum 150% collateral ratio for borrowing
+DEFI_SLIPPAGE_TOLERANCE = 200               # 2% slippage for DeFi operations
+DEFI_PAPER_TRADING_ENABLED = True           # Track DeFi in paper mode
+DEFI_MAX_POSITION_SIZE_USD = 200.0           # Max leverage position in paper mode
+DEFI_MAX_BORROWING_RATIO = 0.25             # Maximum 25% borrowing ratio
+
+# DeFi Execution Settings
+DEFI_EXECUTION_TIMEOUT_SECONDS = 300        # 5 minutes for DeFi operations
+DEFI_RETRY_ATTEMPTS = 3                     # Number of retry attempts for failed operations
+DEFI_SLIPPAGE_TOLERANCE = 200               # 2% slippage tolerance for DeFi swaps
+
+# DeFi Protocol Preferences
+DEFI_PREFERRED_PROTOCOLS = ['solend', 'mango', 'tulip']  # Priority order for protocols
+DEFI_BLACKLISTED_PROTOCOLS = []             # Protocols to avoid
+DEFI_MIN_APY_THRESHOLD = 5.0               # Minimum APY to consider lending
+
+# DeFi Market Sentiment Integration
+DEFI_SENTIMENT_WEIGHT = 0.3                 # Weight of market sentiment in decisions (0-1)
+DEFI_BULLISH_AGGRESSION_MULTIPLIER = 1.2   # Increase allocation by 20% in bullish markets
+DEFI_BEARISH_CAUTION_MULTIPLIER = 0.8      # Decrease allocation by 20% in bearish markets
+
+# DeFi Monitoring and Alerts
+DEFI_MONITORING_INTERVAL_SECONDS = 86400   # Check DeFi positions every 24 hours
+DEFI_ALERT_THRESHOLD_PERCENT = 5.0          # Alert on 5% portfolio value changes
+DEFI_LIQUIDATION_WARNING_THRESHOLD = 1.8    # Warn when collateral ratio drops below 180%
+
+# Validation startup grace
+VALIDATION_STARTUP_GRACE_SECONDS = 600  # 10 minutes
+VALIDATION_MIN_PRICE_SOURCES = 1  # Accept single source during grace
+VALIDATION_MAX_PRICE_AGE_SECONDS = 900  # 15 minutes for SOL
+VALIDATION_PORTFOLIO_SYNC_BLOCKING = False  # Explicit opt-out
+
+# =============================================================================
+# 🚀 REAL-TIME PORTFOLIO MONITORING CONFIGURATION
+# =============================================================================
+
+# Real-time monitoring settings
+REALTIME_MONITORING_ENABLED = True
+REALTIME_UPDATE_THROTTLE_MS = 100  # Batch updates within 100ms
+REALTIME_MAX_UPDATES_PER_SECOND = 10
+REALTIME_WEBSOCKET_TIMEOUT = 30
+REALTIME_RECONNECT_MAX_ATTEMPTS = 10
+REALTIME_RECONNECT_BASE_DELAY = 5
+REALTIME_HEALTH_CHECK_INTERVAL = 30
+REALTIME_TRADES_BUFFER_SIZE = 20  # Keep last 20 trades visible
+
+# =============================================================================
+# 💰 CU OPTIMIZATION CONFIGURATION
+# =============================================================================
+
+# Portfolio snapshot interval (seconds)
+PORTFOLIO_SNAPSHOT_INTERVAL_SECONDS = 60  # 1 minute for fast agent response
+
+# Price service background monitoring (with smart batch fetching)
+PRICE_BACKGROUND_MONITORING_ENABLED = True  # Enabled - fetches all tokens in ONE batch call per minute
+
+# CU usage limits and circuit breakers
+CU_DAILY_LIMIT = 100000  # Maximum CU per day (100k threshold - optimization target)
+CU_WARNING_THRESHOLD = 90000  # Warning at 90k CU per day
+CU_CIRCUIT_BREAKER_ENABLED = True  # Enable automatic throttling
+
+# WebSocket endpoints (already configured)
+# QUICKNODE_WSS_ENDPOINT = os.getenv('QUICKNODE_WSS_ENDPOINT')
+# HELIUS_WEBSOCKET_URL = os.getenv('HELIUS_WEBSOCKET_URL')  # if available
+
+# Cloud sync throttling
+CLOUD_SYNC_THROTTLE_SECONDS = 10
+CLOUD_SYNC_BATCH_ENABLED = True
+
+# Performance optimization
+PERFORMANCE_MONITORING_ENABLED = True
+PERFORMANCE_CPU_WARNING_THRESHOLD = 50.0
+PERFORMANCE_MEMORY_WARNING_THRESHOLD = 80.0
+PERFORMANCE_AUTO_OPTIMIZATION = True
+
+# Run validation on import
+_validate_configuration()
+
+# Copybot AI Configuration (follows same pattern as risk/harvesting agents)
+COPYBOT_MODEL_OVERRIDE = "deepseek-chat"
+COPYBOT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+
+# AI Gains Analysis Configuration
+AI_GAINS_ANALYSIS = {
+    "enabled": True,
+    "thresholds": {
+        "analysis_trigger": 3.0,        # 300% gains - trigger AI analysis (increased from 1.2x)
+        "position_size_trigger": 0.15,  # 15% of portfolio - trigger AI analysis
+        "emergency_exit": 5.0,          # 500% gains - emergency consideration
+        "max_position_pct": 0.15        # 15% max position before AI analysis
+    },
+    "cooldown_minutes": 30,             # 30 minutes between analyses per position
+    "confidence_threshold": 0.7         # 70% confidence required for AI decisions
+}
+
+# Exit targets disabled - AI Analysis handles exits
+AI_EXIT_TARGETS_ENABLED = False
+
+# =============================================================================
+# 🤖 AI CONFIRMATION CONFIGURATION (BUY FILTERING)
+# =============================================================================
+
+# AI confirmation settings
+AI_CONFIRMATION_ENABLED = True
+AI_CONFIRMATION_CONFIDENCE_THRESHOLD = 0.50  # 50% confidence required
+AI_CONFIRMATION_CACHE_MINUTES = 30  # Cache analysis results
+
+# OHLCV data settings for confirmation
+AI_CONFIRMATION_LOOKBACK_DAYS = 1          # Changed from 6 to 1 day
+AI_CONFIRMATION_TIMEFRAME = '1m'           # Changed from '1H' to '1m'
+AI_CONFIRMATION_MIN_CANDLES = 2            # Changed from 20 to 2
+
+# Lightweight indicator settings (volume + volatility only)
+AI_VOLUME_DELTA_PERIODS = 15               # Changed from 10 to 15
+AI_VOLATILITY_ATR_PERIODS = 14             # Changed from 20 to 14
+AI_VOLUME_SURGE_THRESHOLD = 1.5            # Changed from 2.0 to 1.5
+AI_MAX_VOLATILITY_THRESHOLD = 0.15         # Changed from 0.08 to 0.15
+
+# Adaptive mode thresholds
+AI_CONFIRMATION_LAUNCH_MODE_MAX = 3        # Launch mode: ≤3 candles
+AI_CONFIRMATION_ACTIVE_MODE_MAX = 50       # Active mode: 4-50 candles
+AI_CONFIRMATION_MATURE_MODE_MIN = 51       # Mature mode: >50 candles
+
+# Multi-timeframe settings
+AI_CONFIRMATION_TIMEFRAME_5M = '5m'        # 5-minute candles
+AI_CONFIRMATION_TIMEFRAME_1H = '1h'        # 1-hour candles
+AI_CONFIRMATION_FETCH_5M_CANDLES = 72      # 6 hours of context
+AI_CONFIRMATION_FETCH_1H_CANDLES = 48      # 2 days of context
+
+# AI analysis weights (volume + volatility focused)
+AI_CONFIRMATION_WEIGHTS = {
+    'volume_signal': 0.6,      # 60% weight on volume
+    'volatility_signal': 0.4   # 40% weight on volatility
+}
+
+# Exit target recommendations
+AI_EXIT_TARGETS = {
+    'conservative': 0.20,   # 20% gain target
+    'moderate': 0.50,       # 50% gain target
+    'aggressive': 1.0       # 100% gain target
+}
+
+AI_EXIT_STOP_LOSS = -0.15  # -15% stop loss
+
+# AI Confirmation Prompt Template for New Token Analysis
+AI_CONFIRMATION_PROMPT = f"""You are Anarcho Capital's CopyBot Agent analyzing a new token for potential buy confirmation.
+
+## TOKEN DATA
+- Symbol: {{symbol}} ({{name}})
+- Address: {{token_address_short}}...
+- Market Cap: ${{market_cap:,.0f}}
+- Liquidity: ${{liquidity:,.0f}}
+
+## TECHNICAL ANALYSIS
+- Volume Score: {{volume_score:.1%}} ({{volume_surge_threshold:.1f}}x average)
+- Volatility Score: {{volatility_score:.1%}} (ATR: {{atr_pct:.1%}})
+- Overall Signal Strength: {{overall_strength:.1%}}
+- Confidence: {{confidence:.1%}}
+
+## MARKET HEALTH CHECKS
+- Volume Surge: {{volume_surge_detected}}
+- Volatility Acceptable: {{volatility_acceptable}}
+- Market Cap Sufficient: {{market_cap_acceptable}}
+- Liquidity Adequate: {{liquidity_acceptable}}
+
+## PORTFOLIO CONSTRAINTS
+- Max Single Position: {MAX_SINGLE_POSITION_PERCENT*100:.0f}% of portfolio
+- Max Total Allocation: {MAX_TOTAL_ALLOCATION_PERCENT*100:.0f}% of portfolio
+- Max Concurrent Positions: {MAX_CONCURRENT_POSITIONS}
+
+## YOUR TASK
+Analyze this new token opportunity and provide a brief recommendation focusing on:
+1. Volume and volatility signals
+2. Market health indicators
+3. Risk assessment
+4. Entry confidence level
+
+## RESPONSE FORMAT
+Provide a concise 2-3 sentence analysis that includes:
+- Key technical signals (volume/volatility)
+- Market health assessment
+- Overall recommendation confidence
+- Brief reasoning for your decision
+
+Example: "Strong volume surge (2.3x average) with low volatility (3.2% ATR) indicates institutional interest with stable entry conditions. Market cap and liquidity are sufficient for position sizing. High confidence buy recommendation based on technical momentum and market health."
+
+Remember: Be decisive, data-driven, and concise. Your analysis directly impacts trading execution."""
+
+# AI Analysis Prompt Template for Exit Decisions
+COPYBOT_AI_ANALYSIS_PROMPT = """You are Anarcho Capital's CopyBot Agent analyzing an existing position for exit decision.
+
+## POSITION DATA
+- Symbol: {symbol}
+- Token Address: {token_address_short}...
+- Entry Price: ${entry_price:.6f}
+- Current Price: ${current_price:.6f}
+- Current Value: ${current_value:.2f}
+- Gains: {gains_multiplier:.2f}x ({gains_percentage:.1f}%)
+
+## TECHNICAL ANALYSIS (OHLCV-based)
+- RSI (14): {rsi:.1f} {rsi_signal}
+- MACD: {macd_signal}
+- Volume Trend: {volume_trend} ({volume_change:.1f}% vs average)
+- Volatility (ATR): {atr_pct:.1%}
+
+## ON-CHAIN ACTIVITY (24h)
+{onchain_activity}
+
+## PORTFOLIO CONTEXT
+- Position Size: {position_size_pct:.1%} of portfolio
+- Trigger: {trigger_reason}
+
+## YOUR TASK
+Analyze this position and decide: HOLD, SELL_PARTIAL (25%), SELL_HALF (50%), or SELL_ALL (100%)
+
+## DECISION GUIDELINES
+- HOLD: Strong uptrend, bullish indicators, low volatility
+- SELL_PARTIAL (25%): Take some profit, mixed signals, moderate gains
+- SELL_HALF (50%): Significant gains, weakening momentum, risk management
+- SELL_ALL (100%): Overbought (RSI>70), bearish reversal, extreme gains
+
+## RESPONSE FORMAT
+First line: HOLD, SELL_PARTIAL, SELL_HALF, or SELL_ALL
+Then explain your reasoning (2-3 sentences):
+- Technical indicator signals
+- Risk/reward assessment
+- Confidence level
+
+Example: "SELL_HALF - RSI at 78 indicates overbought conditions with bearish MACD crossover. Volume declining suggests weakening momentum. Recommend taking 50% profit while holding remaining position. Confidence: 82%"
+
+Remember: Be decisive and data-driven. Focus on technical indicators and market conditions.
+"""
+
+
+# Debug API key loading if in debug mode
+if BIRDEYE_API_DEBUG:
+    debug_birdeye_api_key()
+
+
+# ==========================================
+# RBI AGENT CONFIGURATION
+# ==========================================
+
+# RBI AI Model Configuration - Using DeepSeek
+RBI_MODEL_OVERRIDE = "deepseek-chat"  # DeepSeek chat model for all RBI phases
+RBI_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+
+# RBI Model Configurations for each phase
+RBI_RESEARCH_CONFIG = {
+    "type": "deepseek",
+    "name": RBI_MODEL_OVERRIDE
+}
+
+RBI_BACKTEST_CONFIG = {
+    "type": "deepseek",
+    "name": RBI_MODEL_OVERRIDE
+}
+
+RBI_DEBUG_CONFIG = {
+    "type": "deepseek",
+    "name": RBI_MODEL_OVERRIDE
+}
+
+RBI_PACKAGE_CONFIG = {
+    "type": "deepseek",
+    "name": RBI_MODEL_OVERRIDE
+}
+
+# RBI Data Storage Configuration
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).parent.parent
+
+# RBI Data Directory Structure
+RBI_DATA_DIR = PROJECT_ROOT / "data" / "rbi"
+RBI_IDEAS_FILE = RBI_DATA_DIR / "ideas.txt"
+RBI_PROCESSED_IDEAS_LOG = RBI_DATA_DIR / "processed_ideas.log"
+
+# Get today's date for organizing outputs
+from datetime import datetime
+RBI_TODAY_DATE = datetime.now().strftime("%m_%d_%Y")
+RBI_TODAY_DIR = RBI_DATA_DIR / RBI_TODAY_DATE
+
+# RBI Output Directories
+RBI_RESEARCH_DIR = RBI_TODAY_DIR / "research"
+RBI_BACKTEST_DIR = RBI_TODAY_DIR / "backtests"
+RBI_PACKAGE_DIR = RBI_TODAY_DIR / "backtests_package"
+RBI_FINAL_BACKTEST_DIR = RBI_TODAY_DIR / "backtests_final"
+RBI_CHARTS_DIR = RBI_TODAY_DIR / "charts"
+RBI_EXECUTION_DIR = RBI_TODAY_DIR / "execution_results"
+
+# RBI Execution Configuration
+RBI_CONDA_ENV = "tflow"  # Conda environment for backtesting
+RBI_MAX_DEBUG_ITERATIONS = 10  # Max times to try debugging
+RBI_EXECUTION_TIMEOUT = 300  # 5 minutes timeout
+
+# RBI AI Model Parameters
+RBI_AI_TEMPERATURE = 0.7
+RBI_AI_MAX_TOKENS = 4000
+
+# RBI Data Retention Policy
+RBI_DATA_RETENTION_DAYS = 30  # Keep data for 30 days
+RBI_MAX_IDEAS_PER_RUN = None  # None = process all, or set a number to limit
+
+# RBI Database Configuration (Supabase)
+RBI_ENABLE_CLOUD_STORAGE = True  # Enable storing results in cloud database
+RBI_CLOUD_TABLE_NAME = "rbi_strategy_results"  # Supabase table name
+
+# RBI Strategy Parameters
+RBI_DEFAULT_POSITION_SIZE = 1000000  # Default backtest position size
+RBI_DEFAULT_CASH = 1000000  # Default starting cash for backtests
+
+# RBI YouTube/PDF Processing
+RBI_ENABLE_YOUTUBE_TRANSCRIPTS = True
+RBI_ENABLE_PDF_EXTRACTION = True
+RBI_MAX_CONTENT_LENGTH = 50000  # Maximum content length to process (characters)
+
+# RBI Performance Thresholds
+RBI_MIN_SHARPE_RATIO = 0.5  # Minimum acceptable Sharpe ratio
+RBI_MIN_WIN_RATE = 50.0  # Minimum acceptable win rate percentage
+RBI_MAX_DRAWDOWN = -20.0  # Maximum acceptable drawdown percentage
+
+# =============================================================================
+# 👑 MASTER AGENT CONFIGURATION
+# =============================================================================
+
+# Master Agent Settings
+MASTER_AGENT_ENABLED = True  # Enable/disable the Master Agent
+MASTER_AGENT_MONTHLY_PNL_GOAL = 30.0  # Monthly PnL goal in percentage
+MASTER_AGENT_MONITORING_INTERVAL = 1800  # Monitoring interval in seconds (30 minutes)
+MASTER_AGENT_AUTO_ADJUST_DATA = True  # Auto-adjust data collection configs
+MASTER_AGENT_REQUIRE_APPROVAL_TRADING = True  # Require approval for trading config changes
+MASTER_AGENT_MIN_CONFIDENCE = 0.70  # Minimum confidence for applying suggestions
+MASTER_AGENT_ROLLBACK_THRESHOLD_HOURS = 24  # Hours to consider for rollback evaluation
+MASTER_AGENT_PERFORMANCE_EVAL_INTERVAL = 3600  # Performance evaluation interval in seconds
+
+# Master Agent Personality Mode (AGGRESSIVE, BALANCED, CONSERVATIVE)
+MASTER_AGENT_DEFAULT_PERSONALITY = "BALANCED"
+
+# Chart Analysis Configuration (adjustable by Master Agent)
+CHART_ANALYSIS_TIMEFRAME = "4h"  # Default timeframe for chart analysis (matches current chart analysis agent)
+CHART_ANALYSIS_LOOKBACK = 20  # Days to look back for chart analysis (120 bars * 4h = 20 days)
+CHART_ANALYSIS_NUM_CANDLES = 120  # Number of candlesticks to analyze (matches LOOKBACK_BARS)
+

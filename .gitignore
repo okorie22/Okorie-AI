@@ -412,6 +412,9 @@ flycheck_*.el
 ./cursor
 .cursor/
 
+# FFmpeg folder (large directory)
+ffmpeg/
+
 # Generated version files
 src/version.ts
 src/version.js
