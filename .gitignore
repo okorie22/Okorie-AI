@@ -279,6 +279,51 @@ tokencache/
 *.wav
 *.mp3
 generatedImages/
+
+
+### 🎥 MEDIA FILES ###
+
+# Video files
+*.mp4
+*.mov
+*.MOV
+*.avi
+*.mkv
+*.wmv
+*.flv
+*.webm
+*.m4v
+*.mpeg
+*.mpg
+*.3gp
+*.m2ts
+*.mts
+
+# Large image files
+*.psd
+*.ai
+*.raw
+*.cr2
+*.nef
+*.tif
+*.tiff
+
+# Audio files (additional)
+*.flac
+*.aac
+*.ogg
+*.wma
+*.m4a
+
+# Media directories
+**/raw_videos/
+**/processed_videos/
+**/video_content/
+**/media/videos/
+**/content_pipeline/raw_videos/
+**/content_pipeline/processed_videos/
+generatedVideos/
+generatedAudio/
 # images/ - REMOVED: too broad, would exclude all image directories
 # data/ - REMOVED: too broad, would exclude all data directories (using specific patterns below instead)
 standalone.ts
