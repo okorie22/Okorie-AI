@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) +
 # Import commerce system components
 from shared.config import *
 from shared.database import get_database_manager, TradingSignal, WhaleRanking, StrategyMetadata, ExecutedTrade
-from core.database import UnifiedTradingSignal, WhaleRankingRecord, StrategyMetadataRecord, ExecutedTradeRecord
+from core_infrastructure.database import UnifiedTradingSignal, WhaleRankingRecord, StrategyMetadataRecord, ExecutedTradeRecord
 from shared.utils import (
     generate_unique_id, format_currency, calculate_sharpe_ratio,
     api_key_manager, rate_limiter, encryption_manager

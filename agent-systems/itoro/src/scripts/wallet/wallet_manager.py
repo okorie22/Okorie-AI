@@ -13,7 +13,7 @@ from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 
 # Local imports
-from ..shared_services.logger import info, warning, error, critical
+from src.scripts.shared_services.logger import info, warning, error, critical
 
 logger = logging.getLogger(__name__)
 

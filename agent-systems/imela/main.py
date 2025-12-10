@@ -15,11 +15,11 @@ def load_env_from_root():
     """Load .env from ITORO root directory"""
     try:
         # Try to find ITORO root
-        # Current path: ITORO/simbon/imela/main.py
+        # Current path: ITORO/agent-systems/imela/main.py
         # Target: ITORO/.env
         current = Path(__file__).parent  # imela directory
-        simbon_dir = current.parent      # simbon directory
-        itoro_root = simbon_dir.parent   # ITORO directory
+        agent_systems_dir = current.parent  # agent-systems directory
+        itoro_root = agent_systems_dir.parent  # ITORO directory
         env_file = itoro_root / '.env'   # ITORO/.env
 
         if env_file.exists():

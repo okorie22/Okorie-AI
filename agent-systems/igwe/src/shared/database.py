@@ -16,7 +16,7 @@ import logging
 
 try:
     # Try relative imports first (when used as part of package)
-    from core.database import (
+    from core_infrastructure.database import (
         UnifiedTradingSignal,
         WhaleRankingRecord,
         StrategyMetadataRecord,
@@ -27,7 +27,7 @@ except ImportError:
     import sys
     import os
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from core.database import (
+    from core_infrastructure.database import (
         UnifiedTradingSignal,
         WhaleRankingRecord,
         StrategyMetadataRecord,

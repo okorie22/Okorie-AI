@@ -71,7 +71,7 @@ The ITORO Master Agent has been successfully implemented as the supreme orchestr
 Run the test suite to ensure everything is working:
 
 ```bash
-cd simbon/itoro
+cd agent-systems/itoro
 python test/test_master_agent.py
 ```
 
