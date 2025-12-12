@@ -8,6 +8,7 @@ Event-driven architecture with real-time WebSocket feeds from multiple exchanges
 """
 
 import os
+import sys
 import pandas as pd
 import time
 from datetime import datetime, timedelta
@@ -15,6 +16,11 @@ from termcolor import colored, cprint
 from dotenv import load_dotenv
 import openai
 from pathlib import Path
+
+# Add project root to Python path for direct script execution
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
 from src import nice_funcs as n
 from src import nice_funcs_hl as hl
 from src.agents.base_agent import BaseAgent
@@ -281,12 +287,20 @@ Consider the ratio of long vs short liquidations and their relative changes
         print(f"║  Short Change: {analysis['pct_change_shorts']:+.1f}%{' '*37} ║")
         print("╚" + "═" * 60 + "╝")
             
-    def run_monitoring_cycle(self):
-        """Run one monitoring cycle across all symbols"""
+    def run_monitoring_cycle(self, reporter=None):
+        """Run one monitoring cycle across all symbols
+        
+        Args:
+            reporter: Optional AgentReporter for dashboard integration
+        """
         try:
             print(f"\n{'='*70}")
             print(f"🌊 Liquidation Monitoring Cycle - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             print(f"{'='*70}")
+            
+            # Track symbols status for dashboard
+            symbols_data = {}
+            alert_detected = False
             
             # Check each symbol
             for symbol in self.symbols:
@@ -311,6 +325,24 @@ Consider the ratio of long vs short liquidations and their relative changes
                                 current_shorts > (previous_shorts * threshold)):
                                 
                                 print(f"\n🚨 SIGNIFICANT LIQUIDATION SPIKE DETECTED for {symbol}!")
+                                alert_detected = True
+                                symbols_data[symbol] = "🚨 ALERT"
+                                
+                                # Calculate percentage changes
+                                pct_change_longs = ((current_longs - previous_longs) / previous_longs) * 100
+                                pct_change_shorts = ((current_shorts - previous_shorts) / previous_shorts) * 100
+                                
+                                # Report alert to dashboard
+                                if reporter:
+                                    reporter.report_alert(
+                                        f"{symbol} liquidation spike: Longs {pct_change_longs:+.1f}%, Shorts {pct_change_shorts:+.1f}%",
+                                        level='ALERT',
+                                        alert_data={
+                                            'symbol': symbol,
+                                            'longs_change': pct_change_longs,
+                                            'shorts_change': pct_change_shorts
+                                        }
+                                    )
                                 
                                 # Get AI analysis
                                 analysis = self._analyze_opportunity(
@@ -320,6 +352,12 @@ Consider the ratio of long vs short liquidations and their relative changes
                                 
                                 if analysis:
                                     self._print_analysis(analysis)
+                            else:
+                                symbols_data[symbol] = "NORMAL"
+                        else:
+                            symbols_data[symbol] = "NORMAL"
+                    else:
+                        symbols_data[symbol] = "NORMAL"
                     
                     # Update previous values
                     self.previous_values[symbol_key] = {
@@ -330,10 +368,20 @@ Consider the ratio of long vs short liquidations and their relative changes
                     
                 except Exception as e:
                     print(f"❌ Error processing {symbol}: {str(e)}")
+                    symbols_data[symbol] = "ERROR"
                     continue
+            
+            # Report cycle completion to dashboard
+            if reporter:
+                reporter.report_cycle_complete(
+                    metrics={'symbols_checked': len(self.symbols), 'alerts': alert_detected},
+                    symbols=symbols_data
+                )
                 
         except Exception as e:
             print(f"❌ Error in monitoring cycle: {str(e)}")
+            if reporter:
+                reporter.report_error(f"Cycle error: {str(e)}", e)
             traceback.print_exc()
 
     def run(self):

@@ -96,8 +96,20 @@ class YouTubeConnection(BaseConnection):
                 logger.debug("Refreshing expired credentials")
                 try:
                     creds.refresh(Request())
+                    logger.info("Successfully refreshed YouTube credentials")
                 except Exception as e:
                     logger.warning(f"Failed to refresh token: {e}")
+                    logger.info("Refresh token may be invalid. Will start new OAuth flow.")
+                    creds = None
+            elif creds and creds.refresh_token and not creds.expired:
+                # Token might be invalid even if not expired
+                logger.debug("Attempting to refresh non-expired but invalid credentials")
+                try:
+                    creds.refresh(Request())
+                    logger.info("Successfully refreshed YouTube credentials")
+                except Exception as e:
+                    logger.warning(f"Failed to refresh token: {e}")
+                    logger.info("Token may be invalid. Will start new OAuth flow.")
                     creds = None
 
             if not creds:
@@ -114,6 +126,21 @@ class YouTubeConnection(BaseConnection):
 
         return creds
 
+    def clear_credentials(self) -> bool:
+        """Clear stored YouTube credentials to force re-authentication"""
+        try:
+            token_path = Path.home() / '.zerepy' / 'youtube_token.pickle'
+            if token_path.exists():
+                token_path.unlink()
+                logger.info("YouTube credentials cleared. Next authentication will require new OAuth flow.")
+                return True
+            else:
+                logger.info("No YouTube credentials file found to clear.")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to clear YouTube credentials: {e}")
+            return False
+
     def _run_oauth_flow(self) -> Credentials:
         """Run the OAuth 2.0 flow to get user consent"""
         try:
@@ -126,12 +153,15 @@ class YouTubeConnection(BaseConnection):
                     "YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET must be set in environment variables"
                 )
 
+            logger.info("Starting YouTube OAuth flow...")
+            logger.info(f"Client ID: {client_id[:20]}...")
+
             # Create client secrets dict
             client_secrets = {
                 "installed": {
                     "client_id": client_id,
                     "client_secret": client_secret,
-                    "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob", "http://localhost"],
+                    "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob", "http://localhost:8080"],
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                     "token_uri": "https://oauth2.googleapis.com/token"
                 }
@@ -140,12 +170,42 @@ class YouTubeConnection(BaseConnection):
             # Create flow
             flow = InstalledAppFlow.from_client_config(client_secrets, self._scopes)
 
-            # Run local server flow
-            creds = flow.run_local_server(port=8080, prompt='consent')
+            logger.info("OAuth flow created. Starting local server on port 8080...")
+            logger.info("If this hangs, check that http://localhost:8080/ is added to your Google OAuth redirect URIs")
+            logger.info("You can add it at: https://console.cloud.google.com/apis/credentials")
 
-            return creds
+            # Run local server flow with timeout
+            try:
+                creds = flow.run_local_server(port=8080, prompt='consent', timeout_seconds=300)
+                logger.info("OAuth flow completed successfully!")
+                return creds
+            except Exception as server_error:
+                logger.error(f"Local server OAuth failed: {server_error}")
+                logger.info("Falling back to manual OAuth flow...")
+
+                # Fallback: Manual OAuth flow
+                flow.redirect_uri = "urn:ietf:wg:oauth:2.0:oob"
+                auth_url, _ = flow.authorization_url(prompt='consent')
+
+                print("\n" + "="*80)
+                print("YOUTUBE OAUTH AUTHORIZATION REQUIRED")
+                print("="*80)
+                print("\nPlease visit this URL in your browser:")
+                print(f"\n{auth_url}\n")
+                print("Sign in with your Google account and grant permissions.")
+                print("After authorization, Google will show you an authorization code.")
+                print("Copy that code and paste it below:")
+                print("="*80)
+
+                auth_code = input("Enter authorization code: ").strip()
+                flow.fetch_token(code=auth_code)
+                creds = flow.credentials
+
+                print("✅ OAuth completed successfully!")
+                return creds
 
         except Exception as e:
+            logger.error(f"OAuth flow failed: {str(e)}")
             raise YouTubeConfigurationError(f"OAuth flow failed: {str(e)}")
 
     def _init_youtube_service(self):

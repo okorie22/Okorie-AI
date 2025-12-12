@@ -6,6 +6,7 @@ Built with love by Anarcho Capital 🚀
 
 import os
 import pandas as pd
+import json
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
@@ -25,8 +26,8 @@ except ImportError:
     def error(msg):
         print(f"ERROR: {msg}")
 
-# Get project root (ai_crypto_agents/)
-PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+# Get project root
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 
 class OIStorage:
@@ -46,10 +47,10 @@ class OIStorage:
     def save_oi_snapshot(self, oi_data: List[Dict]) -> bool:
         """
         Save OI snapshot to Parquet file
-        
+
         Args:
             oi_data: List of OI records with timestamp, symbol, open_interest, etc.
-            
+
         Returns:
             bool: Success status
         """
@@ -57,40 +58,32 @@ class OIStorage:
             if not oi_data:
                 warning("No OI data to save")
                 return False
-            
+
             # Convert to DataFrame
             df = pd.DataFrame(oi_data)
-            
+
             # Ensure timestamp is datetime
             if 'timestamp' in df.columns:
                 df['timestamp'] = pd.to_datetime(df['timestamp'])
-            
-            # Get current date for filename
+
+            # Drop metadata column from local Parquet to avoid nested/complex types
+            if 'metadata' in df.columns:
+                df = df.drop(columns=['metadata'])
+
+            # Get current date for filename (one file per day)
             current_date = datetime.now().date()
             filename = f"oi_{current_date.strftime('%Y%m%d')}.parquet"
             filepath = self.data_dir / filename
-            
-            # If file exists, append to it
-            if filepath.exists():
-                try:
-                    existing_df = pd.read_parquet(filepath)
-                    # Check if the file is empty/corrupted
-                    if existing_df.empty:
-                        warning(f"Existing file {filename} is empty, creating new file")
-                    else:
-                        df = pd.concat([existing_df, df], ignore_index=True)
-                        # Remove duplicates based on timestamp and symbol
-                        df = df.drop_duplicates(subset=['timestamp', 'symbol'], keep='last')
-                except Exception as e:
-                    error(f"Failed to read existing file {filename}: {str(e)}, creating new file")
-                    # File is corrupted, we'll overwrite it
-            
-            # Save to Parquet
+
+            # IMPORTANT:
+            # Do NOT try to read/append the existing file.
+            # Just overwrite today's file with the latest snapshot.
             df.to_parquet(filepath, engine='pyarrow', compression='snappy', index=False)
+
             info(f"✅ Saved {len(oi_data)} OI records to {filename}")
-            
+
             return True
-            
+
         except Exception as e:
             error(f"Failed to save OI snapshot: {str(e)}")
             error(traceback.format_exc())
@@ -142,10 +135,16 @@ class OIStorage:
 
             # Combine all DataFrames
             combined_df = pd.concat(dfs, ignore_index=True)
-            
+
+            # Convert metadata from JSON string back to dict
+            if 'metadata' in combined_df.columns:
+                combined_df['metadata'] = combined_df['metadata'].apply(
+                    lambda x: json.loads(x) if isinstance(x, str) else x
+                )
+
             # Ensure timestamp is datetime
             combined_df['timestamp'] = pd.to_datetime(combined_df['timestamp'])
-            
+
             # Sort by timestamp
             combined_df = combined_df.sort_values('timestamp')
             

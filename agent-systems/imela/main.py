@@ -43,13 +43,18 @@ def load_env_from_root():
                             key = key.strip()
                             value = value.strip().strip('"').strip("'")
 
-                            # Only set ZerePy-relevant keys if not already set
+                            # Load all environment variables, prioritizing ZerePy-relevant keys
                             zerepy_keys = ['DEEPSEEK_KEY', 'DISCORD_BOT_TOKEN', 'GMAIL_APP_PASSWORD', 'YOUTUBE_CLIENT_ID',
                                           'YOUTUBE_CLIENT_SECRET', 'TWITTER_CONSUMER_KEY',
                                           'TWITTER_CONSUMER_SECRET', 'TWITTER_ACCESS_TOKEN',
                                           'TWITTER_ACCESS_TOKEN_SECRET', 'TWITTER_USER_ID']
 
+                            # Always set if it's a ZerePy key and not already set
                             if key in zerepy_keys and key and value and not os.getenv(key):
+                                os.environ[key] = value
+                            # For other keys, only set if not already set (to avoid overwriting existing env vars)
+                            elif key and value and not os.getenv(key):
+                                os.environ[key] = value
                                 os.environ[key] = value
                     except Exception:
                         continue

@@ -131,16 +131,11 @@ class LiquidationStorage:
             filename = f"liquidation_{current_date}.parquet"
             filepath = self.data_dir / filename
             
-            # Load existing data for the day if it exists
-            if filepath.exists():
-                try:
-                    existing_df = pd.read_parquet(filepath)
-                    # Append new data
-                    df = pd.concat([existing_df, df], ignore_index=True)
-                    # Remove duplicates based on event_time, exchange, and symbol
-                    df = df.drop_duplicates(subset=['event_time', 'exchange', 'symbol', 'side', 'price'], keep='last')
-                except Exception as e:
-                    warning(f"Could not load existing file, creating new: {str(e)}")
+            # IMPORTANT: Do NOT try to read/append the existing file to avoid schema issues.
+            # Just overwrite today's file with the latest data.
+            # Remove duplicates in current batch
+            if len(df) > 1:
+                df = df.drop_duplicates(subset=['event_time', 'exchange', 'symbol', 'side', 'price'], keep='last')
             
             # Sort by event_time
             df = df.sort_values('event_time')

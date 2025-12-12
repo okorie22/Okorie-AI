@@ -109,12 +109,16 @@ from src.config import (
     CHART_ANALYSIS_INTERVAL_MINUTES,
     WHALE_UPDATE_INTERVAL_HOURS,
     TOKEN_ONCHAIN_UPDATE_INTERVAL_MINUTES,
-    TOKEN_ONCHAIN_ENABLED
+    TOKEN_ONCHAIN_ENABLED,
+    OI_CHECK_INTERVAL_HOURS,
+    FUNDING_CHECK_INTERVAL_MINUTES
 )
 
 # Import agents
 from src.agents.chartanalysis_agent import ChartAnalysisAgent
 from src.agents.whale_agent import WhaleAgent
+from src.agents.oi_agent import OIAgent
+from src.agents.funding_agent import FundingAgent
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -146,11 +150,11 @@ class MultiAgentScheduler:
     def _initialize_agents(self):
         """Initialize all agents with their execution methods and intervals"""
         try:
-            # Define agent execution order: OnChain (FIRST) -> Chart Analysis (SECOND) -> Whale (THIRD)
+            # Define agent execution order: OnChain -> Chart Analysis -> Whale -> OI -> Funding
             if TOKEN_ONCHAIN_ENABLED:
-                self.agent_execution_order = ['onchain', 'chartanalysis', 'whale']
+                self.agent_execution_order = ['onchain', 'chartanalysis', 'whale', 'oi', 'funding']
             else:
-                self.agent_execution_order = ['chartanalysis', 'whale']
+                self.agent_execution_order = ['chartanalysis', 'whale', 'oi', 'funding']
             
             # OnChain Agent - runs every hour (FIRST)
             if TOKEN_ONCHAIN_ENABLED:
@@ -197,6 +201,36 @@ class MultiAgentScheduler:
                 'max_retries': 3,
                 'max_runtime_minutes': 15,  # 15 minutes timeout
                 'order': 3
+            }
+            
+            # OI Agent - runs every 4 hours (FOURTH)
+            oi_agent = OIAgent()
+            self.agents['oi'] = {
+                'instance': oi_agent,
+                'interval_minutes': OI_CHECK_INTERVAL_HOURS * 60,  # Convert hours to minutes
+                'last_run': None,
+                'next_run': datetime.now() + timedelta(minutes=45),  # Start 45 minutes after launch (after whale)
+                'execution_method': self._execute_oi_analysis,
+                'status': 'idle',
+                'error_count': 0,
+                'max_retries': 3,
+                'max_runtime_minutes': 10,  # 10 minutes timeout
+                'order': 4
+            }
+            
+            # Funding Agent - runs every 2 hours (FIFTH)
+            funding_agent = FundingAgent()
+            self.agents['funding'] = {
+                'instance': funding_agent,
+                'interval_minutes': FUNDING_CHECK_INTERVAL_MINUTES,  # Already in minutes
+                'last_run': None,
+                'next_run': datetime.now() + timedelta(minutes=60),  # Start 60 minutes after launch (after OI)
+                'execution_method': self._execute_funding_analysis,
+                'status': 'idle',
+                'error_count': 0,
+                'max_retries': 3,
+                'max_runtime_minutes': 10,  # 10 minutes timeout
+                'order': 5
             }
             
             # Initialize locks for each agent
@@ -259,6 +293,42 @@ class MultiAgentScheduler:
             
         except Exception as e:
             logger.error(f"❌ Whale Analysis Agent execution failed: {str(e)}")
+            logger.error(traceback.format_exc())
+            return False
+    
+    def _execute_oi_analysis(self, agent_info: Dict) -> bool:
+        """Execute OI agent with proper error handling"""
+        try:
+            logger.info("📊 Starting OI Agent execution...")
+            start_time = time.time()
+            
+            # Execute single monitoring cycle
+            agent_info['instance'].run_monitoring_cycle()
+            
+            execution_time = time.time() - start_time
+            logger.info(f"✅ OI Agent completed successfully in {execution_time:.2f} seconds")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ OI Agent execution failed: {str(e)}")
+            logger.error(traceback.format_exc())
+            return False
+    
+    def _execute_funding_analysis(self, agent_info: Dict) -> bool:
+        """Execute Funding agent with proper error handling"""
+        try:
+            logger.info("💰 Starting Funding Agent execution...")
+            start_time = time.time()
+            
+            # Execute single monitoring cycle
+            agent_info['instance'].run_monitoring_cycle()
+            
+            execution_time = time.time() - start_time
+            logger.info(f"✅ Funding Agent completed successfully in {execution_time:.2f} seconds")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Funding Agent execution failed: {str(e)}")
             logger.error(traceback.format_exc())
             return False
     
@@ -372,10 +442,16 @@ class MultiAgentScheduler:
             # Update schedule
             self._update_agent_schedule(agent_name, agent_info, success)
             
+            # Print status after agent completes
+            self._print_status()
+            
         except Exception as e:
             logger.error(f"❌ Unexpected error in {agent_name} execution: {str(e)}")
             logger.error(traceback.format_exc())
             self._update_agent_schedule(agent_name, agent_info, False)
+            
+            # Print status even on error
+            self._print_status()
     
 
     
@@ -480,13 +556,12 @@ class MultiAgentScheduler:
         print(f"{C.GRAY}💡 {C.YELLOW}'s'{C.GRAY} status | {C.YELLOW}'q'{C.GRAY} quit | {C.YELLOW}'h'{C.GRAY} help{C.RESET}\n")
     
     def _status_monitor(self):
-        """Periodically print status and handle user input"""
+        """Background monitor thread (status now prints after each agent completes)"""
         while not self.shutdown_event.is_set():
             try:
-                # Print status every 15 minutes
-                time.sleep(900)
-                if self.running:
-                    self._print_status()
+                # Status is now printed after each agent completes
+                # This thread just keeps running in case we need it for other monitoring
+                time.sleep(60)
 
             except Exception as e:
                 logger.error(f"❌ Error in status monitor: {str(e)}")

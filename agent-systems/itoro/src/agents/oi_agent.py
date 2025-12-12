@@ -357,8 +357,12 @@ class OIAgent(BaseAgent):
             error(f"Failed to generate AI insights: {str(e)}")
             return []
         
-    def run_monitoring_cycle(self):
-        """Run one monitoring cycle - collect data, calculate analytics, and store"""
+    def run_monitoring_cycle(self, reporter=None):
+        """Run one monitoring cycle - collect data, calculate analytics, and store
+        
+        Args:
+            reporter: Optional AgentReporter for dashboard integration
+        """
         try:
             info("\n" + "="*80)
             info(f"📊 OI Monitoring Cycle Started - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -390,8 +394,25 @@ class OIAgent(BaseAgent):
             info("\n🔬 Calculating analytics...")
             analytics = self.analytics_engine.calculate_all_metrics(history)
             
+            # Prepare symbol data for dashboard
+            symbols_data = {}
             if analytics:
                 info(f"✅ Calculated {len(analytics)} analytics records")
+                
+                # Extract 4h changes for each symbol
+                for record in analytics:
+                    if record['timeframe'] == '4h':
+                        symbol = record['symbol']
+                        oi_change = record['oi_change_pct']
+                        symbols_data[symbol] = f"{oi_change:+.1f}%"
+                        
+                        # Report alerts for significant changes
+                        if reporter and abs(oi_change) > 15:  # Threshold for alert
+                            reporter.report_alert(
+                                f"{symbol} OI change: {oi_change:+.1f}% (4h)",
+                                level='ALERT',
+                                alert_data={'symbol': symbol, 'change': oi_change}
+                            )
                 
                 # Display sample analytics
                 if len(analytics) > 0:
@@ -402,6 +423,13 @@ class OIAgent(BaseAgent):
                         info(f"  Funding Rate Change: {sample['funding_rate_change_pct']:.2f}%")
                     if sample.get('oi_volume_ratio'):
                         info(f"  OI/Volume Ratio: {sample['oi_volume_ratio']:.4f}")
+            
+            # Report cycle completion to dashboard
+            if reporter:
+                reporter.report_cycle_complete(
+                    metrics={'records': len(oi_data), 'analytics': len(analytics)},
+                    symbols=symbols_data
+                )
             
             # Step 5: Generate AI insights (if enabled)
             insights = []

@@ -49,9 +49,16 @@ class LiquidationCollector:
     Streams data from multiple exchanges and stores locally + cloud
     """
     
-    def __init__(self):
-        """Initialize the liquidation collector"""
+    def __init__(self, reporter=None):
+        """Initialize the liquidation collector
+        
+        Args:
+            reporter: Optional AgentReporter for dashboard integration
+        """
         info("🌊 Initializing Liquidation Collector...")
+        
+        # Store reporter for dashboard updates
+        self.reporter = reporter
         
         # Load configuration
         self.symbols = config.LIQUIDATION_SYMBOLS
@@ -95,19 +102,16 @@ class LiquidationCollector:
         # Running flag
         self.running = False
         
-        # Register signal handlers for graceful shutdown
-        signal.signal(signal.SIGINT, self._signal_handler)
-        signal.signal(signal.SIGTERM, self._signal_handler)
+        # Note: Signal handlers not registered here because collector runs in background thread
+        # Main launcher handles shutdown signaling via stop_event
         
         info(f"📊 Tracking symbols: {', '.join(self.symbols)}")
         info(f"🌐 Monitoring exchanges: {', '.join(self.exchanges)}")
         info(f"💾 Batch interval: {self.batch_interval}s")
         info(f"☁️ Cloud sync interval: {self.cloud_sync_interval}s")
     
-    def _signal_handler(self, signum, frame):
-        """Handle shutdown signals gracefully"""
-        info(f"\n🛑 Received signal {signum}, shutting down gracefully...")
-        self.running = False
+    # Signal handler removed - not needed when running in background thread
+    # Main launcher handles shutdown signaling via stop_event
     
     def _enrich_event(self, event: Dict) -> Dict:
         """
@@ -297,6 +301,14 @@ class LiquidationCollector:
                 info(f"💾 Local Saves: {self.stats['local_saves']}")
                 info(f"☁️  Cloud Saves: {self.stats['cloud_saves']}")
                 
+                # Report to dashboard
+                if self.reporter:
+                    self.reporter.report_collector_status(
+                        connected=self.running,
+                        data_points=self.stats['total_events'],
+                        exchanges=self.exchanges
+                    )
+                
                 info("\n📊 Events by Exchange:")
                 for exchange, count in sorted(self.stats['events_by_exchange'].items(), 
                                              key=lambda x: x[1], reverse=True):
@@ -338,6 +350,14 @@ class LiquidationCollector:
         
         # Register callback with WebSocket manager
         self.ws_manager.on_liquidation_event(self._on_liquidation)
+        
+        # Report initial status to dashboard
+        if self.reporter:
+            self.reporter.report_collector_status(
+                connected=True,
+                data_points=0,
+                exchanges=self.exchanges
+            )
         
         # Start background tasks
         tasks = [

@@ -63,7 +63,8 @@ MODEL_FACTORY_QUIET_MODE = True  # Suppress verbose model factory initialization
 
 # Log file settings
 LOG_TO_FILE = True  # Whether to save logs to file
-LOG_DIRECTORY = "logs"  # Directory to store log files
+import os
+LOG_DIRECTORY = os.path.join(os.path.dirname(__file__), "logs")  # Absolute path to src/logs directory
 LOG_FILENAME = "trading_system.log"  # Name of the log file
 LOG_MAX_SIZE_MB = 10  # Maximum size of log file before rotation (in MB)
 LOG_BACKUP_COUNT = 5  # Number of backup log files to keep

@@ -44,7 +44,13 @@ try:
         WHALE_HISTORY_MAX_RECORDS, WHALE_HISTORY_RETENTION_DAYS,
         LOG_LEVEL, LOG_TO_FILE, LOG_DIRECTORY
     )
-    from ..integration.core_bridge import publish_whale_rankings
+    # Try to import core_bridge (may not be available)
+    try:
+        from ..integration.core_bridge import publish_whale_rankings
+        CORE_BRIDGE_AVAILABLE = True
+    except ImportError:
+        CORE_BRIDGE_AVAILABLE = False
+        publish_whale_rankings = None
 except ImportError:
     # Fallback for direct execution
     import sys
@@ -59,7 +65,13 @@ except ImportError:
         WHALE_HISTORY_MAX_RECORDS, WHALE_HISTORY_RETENTION_DAYS,
         LOG_LEVEL, LOG_TO_FILE, LOG_DIRECTORY
     )
-    from src.integration.core_bridge import publish_whale_rankings
+    # Try to import core_bridge (may not be available)
+    try:
+        from src.integration.core_bridge import publish_whale_rankings
+        CORE_BRIDGE_AVAILABLE = True
+    except ImportError:
+        CORE_BRIDGE_AVAILABLE = False
+        publish_whale_rankings = None
 
 # Cloud database import
 try:
@@ -827,10 +839,11 @@ class WhaleAgent(BaseAgent):
         
         self.ranked_wallets = new_ranked
         logger.info(f"Updated ranked wallets: {len([w for w in new_ranked.values() if w.is_active])} active, {len([w for w in new_ranked.values() if not w.is_active])} inactive")
-        try:
-            publish_whale_rankings(new_ranked.values())
-        except Exception:
-            logger.exception("Failed to publish whale rankings to core bridge")
+        if CORE_BRIDGE_AVAILABLE:
+            try:
+                publish_whale_rankings(new_ranked.values())
+            except Exception:
+                logger.exception("Failed to publish whale rankings to core bridge")
     
     def _update_wallet_history(self, wallet: WhaleWallet, timestamp: str):
         """

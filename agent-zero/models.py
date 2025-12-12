@@ -327,7 +327,48 @@ class LiteLLMChatWrapper(SimpleChatModel):
         }
         for m in messages:
             role = role_mapping.get(m.type, m.type)
-            message_dict = {"role": role, "content": m.content}
+
+            # Handle Deepseek-specific message filtering
+            if hasattr(self, 'provider') and self.provider == 'deepseek':
+                # Skip messages with image_url content (Deepseek doesn't support vision)
+                if hasattr(m, 'content') and isinstance(m.content, list):
+                    # Check if content contains image_url
+                    has_image = any(
+                        isinstance(item, dict) and item.get('type') == 'image_url'
+                        for item in m.content
+                    )
+                    if has_image:
+                        # Convert to text-only by extracting text parts
+                        text_parts = [
+                            item.get('text', '') if isinstance(item, dict) and item.get('type') == 'text'
+                            else str(item) if isinstance(item, str)
+                            else ''
+                            for item in m.content
+                        ]
+                        content = ' '.join(text_parts).strip()
+                        if not content:
+                            continue  # Skip if no text content
+                        message_dict = {"role": role, "content": content}
+                    else:
+                        # Convert list content to string for Deepseek
+                        if all(isinstance(item, str) for item in m.content):
+                            message_dict = {"role": role, "content": ' '.join(m.content)}
+                        else:
+                            # Handle mixed content by extracting text
+                            text_parts = []
+                            for item in m.content:
+                                if isinstance(item, str):
+                                    text_parts.append(item)
+                                elif isinstance(item, dict) and item.get('type') == 'text':
+                                    text_parts.append(item.get('text', ''))
+                            message_dict = {"role": role, "content": ' '.join(text_parts)}
+                elif m.type not in ['human', 'ai', 'system', 'tool']:
+                    # Skip other unsupported message types for Deepseek
+                    continue
+                else:
+                    message_dict = {"role": role, "content": m.content}
+            else:
+                message_dict = {"role": role, "content": m.content}
 
             # Handle tool calls for AI messages
             tool_calls = getattr(m, "tool_calls", None)

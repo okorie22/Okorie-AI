@@ -620,8 +620,12 @@ class FundingAgent(BaseAgent):
             print(f"❌ Error saving to history: {str(e)}")
             traceback.print_exc()
 
-    def run_monitoring_cycle(self):
-        """Run one monitoring cycle - collect, save, analyze, and alert"""
+    def run_monitoring_cycle(self, reporter=None):
+        """Run one monitoring cycle - collect, save, analyze, and alert
+        
+        Args:
+            reporter: Optional AgentReporter for dashboard integration
+        """
         try:
             print("\n" + "="*80)
             print(f"💰 Funding Rate Monitoring Cycle - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -679,7 +683,9 @@ class FundingAgent(BaseAgent):
                 
                 print(f"\n📊 Alert Summary: {extreme_count} extreme, {mid_count} mid-range, {normal_count} normal")
             
-            # Step 5: Display funding rate table
+            # Step 5: Display funding rate table and prepare dashboard data
+            symbols_data = {}
+            
             print("\n" + "╔" + "═" * 70 + "╗")
             print("║" + " "*20 + "💰 Funding Rates Dashboard" + " "*24 + "║")
             print("╠" + "═" * 70 + "╣")
@@ -694,6 +700,13 @@ class FundingAgent(BaseAgent):
                 if annual_rate < NEGATIVE_THRESHOLD or annual_rate > POSITIVE_THRESHOLD:
                     alert_level = "EXTREME 🚨"
                     status = "AI Analyzed"
+                    # Report extreme alerts to dashboard
+                    if reporter:
+                        reporter.report_alert(
+                            f"{symbol} funding rate: {annual_rate:.2f}% (EXTREME)",
+                            level='ALERT',
+                            alert_data={'symbol': symbol, 'rate': annual_rate}
+                        )
                 elif annual_rate < MID_NEGATIVE_THRESHOLD or annual_rate > MID_POSITIVE_THRESHOLD:
                     alert_level = "MID-RANGE⚠️"
                     status = "Monitoring"
@@ -701,9 +714,20 @@ class FundingAgent(BaseAgent):
                     alert_level = "NORMAL ✓"
                     status = "Collecting"
                 
+                # Add to symbols data for dashboard (only show key symbols)
+                if symbol in ['BTC', 'ETH', 'SOL']:
+                    symbols_data[symbol] = f"{annual_rate:.2f}%"
+                
                 print(f"║  {symbol:<8} │  {annual_rate:>8.2f}%  │  {alert_level:<12} │  {status:<14} ║")
             
             print("╚" + "═" * 70 + "╝")
+            
+            # Report cycle completion to dashboard
+            if reporter:
+                reporter.report_cycle_complete(
+                    metrics={'symbols_count': len(current_data)},
+                    symbols=symbols_data
+                )
             
             print(f"\n✅ Monitoring cycle completed successfully")
             

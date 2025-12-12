@@ -454,6 +454,53 @@ if __name__ == "__main__":
     except Exception as e:
         log_exception(e)
 
+def setup_file_logging(log_file_path: str):
+    """
+    Redirect stdout/stderr to log file for agent isolation
+    Used by anomaly launcher to send agent output to individual log files
+    
+    Args:
+        log_file_path: Path to log file (e.g., 'logs/oi_agent.log')
+    
+    Returns:
+        Tuple of (original_stdout, original_stderr, log_file)
+    """
+    from pathlib import Path
+    
+    # Create logs directory
+    log_path = Path(log_file_path)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Save original streams
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    
+    # Open log file in append mode with line buffering
+    log_file = open(log_file_path, 'a', buffering=1, encoding='utf-8')
+    
+    # Redirect stdout and stderr
+    sys.stdout = log_file
+    sys.stderr = log_file
+    
+    return original_stdout, original_stderr, log_file
+
+
+def restore_logging(original_stdout, original_stderr, log_file):
+    """
+    Restore original stdout/stderr and close log file
+    
+    Args:
+        original_stdout: Original stdout stream
+        original_stderr: Original stderr stream  
+        log_file: Log file to close
+    """
+    sys.stdout = original_stdout
+    sys.stderr = original_stderr
+    
+    if log_file and not log_file.closed:
+        log_file.close()
+
+
 # Suppress urllib3 connection warnings to log files only
 urllib3_logger = logging.getLogger("urllib3.connectionpool")
 urllib3_logger.setLevel(logging.ERROR)

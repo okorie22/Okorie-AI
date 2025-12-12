@@ -160,5 +160,59 @@
       "on_track": false
     },
     "recent_decisions": 0
+  },
+  {
+    "timestamp": "2025-12-10T15:04:13.536961",
+    "personality_mode": "BALANCED",
+    "overall_health_score": 4.462387174208333,
+    "goal_progress": {
+      "goal_percent": 30.0,
+      "current_monthly_pnl_percent": 0.0,
+      "current_monthly_pnl_usd": 0.0,
+      "progress_percent": 0.0,
+      "gap_percent": 30.0,
+      "gap_usd": 300.0,
+      "days_elapsed": 10,
+      "days_remaining": 20,
+      "required_daily_pnl_usd": 15.0,
+      "on_track": false
+    },
+    "recent_decisions": 0
+  },
+  {
+    "timestamp": "2025-12-11T22:40:08.856228",
+    "personality_mode": "BALANCED",
+    "overall_health_score": 14.540175796916667,
+    "goal_progress": {
+      "goal_percent": 30.0,
+      "current_monthly_pnl_percent": 0.0,
+      "current_monthly_pnl_usd": 0.0,
+      "progress_percent": 0.0,
+      "gap_percent": 30.0,
+      "gap_usd": 300.0,
+      "days_elapsed": 11,
+      "days_remaining": 19,
+      "required_daily_pnl_usd": 15.789473684210526,
+      "on_track": false
+    },
+    "recent_decisions": 0
+  },
+  {
+    "timestamp": "2025-12-11T22:59:41.402594",
+    "personality_mode": "BALANCED",
+    "overall_health_score": 14.244865204041666,
+    "goal_progress": {
+      "goal_percent": 30.0,
+      "current_monthly_pnl_percent": 0.0,
+      "current_monthly_pnl_usd": 0.0,
+      "progress_percent": 0.0,
+      "gap_percent": 30.0,
+      "gap_usd": 300.0,
+      "days_elapsed": 11,
+      "days_remaining": 19,
+      "required_daily_pnl_usd": 15.789473684210526,
+      "on_track": false
+    },
+    "recent_decisions": 0
   }
 ]

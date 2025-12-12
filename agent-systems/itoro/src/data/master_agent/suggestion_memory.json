@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "timestamp": "2025-12-11T22:40:08.845294",
+    "parameter": "PAPER_MAX_POSITION_SIZE",
+    "value": 75.0,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2025-12-11T22:59:41.383483",
+    "parameter": "WHALE_UPDATE_INTERVAL_HOURS",
+    "value": 12,
+    "category": "data"
+  }
+]

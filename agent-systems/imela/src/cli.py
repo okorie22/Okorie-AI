@@ -497,6 +497,17 @@ class ZerePyCLI:
             logger.info("No agent is currently loaded. Use 'load-agent' to load an agent.")
             return
 
+        # Auto-configure YouTube if not configured
+        if not self.agent.connection_manager.connections.get("youtube", {}).is_configured():
+            logger.info("\n🔧 YouTube not configured. Setting up automatically...")
+            try:
+                self.agent.connection_manager.configure_connection("youtube")
+                logger.info("✅ YouTube configured successfully!")
+            except Exception as e:
+                logger.warning(f"⚠️ YouTube auto-configuration failed: {e}")
+                logger.info("You can manually configure YouTube later with 'configure-connection youtube'")
+                logger.info("Continuing with available connections...")
+
         try:
             self.agent.loop()
         except KeyboardInterrupt:
