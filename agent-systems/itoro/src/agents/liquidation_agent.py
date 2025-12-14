@@ -14,7 +14,6 @@ import time
 from datetime import datetime, timedelta
 from termcolor import colored, cprint
 from dotenv import load_dotenv
-import openai
 from pathlib import Path
 
 # Add project root to Python path for direct script execution
@@ -24,6 +23,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src import nice_funcs as n
 from src import nice_funcs_hl as hl
 from src.agents.base_agent import BaseAgent
+from src.scripts.shared_services.redis_event_bus import get_event_bus
+from src.scripts.shared_services.alert_system import MarketAlert, AlertType, AlertSeverity
 import traceback
 import numpy as np
 import re
@@ -62,19 +63,17 @@ class LiquidationAgent(BaseAgent):
         print(f"   Max Tokens: {self.ai_max_tokens}")
                 
         load_dotenv()
-        
-        # Get DeepSeek API key
-        deepseek_key = os.getenv("DEEPSEEK_KEY")
-        
-        if not deepseek_key:
-            raise ValueError("🚨 DEEPSEEK_KEY not found in environment variables!")
-            
-        # Initialize DeepSeek client
-        self.ai_client = openai.OpenAI(
-            api_key=deepseek_key,
-            base_url="https://api.deepseek.com"
-        )
-        print("🚀 DeepSeek model initialized!")
+
+        # Initialize DeepSeek AI model via model factory
+        try:
+            from src.models.model_factory import model_factory
+            self.ai_model = model_factory.get_model('deepseek', 'deepseek-chat')
+            if self.ai_model and self.ai_model.is_available():
+                print("🚀 DeepSeek model initialized via model factory!")
+            else:
+                raise ValueError("DeepSeek model not available")
+        except ImportError as e:
+            raise ValueError(f"🚨 Model factory not available: {e}")
         
         # Initialize storage
         self.storage = LiquidationStorage()
@@ -85,8 +84,12 @@ class LiquidationAgent(BaseAgent):
         
         # Initialize tracking for previous values
         self.previous_values = {}
-        
+
+        # Initialize Redis event bus for alert publishing
+        self.event_bus = get_event_bus()
+
         print("🌊 Luna the Liquidation Agent initialized!")
+        print("🔄 Event bus connected for real-time alert publishing")
         print(f"🎯 Alerting on liquidation increases above +{self.threshold*100:.0f}% from previous")
         print(f"📊 Analyzing symbols: {', '.join(self.symbols)}")
         print(f"🌐 Monitoring exchanges: {', '.join(self.exchanges)}")
@@ -215,19 +218,14 @@ Consider the ratio of long vs short liquidations and their relative changes
 """
             
             print(f"\n🤖 Analyzing {symbol} liquidation spike with DeepSeek AI...")
-            
-            # Call DeepSeek API
-            response = self.ai_client.chat.completions.create(
-                model=self.ai_model,
-                messages=[
-                    {"role": "system", "content": "You are a liquidation analyst. You must respond in exactly 3 lines: BUY/SELL/NOTHING, reason, and confidence."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=self.ai_max_tokens,
+
+            # Call DeepSeek API via model factory
+            response_text = self.ai_model.generate_response(
+                system_prompt="You are a liquidation analyst. You must respond in exactly 3 lines: BUY/SELL/NOTHING, reason, and confidence.",
+                user_content=prompt,
                 temperature=self.ai_temperature,
-                stream=False
+                max_tokens=self.ai_max_tokens
             )
-            response_text = response.choices[0].message.content.strip()
             
             # Handle response
             if not response_text:
@@ -332,17 +330,46 @@ Consider the ratio of long vs short liquidations and their relative changes
                                 pct_change_longs = ((current_longs - previous_longs) / previous_longs) * 100
                                 pct_change_shorts = ((current_shorts - previous_shorts) / previous_shorts) * 100
                                 
-                                # Report alert to dashboard
-                                if reporter:
-                                    reporter.report_alert(
-                                        f"{symbol} liquidation spike: Longs {pct_change_longs:+.1f}%, Shorts {pct_change_shorts:+.1f}%",
-                                        level='ALERT',
-                                        alert_data={
-                                            'symbol': symbol,
-                                            'longs_change': pct_change_longs,
-                                            'shorts_change': pct_change_shorts
-                                        }
-                                    )
+                                # Publish alerts via Redis event bus
+                                # Determine severity based on magnitude
+                                total_change = abs(pct_change_longs) + abs(pct_change_shorts)
+                                if total_change > 100:  # Very large spike
+                                    severity = AlertSeverity.CRITICAL
+                                    confidence = min(total_change / 200, 0.95)
+                                elif total_change > 50:  # Significant spike
+                                    severity = AlertSeverity.HIGH
+                                    confidence = min(total_change / 150, 0.85)
+                                else:  # Moderate spike
+                                    severity = AlertSeverity.MEDIUM
+                                    confidence = min(total_change / 100, 0.75)
+
+                                alert = MarketAlert(
+                                    agent_source="liquidation_agent",
+                                    alert_type=AlertType.LIQUIDATION_SPIKE,
+                                    symbol=symbol,
+                                    severity=severity,
+                                    confidence=confidence,
+                                    data={
+                                        'total_liquidations': current_longs + current_shorts,
+                                        'long_liquidations': current_longs,
+                                        'short_liquidations': current_shorts,
+                                        'long_liquidations_pct': pct_change_longs,
+                                        'short_liquidations_pct': pct_change_shorts,
+                                        'total_change_pct': total_change,
+                                        'timeframe_minutes': self.comparison_window,
+                                        'threshold_triggered': self.threshold
+                                    },
+                                    timestamp=datetime.now(),
+                                    metadata={
+                                        'liquidation_analysis': True,
+                                        'market_impact': 'high' if total_change > 75 else 'medium',
+                                        'ai_analyzed': True
+                                    }
+                                )
+
+                                # Publish to event bus
+                                self.event_bus.publish('market_alert', alert.to_dict())
+                                print(f"🌊 Published liquidation alert for {symbol}: ${current_longs + current_shorts:,.0f} total liquidations")
                                 
                                 # Get AI analysis
                                 analysis = self._analyze_opportunity(

@@ -23,8 +23,9 @@ import requests
 from src.agents.base_agent import BaseAgent
 from src.scripts.oi.oi_storage import OIStorage
 from src.scripts.oi.oi_analytics import OIAnalytics
+from src.scripts.shared_services.redis_event_bus import get_event_bus
+from src.scripts.shared_services.alert_system import MarketAlert, AlertType, AlertSeverity
 import traceback
-import anthropic
 from typing import List, Dict, Optional
 
 # Import logger
@@ -120,16 +121,25 @@ class OIAgent(BaseAgent):
             warning("⚠️ Cloud database module not available")
         
         # Initialize AI client for insights if enabled
-        self.ai_client = None
+        self.ai_model = None
         if AI_INSIGHTS_ENABLED:
-            anthropic_key = os.getenv("ANTHROPIC_KEY")
-            if anthropic_key:
-                self.ai_client = anthropic.Anthropic(api_key=anthropic_key)
-                info("🤖 AI insights enabled")
-            else:
-                warning("⚠️ ANTHROPIC_KEY not found - AI insights disabled")
+            try:
+                from src.models.model_factory import model_factory
+                self.ai_model = model_factory.get_model('deepseek', 'deepseek-chat')
+                if self.ai_model and self.ai_model.is_available():
+                    info("🤖 AI insights enabled with DeepSeek")
+                else:
+                    warning("⚠️ DeepSeek model not available - AI insights disabled")
+                    self.ai_model = None
+            except ImportError as e:
+                warning(f"⚠️ Model factory not available: {e} - AI insights disabled")
+                self.ai_model = None
         
+        # Initialize Redis event bus for alert publishing
+        self.event_bus = get_event_bus()
+
         info(f"📊 OI Agent initialized - tracking {len(TRACKED_SYMBOLS)} symbols every {CHECK_INTERVAL_HOURS}h")
+        info("🔄 Event bus connected for real-time alert publishing")
 
     def get_funding_rates(self, symbol):
         """
@@ -297,19 +307,19 @@ class OIAgent(BaseAgent):
     def generate_ai_insights(self, analytics: List[Dict]) -> List[Dict]:
         """
         Generate AI insights from analytics data
-        
+
         Args:
             analytics: List of analytics records
-            
+
         Returns:
             List of insights with AI-generated interpretations
         """
         try:
-            if not self.ai_client or not analytics:
+            if not self.ai_model or not analytics:
                 return []
-            
+
             insights = []
-            
+
             for record in analytics[:5]:  # Limit to top 5 to save tokens
                 try:
                     # Prepare prompt
@@ -322,22 +332,16 @@ class OIAgent(BaseAgent):
                         liquidity_status=record.get('metadata', {}).get('liquidity_status', 'unknown')
                     )
 
-                    # Get AI analysis
-                    message = self.ai_client.messages.create(
-                        model=config.AI_MODEL if hasattr(config, 'AI_MODEL') else "claude-3-sonnet-20240229",
-                        max_tokens=150,
+                    # Get AI analysis using DeepSeek
+                    response = self.ai_model.generate_response(
+                        system_prompt="You are an expert cryptocurrency analyst. Provide concise, actionable insights about open interest changes.",
+                        user_content=prompt,
                         temperature=0.7,
-                        messages=[{
-                            "role": "user",
-                            "content": prompt
-                        }]
+                        max_tokens=150
                     )
 
-                    # Extract insight
-                    if isinstance(message.content, list):
-                        insight_text = message.content[0].text if message.content else ""
-                    else:
-                        insight_text = message.content
+                    # Extract insight text
+                    insight_text = response if isinstance(response, str) else str(response)
 
                     insights.append({
                         'symbol': record['symbol'],
@@ -349,10 +353,10 @@ class OIAgent(BaseAgent):
                 except Exception as e:
                     error(f"Failed to generate insight for {record.get('symbol')}: {str(e)}")
                     continue
-            
-            info(f"🤖 Generated {len(insights)} AI insights")
+
+            info(f"🤖 Generated {len(insights)} AI insights with DeepSeek")
             return insights
-            
+
         except Exception as e:
             error(f"Failed to generate AI insights: {str(e)}")
             return []
@@ -406,13 +410,41 @@ class OIAgent(BaseAgent):
                         oi_change = record['oi_change_pct']
                         symbols_data[symbol] = f"{oi_change:+.1f}%"
                         
-                        # Report alerts for significant changes
-                        if reporter and abs(oi_change) > 15:  # Threshold for alert
-                            reporter.report_alert(
-                                f"{symbol} OI change: {oi_change:+.1f}% (4h)",
-                                level='ALERT',
-                                alert_data={'symbol': symbol, 'change': oi_change}
+                        # Publish alerts for significant changes via Redis event bus
+                        if abs(oi_change) > 15:  # Threshold for alert
+                            # Determine severity based on magnitude
+                            if abs(oi_change) > 30:
+                                severity = AlertSeverity.CRITICAL
+                                confidence = min(abs(oi_change) / 100, 0.95)  # Scale confidence
+                            elif abs(oi_change) > 20:
+                                severity = AlertSeverity.HIGH
+                                confidence = min(abs(oi_change) / 80, 0.85)
+                            else:
+                                severity = AlertSeverity.MEDIUM
+                                confidence = min(abs(oi_change) / 60, 0.75)
+
+                            alert = MarketAlert(
+                                agent_source="oi_agent",
+                                alert_type=AlertType.OI_SIGNIFICANT_CHANGE,
+                                symbol=symbol,
+                                severity=severity,
+                                confidence=confidence,
+                                data={
+                                    'oi_change_pct': oi_change,
+                                    'timeframe': '4h',
+                                    'current_oi': record.get('current_oi', 0),
+                                    'analytics': record
+                                },
+                                timestamp=datetime.now(),
+                                metadata={
+                                    'threshold_triggered': 15,
+                                    'change_magnitude': abs(oi_change)
+                                }
                             )
+
+                            # Publish to event bus
+                            self.event_bus.publish('market_alert', alert.to_dict())
+                            info(f"🚨 Published OI alert for {symbol}: {oi_change:+.1f}% change")
                 
                 # Display sample analytics
                 if len(analytics) > 0:

@@ -9,9 +9,13 @@ Handles all LLM-based trading decisions
 
 # AI Model Configuration (via Model Factory)
 # Available types: 'groq', 'openai', 'claude', 'deepseek', 'xai', 'ollama'
-# xAI's Grok is great for trading! Fast reasoning at 2M context window
-AI_MODEL_TYPE = 'xai'  # Change to: groq, openai, claude, deepseek, xai, ollama
-AI_MODEL_NAME = None   # None = use default for model type, or specify model name
+# DeepSeek provides excellent reasoning for trading decisions
+AI_MODEL_TYPE = 'deepseek'  # Using DeepSeek for all AI trading decisions
+AI_MODEL_NAME = 'deepseek-chat'   # Fast chat model for trading
+
+# Available DeepSeek models:
+# - 'deepseek-chat' (default) - Fast chat model, good for trading
+# - 'deepseek-reasoner' - Enhanced reasoning capabilities
 
 # Available xAI models:
 # - 'grok-4-fast-reasoning' (default) - Best value! 2M context, cheap, fast
@@ -103,8 +107,9 @@ if project_root not in sys.path:
 # Local imports
 from src.config import *
 from src import nice_funcs as n
-from src.data.ohlcv_collector import collect_all_tokens
+from src.scripts.data_processing.ohlcv_collector import collect_all_tokens
 from src.models.model_factory import model_factory
+from src.scripts.shared_services.redis_event_bus import get_event_bus
 
 # Load environment variables
 load_dotenv()
@@ -124,8 +129,40 @@ class TradingAgent:
 
         cprint(f"✅ Using model: {self.model.model_name}", "green")
 
+        # Initialize Redis event bus
+        self.event_bus = get_event_bus()
+        self.strategy_signals = []  # Queue for strategy signals
+
+        # Subscribe to trading signals from strategy agent
+        self.event_bus.subscribe('trading_signal', self.handle_trading_signal)
+
         self.recommendations_df = pd.DataFrame(columns=['token', 'action', 'confidence', 'reasoning'])
+        cprint("🔄 Trading Agent connected to event bus for strategy signals", "cyan")
         cprint("🤖 Moon Dev's LLM Trading Agent initialized!", "green")
+
+    def handle_trading_signal(self, signal_data: dict):
+        """
+        Handle incoming trading signals from the strategy agent
+
+        Args:
+            signal_data: Trading signal from Redis event bus
+        """
+        try:
+            cprint(f"📡 Trading Agent received signal: {signal_data.get('symbol', 'UNKNOWN')} {signal_data.get('direction', 'UNKNOWN')}", "cyan")
+
+            # Add to strategy signals queue
+            self.strategy_signals.append(signal_data)
+
+            # Log signal details
+            confidence = signal_data.get('confidence', 0)
+            strategy = signal_data.get('strategy_type', 'unknown')
+            reasoning = signal_data.get('reasoning', 'No reasoning provided')
+
+            cprint(f"   🎯 Strategy: {strategy} | Confidence: {confidence:.1%}", "cyan")
+            cprint(f"   💭 Reasoning: {reasoning[:100]}{'...' if len(reasoning) > 100 else ''}", "cyan")
+
+        except Exception as e:
+            cprint(f"❌ Error handling trading signal: {e}", "red")
 
     def chat_with_ai(self, system_prompt, user_content):
         """Send prompt to AI model via model factory"""
@@ -281,69 +318,220 @@ Example format:
             return None
 
     def execute_allocations(self, allocation_dict):
-        """Execute the allocations using AI entry for each position"""
+        """Execute the allocations using spot or leverage trading"""
+        from src.config import USE_LEVERAGE_TRADING, LEVERAGE_EXCHANGE, LEVERAGE_SUPPORTED_ASSETS
+
         try:
             print("\n🚀 Moon Dev executing portfolio allocations...")
-            
+
+            # Determine trading mode
+            leverage_mode = USE_LEVERAGE_TRADING and LEVERAGE_EXCHANGE == 'hyperliquid'
+            if leverage_mode:
+                print("⚡ LEVERAGE MODE: Using Hyperliquid perpetual futures")
+            else:
+                print("🏪 SPOT MODE: Using traditional spot trading")
             for token, amount in allocation_dict.items():
                 # Skip USDC and other excluded tokens
                 if token in EXCLUDED_TOKENS:
                     print(f"💵 Keeping ${amount:.2f} in {token}")
                     continue
-                    
+
                 print(f"\n🎯 Processing allocation for {token}...")
-                
+
                 try:
-                    # Get current position value
-                    current_position = n.get_token_balance_usd(token)
-                    target_allocation = amount
-                    
-                    print(f"🎯 Target allocation: ${target_allocation:.2f} USD")
-                    print(f"📊 Current position: ${current_position:.2f} USD")
-                    
-                    if current_position < target_allocation:
-                        print(f"✨ Executing entry for {token}")
-                        n.ai_entry(token, amount)
-                        print(f"✅ Entry complete for {token}")
+                    # Check if token is supported for leverage trading
+                    token_symbol = self._get_token_symbol(token)
+                    is_leverage_supported = leverage_mode and token_symbol in LEVERAGE_SUPPORTED_ASSETS
+
+                    if is_leverage_supported:
+                        # LEVERAGE TRADING PATH
+                        print(f"⚡ Executing LEVERAGED trade for {token_symbol}")
+                        success = self._execute_leverage_trade(token, amount, 'BUY')
+                        if success:
+                            print(f"✅ Leveraged entry complete for {token_symbol}")
+                        else:
+                            print(f"❌ Leveraged entry failed for {token_symbol}")
                     else:
-                        print(f"⏸️ Position already at target size for {token}")
-                    
+                        # SPOT TRADING PATH (existing logic)
+                        current_position = n.get_token_balance_usd(token)
+                        target_allocation = amount
+
+                        print(f"🎯 Target allocation: ${target_allocation:.2f} USD")
+                        print(f"📊 Current position: ${current_position:.2f} USD")
+
+                        if current_position < target_allocation:
+                            print(f"✨ Executing SPOT entry for {token}")
+                            n.ai_entry(token, amount)
+                            print(f"✅ Spot entry complete for {token}")
+                        else:
+                            print(f"⏸️ Position already at target size for {token}")
+
                 except Exception as e:
                     print(f"❌ Error executing entry for {token}: {str(e)}")
-                
+
                 time.sleep(2)  # Small delay between entries
                 
         except Exception as e:
             print(f"❌ Error executing allocations: {str(e)}")
             print("🔧 Moon Dev suggests checking the logs and trying again!")
 
+    def _execute_leverage_trade(self, token_address: str, usd_amount: float, direction: str):
+        """
+        Execute a leveraged trade on Hyperliquid
+
+        Args:
+            token_address: Token contract address
+            usd_amount: Position size in USD
+            direction: 'BUY' or 'SELL'
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            from src import nice_funcs_hl as hl
+            from src.config import DEFAULT_LEVERAGE
+
+            # Use the high-level leverage entry function
+            result = hl.hyperliquid_leverage_entry(
+                token_address=token_address,
+                direction=direction,
+                confidence=0.8,  # High confidence for AI-driven trades
+                usd_size=usd_amount
+            )
+
+            return result is not None and result.get('success', False)
+
+        except Exception as e:
+            print(f"❌ Leverage trade execution failed: {str(e)}")
+            return False
+
+    def _get_token_symbol(self, token_address: str):
+        """
+        Convert token address to symbol for leverage trading
+
+        Args:
+            token_address: Token contract address
+
+        Returns:
+            str: Token symbol
+        """
+        # Common token mappings (expand as needed)
+        token_map = {
+            'So11111111111111111111111111111111111111111': 'SOL',
+            'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 'USDC',
+            '9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump': 'BONK',
+            '67mTTGnVRunoSLGitgRGK2FJp5cT1KschjzWH9zKc3r': 'WIF',
+            'C94njgTrKMQBmgqe23EGLrtPgfvcjWtqBBvGQ7Cjiank': 'WIF',
+            '67mTTGnVRunoSLGitgRGK2FJp5cT1KschjzWH9zKc3r': 'BONK',
+            '9YnfbEaXPaPmoXnKZFmNH8hzcLyjbRf56MQP7oqGpump': 'PUMP'
+        }
+
+        return token_map.get(token_address, token_address[:4].upper())
+
+    def _get_leverage_position_value(self, token_symbol: str):
+        """
+        Get the current leveraged position value for a token
+
+        Args:
+            token_symbol: Token symbol (e.g., 'BTC', 'ETH')
+
+        Returns:
+            float: Position value in USD
+        """
+        try:
+            from src import nice_funcs_hl as hl
+
+            # Get position from Hyperliquid
+            position = hl.get_hyperliquid_position(f"{token_symbol}PERP")
+
+            if position and position.get('size', 0) != 0:
+                # Calculate position value (simplified)
+                # In reality, you'd get the mark price and calculate properly
+                size = abs(position['size'])
+                entry_price = position.get('entry_price', 0)
+                return size * entry_price
+            else:
+                return 0
+
+        except Exception as e:
+            print(f"❌ Error getting leverage position for {token_symbol}: {str(e)}")
+            return 0
+
+    def _execute_leverage_exit(self, token_symbol: str, percentage: float = 100.0):
+        """
+        Execute a leveraged position exit
+
+        Args:
+            token_symbol: Token symbol to exit
+            percentage: Percentage of position to close (0-100)
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            from src import nice_funcs_hl as hl
+
+            # Close position using Hyperliquid
+            result = hl.hyperliquid_close_position(token_symbol, percentage)
+
+            return result is not None and result.get('success', False)
+
+        except Exception as e:
+            print(f"❌ Leverage exit failed for {token_symbol}: {str(e)}")
+            return False
+
     def handle_exits(self):
         """Check and exit positions based on SELL or NOTHING recommendations"""
+        from src.config import USE_LEVERAGE_TRADING, LEVERAGE_EXCHANGE, LEVERAGE_SUPPORTED_ASSETS
+
         cprint("\n🔄 Checking for positions to exit...", "white", "on_blue")
-        
+
+        # Determine trading mode
+        leverage_mode = USE_LEVERAGE_TRADING and LEVERAGE_EXCHANGE == 'hyperliquid'
+
         for _, row in self.recommendations_df.iterrows():
             token = row['token']
-            
+
             # Skip excluded tokens (USDC and SOL)
             if token in EXCLUDED_TOKENS:
                 continue
-                
+
             action = row['action']
-            
-            # Check if we have a position
-            current_position = n.get_token_balance_usd(token)
-            
+            token_symbol = self._get_token_symbol(token)
+            is_leverage_supported = leverage_mode and token_symbol in LEVERAGE_SUPPORTED_ASSETS
+
+            # Check if we have a position (different logic for spot vs leverage)
+            if is_leverage_supported:
+                # LEVERAGE POSITION CHECK
+                current_position = self._get_leverage_position_value(token_symbol)
+                position_type = "leveraged"
+            else:
+                # SPOT POSITION CHECK
+                current_position = n.get_token_balance_usd(token)
+                position_type = "spot"
+
             if current_position > 0 and action in ["SELL", "NOTHING"]:
                 cprint(f"\n🚫 AI Agent recommends {action} for {token}", "white", "on_yellow")
-                cprint(f"💰 Current position: ${current_position:.2f}", "white", "on_blue")
+                cprint(f"💰 Current {position_type} position: ${current_position:.2f}", "white", "on_blue")
+
                 try:
-                    cprint(f"📉 Closing position with chunk_kill...", "white", "on_cyan")
-                    n.chunk_kill(token, max_usd_order_size, slippage)
-                    cprint(f"✅ Successfully closed position", "white", "on_green")
+                    if is_leverage_supported:
+                        # LEVERAGE EXIT
+                        cprint(f"📉 Closing LEVERAGED position...", "white", "on_cyan")
+                        success = self._execute_leverage_exit(token_symbol)
+                        if success:
+                            cprint(f"✅ Successfully closed leveraged position", "white", "on_green")
+                        else:
+                            cprint(f"❌ Failed to close leveraged position", "white", "on_red")
+                    else:
+                        # SPOT EXIT
+                        cprint(f"📉 Closing SPOT position with chunk_kill...", "white", "on_cyan")
+                        n.chunk_kill(token, max_usd_order_size, slippage)
+                        cprint(f"✅ Successfully closed spot position", "white", "on_green")
                 except Exception as e:
-                    cprint(f"❌ Error closing position: {str(e)}", "white", "on_red")
+                    cprint(f"❌ Error closing {position_type} position: {str(e)}", "white", "on_red")
             elif current_position > 0:
-                cprint(f"✨ Keeping position for {token} (${current_position:.2f}) - AI recommends {action}", "white", "on_blue")
+                cprint(f"✨ Keeping {position_type} position for {token} (${current_position:.2f}) - AI recommends {action}", "white", "on_blue")
 
     def parse_allocation_response(self, response):
         """Parse the AI's allocation response and handle both string and TextBlock formats"""
@@ -442,15 +630,38 @@ Example format:
             cprint("📊 Collecting market data...", "white", "on_blue")
             market_data = collect_all_tokens()
             
+            # Get strategy signals received from event bus
+            current_strategy_signals = self.strategy_signals.copy()
+            self.strategy_signals.clear()  # Clear after processing
+
+            # Group strategy signals by token
+            strategy_signals_by_token = {}
+            for signal in current_strategy_signals:
+                token = signal.get('symbol', 'UNKNOWN')
+                if token not in strategy_signals_by_token:
+                    strategy_signals_by_token[token] = []
+                strategy_signals_by_token[token].append(signal)
+
+            if current_strategy_signals:
+                cprint(f"🎯 Processing {len(current_strategy_signals)} strategy signals from event bus", "cyan")
+
             # Analyze each token's data
             for token, data in market_data.items():
                 cprint(f"\n🤖 AI Agent Analyzing Token: {token}", "white", "on_green")
-                
-                # Include strategy signals in analysis if available
-                if strategy_signals and token in strategy_signals:
-                    cprint(f"📊 Including {len(strategy_signals[token])} strategy signals in analysis", "cyan")
-                    data['strategy_signals'] = strategy_signals[token]
-                
+
+                # Include strategy signals for this token if available
+                if token in strategy_signals_by_token:
+                    signals_for_token = strategy_signals_by_token[token]
+                    cprint(f"📊 Including {len(signals_for_token)} strategy signals in analysis", "cyan")
+                    data['strategy_signals'] = signals_for_token
+
+                    # Log strategy signals
+                    for signal in signals_for_token:
+                        direction = signal.get('direction', 'UNKNOWN')
+                        confidence = signal.get('confidence', 0)
+                        strategy = signal.get('strategy_type', 'unknown')
+                        cprint(f"   🎯 {strategy}: {direction} ({confidence:.1%} confidence)", "cyan")
+
                 analysis = self.analyze_market_data(token, data)
                 print(f"\n📈 Analysis for contract: {token}")
                 print(analysis)

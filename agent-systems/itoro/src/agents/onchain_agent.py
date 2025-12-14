@@ -20,6 +20,8 @@ sys.path.insert(0, str(project_root))
 
 from src.agents.base_agent import BaseAgent
 from src.scripts.shared_services.logger import debug, info, warning, error
+from src.scripts.shared_services.redis_event_bus import get_event_bus
+from src.scripts.shared_services.alert_system import MarketAlert, AlertType, AlertSeverity
 from src.config import (
     TOKEN_ONCHAIN_ENABLED,
     TOKEN_ONCHAIN_DATA_FILE,
@@ -72,11 +74,15 @@ class OnChainAgent(BaseAgent):
         
         # Data structures
         self.onchain_data = {}
-        
+
+        # Initialize Redis event bus for alert publishing
+        self.event_bus = get_event_bus()
+
         # Register singleton
         set_onchain_agent(self)
-        
+
         info("\033[0;34m🔗 OnChain Agent initialized\033[0m")
+        info("\033[0;34m🔄 Event bus connected for real-time alert publishing\033[0m")
     
     def run_single_cycle(self) -> bool:
         """Execute a single data collection cycle"""
@@ -145,7 +151,10 @@ class OnChainAgent(BaseAgent):
             
             elapsed = time.time() - start_time
             info(f"\033[0;34m✅ On-chain collection completed in {elapsed:.2f}s ({len(results)} tokens)\033[0m")
-            
+
+            # Generate alerts based on collected data
+            self._generate_onchain_alerts(results)
+
             self.last_update = datetime.now()
             return True
             
@@ -154,7 +163,145 @@ class OnChainAgent(BaseAgent):
             import traceback
             error(traceback.format_exc())
             return False
-    
+
+    def _generate_onchain_alerts(self, token_results: List[Dict]):
+        """Generate alerts based on on-chain data analysis"""
+        try:
+            info("\033[0;34m🔍 Analyzing on-chain data for alerts...\033[0m")
+
+            alerts_generated = 0
+
+            for token_data in token_results:
+                token_address = token_data.get('token_address')
+                symbol = token_data.get('symbol', token_address[:8] + '...')
+
+                # Check for whale concentration alerts
+                whale_pct = token_data.get('whale_concentration', 0)
+                if whale_pct > TOKEN_ONCHAIN_WHALE_CONCENTRATION_HIGH:
+                    alert = MarketAlert(
+                        agent_source="onchain_agent",
+                        alert_type=AlertType.WHALE_CONCENTRATION,
+                        symbol=symbol,
+                        severity=AlertSeverity.HIGH,
+                        confidence=min(whale_pct / 50, 0.9),  # Scale confidence by whale %
+                        data={
+                            'whale_concentration': whale_pct,
+                            'top_10_holders_pct': whale_pct,
+                            'total_holders': token_data.get('holder_count', 0),
+                            'concentration_level': 'high' if whale_pct > 40 else 'moderate'
+                        },
+                        timestamp=datetime.now(),
+                        metadata={
+                            'onchain_metric': 'whale_concentration',
+                            'alert_trigger': f'whale_pct_{whale_pct:.1f}',
+                            'risk_level': 'high' if whale_pct > 40 else 'medium'
+                        }
+                    )
+                    self.event_bus.publish('market_alert', alert.to_dict())
+                    alerts_generated += 1
+                    info(f"🐋 Published whale concentration alert for {symbol}: {whale_pct:.1f}%")
+
+                # Check for liquidity change alerts
+                liquidity_change_pct = token_data.get('liquidity_change_pct', 0)
+                if abs(liquidity_change_pct) > 25:  # 25% change threshold
+                    severity = AlertSeverity.CRITICAL if abs(liquidity_change_pct) > 50 else AlertSeverity.HIGH
+                    confidence = min(abs(liquidity_change_pct) / 100, 0.9)
+
+                    alert = MarketAlert(
+                        agent_source="onchain_agent",
+                        alert_type=AlertType.LIQUIDITY_CHANGE,
+                        symbol=symbol,
+                        severity=severity,
+                        confidence=confidence,
+                        data={
+                            'liquidity_change_pct': liquidity_change_pct,
+                            'current_liquidity_usd': token_data.get('liquidity_usd', 0),
+                            'direction': 'increase' if liquidity_change_pct > 0 else 'decrease',
+                            'magnitude': 'large' if abs(liquidity_change_pct) > 50 else 'moderate'
+                        },
+                        timestamp=datetime.now(),
+                        metadata={
+                            'onchain_metric': 'liquidity_change',
+                            'alert_trigger': f'liquidity_change_{liquidity_change_pct:+.1f}%',
+                            'impact': 'high' if abs(liquidity_change_pct) > 50 else 'medium'
+                        }
+                    )
+                    self.event_bus.publish('market_alert', alert.to_dict())
+                    alerts_generated += 1
+                    info(f"💧 Published liquidity change alert for {symbol}: {liquidity_change_pct:+.1f}%")
+
+                # Check for holder growth alerts
+                holder_change_pct = token_data.get('holder_change_pct', 0)
+                if abs(holder_change_pct) > 15:  # 15% change threshold
+                    severity = AlertSeverity.HIGH if abs(holder_change_pct) > 25 else AlertSeverity.MEDIUM
+                    confidence = min(abs(holder_change_pct) / 50, 0.85)
+
+                    alert = MarketAlert(
+                        agent_source="onchain_agent",
+                        alert_type=AlertType.HOLDER_GROWTH,
+                        symbol=symbol,
+                        severity=severity,
+                        confidence=confidence,
+                        data={
+                            'holder_change_pct': holder_change_pct,
+                            'current_holders': token_data.get('holder_count', 0),
+                            'holder_change_count': token_data.get('holder_change_count', 0),
+                            'growth_type': 'expansion' if holder_change_pct > 0 else 'contraction'
+                        },
+                        timestamp=datetime.now(),
+                        metadata={
+                            'onchain_metric': 'holder_growth',
+                            'alert_trigger': f'holder_change_{holder_change_pct:+.1f}%',
+                            'momentum': 'strong' if abs(holder_change_pct) > 25 else 'moderate'
+                        }
+                    )
+                    self.event_bus.publish('market_alert', alert.to_dict())
+                    alerts_generated += 1
+                    info(f"👥 Published holder growth alert for {symbol}: {holder_change_pct:+.1f}%")
+
+                # Check for on-chain activity trend alerts
+                trend_signal = token_data.get('trend_signal')
+                volume_24h = token_data.get('volume_24h', 0)
+                tx_count_24h = token_data.get('tx_count_24h', 0)
+
+                # Only alert for significant activity trends
+                if trend_signal in ['GROWING', 'SHRINKING'] and (volume_24h > 100000 or tx_count_24h > 100):
+                    severity = AlertSeverity.MEDIUM
+                    confidence = 0.7  # On-chain trends are moderately reliable
+
+                    alert = MarketAlert(
+                        agent_source="onchain_agent",
+                        alert_type=AlertType.ONCHAIN_ACTIVITY,
+                        symbol=symbol,
+                        severity=severity,
+                        confidence=confidence,
+                        data={
+                            'trend_signal': trend_signal,
+                            'volume_24h': volume_24h,
+                            'tx_count_24h': tx_count_24h,
+                            'holder_count': token_data.get('holder_count', 0),
+                            'liquidity_usd': token_data.get('liquidity_usd', 0),
+                            'activity_level': 'high' if volume_24h > 500000 else 'moderate'
+                        },
+                        timestamp=datetime.now(),
+                        metadata={
+                            'onchain_metric': 'activity_trend',
+                            'alert_trigger': f'trend_{trend_signal.lower()}_volume_{volume_24h:,.0f}',
+                            'trend_direction': trend_signal.lower(),
+                            'activity_score': min(volume_24h / 1000000, 1.0)  # 0-1 activity score
+                        }
+                    )
+                    self.event_bus.publish('market_alert', alert.to_dict())
+                    alerts_generated += 1
+                    info(f"📈 Published on-chain activity alert for {symbol}: {trend_signal}")
+
+            info(f"\033[0;34m🚨 Generated {alerts_generated} on-chain alerts\033[0m")
+
+        except Exception as e:
+            error(f"Error generating on-chain alerts: {e}")
+            import traceback
+            error(traceback.format_exc())
+
     def _fetch_token_data(self, token_address: str) -> Optional[Dict]:
         """Fetch on-chain data for a single token with change detection"""
         try:
@@ -221,6 +368,25 @@ class OnChainAgent(BaseAgent):
             if self.include_whale_data:
                 whale_distribution = self._fetch_whale_distribution(token_address)
             
+            # Calculate whale concentration from holder distribution
+            whale_concentration = 0.0
+            if whale_distribution and isinstance(whale_distribution, dict):
+                # Calculate percentage held by top holders
+                total_supply = whale_distribution.get('total_supply', 0)
+                if total_supply > 0:
+                    top_holders_balance = sum(
+                        holder.get('balance', 0)
+                        for holder in whale_distribution.get('top_holders', [])[:10]  # Top 10 holders
+                    )
+                    whale_concentration = (top_holders_balance / total_supply) * 100
+
+            # Calculate liquidity change percentage
+            liquidity_change_pct = 0.0
+            if historical_data and len(historical_data) > 0:
+                prev_liquidity = historical_data[-1].get('liquidity_usd', 0)
+                if prev_liquidity > 0:
+                    liquidity_change_pct = ((liquidity_usd - prev_liquidity) / prev_liquidity) * 100
+
             # Compile token data
             token_data = {
                 'holder_count': holder_count,
@@ -228,9 +394,11 @@ class OnChainAgent(BaseAgent):
                 'holder_change_pct': holder_change_pct,
                 'tx_count_24h': tx_count_24h,
                 'liquidity_usd': liquidity_usd,
+                'liquidity_change_pct': liquidity_change_pct,
                 'volume_24h': volume_24h,
                 'price_change_24h': price_change_24h,
                 'trend_signal': trend_signal,
+                'whale_concentration': whale_concentration,
                 'holder_distribution': whale_distribution,
                 'timestamp': datetime.now().isoformat()
             }

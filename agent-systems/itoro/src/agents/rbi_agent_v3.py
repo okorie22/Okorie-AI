@@ -74,31 +74,30 @@ except ImportError as e:
 
 # Model Configurations
 # You can switch between "deepseek", "xai", "openai", "claude", "groq", etc.
-# Available xAI models: grok-4-fast-reasoning (best value!), grok-4-0709, grok-4-fast-non-reasoning,
-#                       grok-3, grok-3-mini, grok-code-fast-1
+# Now using DeepSeek for all AI operations - excellent reasoning capabilities!
 RESEARCH_CONFIG = {
-    "type": "xai",  # Using Grok 4 Fast Reasoning (2M context, cheap!)
-    "name": "grok-4-fast-reasoning"
+    "type": "deepseek",  # Using DeepSeek for research and idea generation
+    "name": "deepseek-chat"
 }
 
 BACKTEST_CONFIG = {
-    "type": "xai",  # Using Grok 4 Fast Reasoning for backtest coding
-    "name": "grok-4-fast-reasoning"
+    "type": "deepseek",  # Using DeepSeek for backtest coding
+    "name": "deepseek-chat"
 }
 
 DEBUG_CONFIG = {
-    "type": "xai",  # Using Grok 4 Fast Reasoning for debugging
-    "name": "grok-4-fast-reasoning"
+    "type": "deepseek",  # Using DeepSeek for debugging
+    "name": "deepseek-chat"
 }
 
 PACKAGE_CONFIG = {
-    "type": "xai",  # Using Grok 4 Fast Reasoning for package checking
-    "name": "grok-4-fast-reasoning"
+    "type": "deepseek",  # Using DeepSeek for package checking
+    "name": "deepseek-chat"
 }
 
 OPTIMIZE_CONFIG = {
-    "type": "xai",  # Using Grok 4 Fast Reasoning for optimization
-    "name": "grok-4-fast-reasoning"
+    "type": "deepseek",  # Using DeepSeek for strategy optimization
+    "name": "deepseek-chat"
 }
 
 # 🎯🎯🎯 PROFIT TARGET CONFIGURATION 🎯🎯🎯

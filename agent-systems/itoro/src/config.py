@@ -50,6 +50,47 @@ PARTIAL_SELL_MIN_THRESHOLD = 0.10  # Minimum 10% to be considered partial
 FULL_SELL_THRESHOLD = 0.95  # 95%+ considered full sell
 
 # =============================================================================
+# 🚀 LEVERAGE TRADING CONFIGURATION
+# =============================================================================
+
+# Leverage Trading Mode
+USE_LEVERAGE_TRADING = False  # Set to True for perpetual futures trading
+LEVERAGE_EXCHANGE = 'hyperliquid'  # 'hyperliquid', 'jupiter', 'none'
+
+# Leverage Settings
+DEFAULT_LEVERAGE = 5  # Default leverage multiplier (5x)
+MAX_LEVERAGE = 10  # Maximum allowed leverage (safety limit)
+MIN_LEVERAGE = 1  # Minimum leverage (1x = spot)
+
+# Leverage Risk Management
+LEVERAGE_MAX_POSITION_SIZE = 0.25  # Max 25% of equity per position (leverage adjusted)
+LEVERAGE_STOP_LOSS_MULTIPLIER = 0.5  # Tighter stops for leverage (0.5% vs 2% spot)
+LEVERAGE_TAKE_PROFIT_MULTIPLIER = 1.5  # Wider targets for leverage (1.5x normal)
+
+# Hyperliquid Specific Settings
+HYPERLIQUID_WALLET_ADDRESS = os.getenv('HYPERLIQUID_WALLET_ADDRESS')
+HYPERLIQUID_PRIVATE_KEY = os.getenv('HYPERLIQUID_PRIVATE_KEY')
+HYPERLIQUID_VAULT_ADDRESS = os.getenv('HYPERLIQUID_VAULT_ADDRESS')  # Optional vault
+HYPERLIQUID_TESTNET = True  # Set to False for mainnet trading
+
+# Leverage Trading Pairs (Hyperliquid supported assets)
+LEVERAGE_SUPPORTED_ASSETS = [
+    'BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'AVAX', 'MATIC',
+    'DOT', 'LINK', 'UNI', 'AAVE', 'SUSHI', 'COMP', 'NEAR', 'WIF'
+]
+
+# Leverage Position Management
+LEVERAGE_MAX_OPEN_POSITIONS = 5  # Maximum concurrent leveraged positions
+LEVERAGE_POSITION_TIMEOUT_HOURS = 24  # Auto-close positions after 24 hours
+LEVERAGE_TRAILING_STOP_ENABLED = True  # Enable trailing stops for profits
+LEVERAGE_TRAILING_STOP_PERCENT = 0.5  # 0.5% trailing stop
+
+# Leverage Fee Settings
+LEVERAGE_MAKER_FEE = 0.0002  # 0.02% maker fee
+LEVERAGE_TAKER_FEE = 0.0005  # 0.05% taker fee
+LEVERAGE_FUNDING_RATE_BUFFER = 0.0001  # 0.01% buffer for funding costs
+
+# =============================================================================
 # 🔊 LOGGING CONFIGURATION
 # =============================================================================
 

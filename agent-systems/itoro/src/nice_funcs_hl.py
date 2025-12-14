@@ -503,12 +503,286 @@ if __name__ == "__main__":
                 
         except Exception as e:
             error(f"Error in BTC test: {str(e)}")
-    
+
+# =============================================================================
+# 🚀 HYPERLIQUID LEVERAGE TRADING FUNCTIONS
+# =============================================================================
+
+def hyperliquid_perp_entry(symbol: str, side: str, size_usd: float, leverage: int = 5, reduce_only: bool = False):
+    """
+    Enter a Hyperliquid perpetual position
+
+    Args:
+        symbol: Trading pair (e.g., 'BTC', 'ETH', 'SOL')
+        side: 'buy' for long, 'sell' for short
+        size_usd: Position size in USD
+        leverage: Leverage multiplier (1-50)
+        reduce_only: If True, only reduce existing position
+
+    Returns:
+        dict: Order response
+    """
+    from src.config import HYPERLIQUID_WALLET_ADDRESS, HYPERLIQUID_PRIVATE_KEY, HYPERLIQUID_TESTNET
+
+    if not HYPERLIQUID_WALLET_ADDRESS or not HYPERLIQUID_PRIVATE_KEY:
+        error("Hyperliquid wallet credentials not configured")
+        return None
+
+    try:
+        # Convert symbol to Hyperliquid format (add 'PERP-' prefix if needed)
+        if not symbol.endswith('PERP'):
+            symbol = f"{symbol}PERP"
+
+        # Calculate position size in base asset
+        # This is simplified - in reality you'd need current price
+        price = get_current_price(symbol.replace('PERP', ''))
+        if not price:
+            error(f"Could not get price for {symbol}")
+            return None
+
+        size_base = size_usd / price
+
+        order = {
+            "type": "order",
+            "orders": [{
+                "coin": symbol,
+                "side": side.upper(),
+                "sz": size_base,
+                "limit_px": price,  # Market order approximation
+                "order_type": {"limit": {"tif": "Ioc"}},  # Immediate or Cancel
+                "reduce_only": reduce_only
+            }],
+            "grouping": "na"
+        }
+
+        # Sign and submit order (simplified - would need actual Hyperliquid SDK)
+        # This is a placeholder for the actual implementation
+        info(f"Hyperliquid {side.upper()} order: {symbol} {size_usd} USD @ {leverage}x leverage")
+
+        # TODO: Implement actual Hyperliquid API order submission
+        # response = submit_hyperliquid_order(order, HYPERLIQUID_PRIVATE_KEY)
+
+        return {
+            'success': True,
+            'symbol': symbol,
+            'side': side,
+            'size_usd': size_usd,
+            'leverage': leverage,
+            'status': 'simulated'  # Remove when implementing real orders
+        }
+
+    except Exception as e:
+        error(f"Hyperliquid perp entry failed: {str(e)}")
+        return None
+
+def hyperliquid_close_position(symbol: str, percentage: float = 100.0):
+    """
+    Close a Hyperliquid perpetual position
+
+    Args:
+        symbol: Trading pair (e.g., 'BTC', 'ETH', 'SOL')
+        percentage: Percentage of position to close (0-100)
+
+    Returns:
+        dict: Order response
+    """
+    try:
+        # Convert symbol to Hyperliquid format
+        if not symbol.endswith('PERP'):
+            symbol = f"{symbol}PERP"
+
+        # Get current position
+        position = get_hyperliquid_position(symbol)
+        if not position or position['size'] == 0:
+            info(f"No open position for {symbol}")
+            return None
+
+        # Calculate close size
+        close_size = abs(position['size']) * (percentage / 100.0)
+
+        # Determine close side (opposite of position)
+        close_side = 'sell' if position['size'] > 0 else 'buy'
+
+        order = {
+            "type": "order",
+            "orders": [{
+                "coin": symbol,
+                "side": close_side.upper(),
+                "sz": close_size,
+                "limit_px": get_current_price(symbol.replace('PERP', '')),  # Market approximation
+                "order_type": {"limit": {"tif": "Ioc"}},
+                "reduce_only": True
+            }],
+            "grouping": "na"
+        }
+
+        info(f"Hyperliquid close order: {symbol} {percentage}% position")
+
+        # TODO: Implement actual order submission
+        return {
+            'success': True,
+            'symbol': symbol,
+            'action': 'close',
+            'percentage': percentage,
+            'status': 'simulated'
+        }
+
+    except Exception as e:
+        error(f"Hyperliquid close position failed: {str(e)}")
+        return None
+
+def get_hyperliquid_position(symbol: str):
+    """
+    Get current position for a symbol
+
+    Args:
+        symbol: Trading pair
+
+    Returns:
+        dict: Position info or None
+    """
+    # TODO: Implement actual position query from Hyperliquid API
+    # This is a placeholder
+    return {
+        'symbol': symbol,
+        'size': 0,  # Positive = long, negative = short
+        'entry_price': 0,
+        'unrealized_pnl': 0
+    }
+
+def get_hyperliquid_balance():
+    """
+    Get Hyperliquid account balance
+
+    Returns:
+        dict: Balance information
+    """
+    # TODO: Implement actual balance query
+    return {
+        'total_equity': 0,
+        'available_balance': 0,
+        'margin_used': 0
+    }
+
+def get_current_price(symbol: str):
+    """
+    Get current price for a symbol
+
+    Args:
+        symbol: Trading pair
+
+    Returns:
+        float: Current price or None
+    """
+    try:
+        # Try to get from Hyperliquid API
+        response = requests.post(BASE_URL, json={
+            "type": "allMids"
+        })
+
+        if response.status_code == 200:
+            data = response.json()
+            # Find the symbol in the response
+            for coin, price in data.items():
+                if coin.replace('PERP', '') == symbol:
+                    return float(price)
+
+        # Fallback to local data
+        return None
+
+    except Exception as e:
+        error(f"Failed to get price for {symbol}: {str(e)}")
+        return None
+
+def calculate_position_size(balance: float, risk_percent: float, leverage: int, stop_loss_percent: float):
+    """
+    Calculate safe position size for leveraged trading
+
+    Args:
+        balance: Account balance in USD
+        risk_percent: Risk per trade (0.01 = 1%)
+        leverage: Leverage multiplier
+        stop_loss_percent: Stop loss percentage
+
+    Returns:
+        float: Position size in USD
+    """
+    # Risk amount = balance * risk_percent
+    risk_amount = balance * risk_percent
+
+    # Effective risk per 1% move = risk_amount / (stop_loss_percent * leverage)
+    # Position size = risk_amount / (stop_loss_percent / 100 * leverage)
+    position_size = risk_amount / (stop_loss_percent / 100)
+
+    # Adjust for leverage
+    position_size *= leverage
+
+    return position_size
+
+def hyperliquid_leverage_entry(token_address: str, direction: str, confidence: float, usd_size: float):
+    """
+    High-level function for AI-driven leveraged entry
+    Called by trading agent for automated leverage trading
+
+    Args:
+        token_address: Token address
+        direction: 'BUY' or 'SELL'
+        confidence: AI confidence (0-1)
+        usd_size: Position size in USD
+
+    Returns:
+        dict: Trade result
+    """
+    from src.config import DEFAULT_LEVERAGE, LEVERAGE_SUPPORTED_ASSETS
+
+    try:
+        # Check if token is supported for leverage
+        token_symbol = get_token_symbol_from_address(token_address)
+        if token_symbol not in LEVERAGE_SUPPORTED_ASSETS:
+            info(f"Token {token_symbol} not supported for leverage trading")
+            return None
+
+        # Adjust leverage based on confidence
+        leverage = min(DEFAULT_LEVERAGE, max(1, int(confidence * DEFAULT_LEVERAGE)))
+
+        # Adjust position size based on confidence
+        adjusted_size = usd_size * confidence
+
+        # Convert direction to Hyperliquid format
+        side = 'buy' if direction == 'BUY' else 'sell'
+
+        # Execute trade
+        result = hyperliquid_perp_entry(token_symbol, side, adjusted_size, leverage)
+
+        if result:
+            info(f"Leveraged {direction} executed: {token_symbol} {adjusted_size} USD @ {leverage}x")
+
+        return result
+
+    except Exception as e:
+        error(f"Leverage entry failed: {str(e)}")
+        return None
+
+def get_token_symbol_from_address(token_address: str):
+    """
+    Convert token address to symbol for Hyperliquid
+    This is a simplified mapping - you'd want a more comprehensive one
+    """
+    # Common mappings
+    address_to_symbol = {
+        'So11111111111111111111111111111111111111111': 'SOL',
+        'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 'USDC',
+        '9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump': 'BONK',
+        '67mTTGnVRunoSLGitgRGK2FJp5cT1KschjzWH9zKc3r': 'WIF'
+    }
+
+    return address_to_symbol.get(token_address, token_address[:4].upper())
+
     # Run tests
     debug("Running function tests...", file_only=True)
-    
+
     test_btc_data()
     test_market_info()
     test_funding_rates()  # Now tests individual symbols
-    
-    info("Testing complete!") 
+
+    info("Testing complete!")

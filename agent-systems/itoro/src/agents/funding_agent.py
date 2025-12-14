@@ -26,6 +26,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src import nice_funcs_hl as hl
 from src.agents.base_agent import BaseAgent
+from src.scripts.shared_services.redis_event_bus import get_event_bus
+from src.scripts.shared_services.alert_system import MarketAlert, AlertType, AlertSeverity
 
 # Import configuration
 from src import config
@@ -121,8 +123,12 @@ class FundingAgent(BaseAgent):
         # AI analysis cache
         self.ai_cache = {}
         self.cache_timeout = 1800  # 30 minutes
-        
+
+        # Initialize Redis event bus for alert publishing
+        self.event_bus = get_event_bus()
+
         print("💰 Funding Agent initialized!")
+        print("🔄 Event bus connected for real-time alert publishing")
         print(f"🎯 Mid-range alerts: below {MID_NEGATIVE_THRESHOLD}% or above {MID_POSITIVE_THRESHOLD}%")
         print(f"🚨 Extreme alerts (AI): below {NEGATIVE_THRESHOLD}% or above {POSITIVE_THRESHOLD}%")
         print(f"📊 Monitoring {len(SYMBOL_NAMES)} symbols every {CHECK_INTERVAL_MINUTES} minutes")
@@ -700,13 +706,32 @@ class FundingAgent(BaseAgent):
                 if annual_rate < NEGATIVE_THRESHOLD or annual_rate > POSITIVE_THRESHOLD:
                     alert_level = "EXTREME 🚨"
                     status = "AI Analyzed"
-                    # Report extreme alerts to dashboard
-                    if reporter:
-                        reporter.report_alert(
-                            f"{symbol} funding rate: {annual_rate:.2f}% (EXTREME)",
-                            level='ALERT',
-                            alert_data={'symbol': symbol, 'rate': annual_rate}
-                        )
+
+                    # Publish extreme alerts via Redis event bus
+                    alert = MarketAlert(
+                        agent_source="funding_agent",
+                        alert_type=AlertType.FUNDING_RATE_EXTREME,
+                        symbol=symbol,
+                        severity=AlertSeverity.CRITICAL,
+                        confidence=0.9,  # AI analyzed alerts get high confidence
+                        data={
+                            'funding_rate': annual_rate,
+                            'annual_rate': annual_rate,
+                            'threshold_breached': NEGATIVE_THRESHOLD if annual_rate < NEGATIVE_THRESHOLD else POSITIVE_THRESHOLD,
+                            'direction': 'negative_extreme' if annual_rate < NEGATIVE_THRESHOLD else 'positive_extreme',
+                            'market_data': row.to_dict()
+                        },
+                        timestamp=datetime.now(),
+                        metadata={
+                            'ai_analyzed': True,
+                            'alert_level': 'EXTREME',
+                            'funding_rate_pct': annual_rate
+                        }
+                    )
+
+                    # Publish to event bus
+                    self.event_bus.publish('market_alert', alert.to_dict())
+                    print(f"🚨 Published funding alert for {symbol}: {annual_rate:.2f}% annual rate")
                 elif annual_rate < MID_NEGATIVE_THRESHOLD or annual_rate > MID_POSITIVE_THRESHOLD:
                     alert_level = "MID-RANGE⚠️"
                     status = "Monitoring"
