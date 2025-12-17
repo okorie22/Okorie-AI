@@ -425,7 +425,7 @@ def cleanup_old_rbi_data():
                     header = lines[0] if lines and lines[0].startswith('#') else ""
                     recent_lines = lines[-1000:] if not header else [header] + lines[-999:]
 
-                    with open(RBI_PROCESSED_IDEAS_LOG, 'w') as f:
+                    with open(RBI_PROCESSED_IDEAS_LOG, 'w', encoding='utf-8') as f:
                         f.writelines(recent_lines)
 
                     cprint(f"🧹 Trimmed processed ideas log from {len(lines)} to {len(recent_lines)} entries", "blue")
@@ -771,7 +771,7 @@ def research_strategy(content):
         
         # Save research output
         filepath = RBI_RESEARCH_DIR / f"{strategy_name}_strategy.txt"
-        with open(filepath, 'w') as f:
+        with open(filepath, 'w', encoding='utf-8') as f:
             f.write(output)
         cprint(f"📝 Research AI found something spicy! Saved to {filepath} 🌶️", "green")
         cprint(f"🏷️ Generated strategy name: {strategy_name}", "yellow")
@@ -805,7 +805,7 @@ def create_backtest(strategy, strategy_name="UnknownStrategy"):
                 output = str(output)
         
         filepath = RBI_BACKTEST_DIR / f"{strategy_name}_BT.py"
-        with open(filepath, 'w') as f:
+        with open(filepath, 'w', encoding='utf-8') as f:
             f.write(output)
         cprint(f"🔥 Backtest AI cooked up some heat! Saved to {filepath} 🚀", "green")
         return output
@@ -842,7 +842,7 @@ def debug_backtest(backtest_code, strategy=None, strategy_name="UnknownStrategy"
                 output = str(output)
             
         filepath = FINAL_RBI_BACKTEST_DIR / f"{strategy_name}_BTFinal.py"
-        with open(filepath, 'w') as f:
+        with open(filepath, 'w', encoding='utf-8') as f:
             f.write(output)
         cprint(f"🔧 Debug AI fixed the code! Saved to {filepath} ✨", "green")
         return output
@@ -875,7 +875,7 @@ def package_check(backtest_code, strategy_name="UnknownStrategy"):
                 output = str(output)
             
         filepath = RBI_PACKAGE_DIR / f"{strategy_name}_PKG.py"
-        with open(filepath, 'w') as f:
+        with open(filepath, 'w', encoding='utf-8') as f:
             f.write(output)
         cprint(f"📦 Package AI optimized the imports! Saved to {filepath} ✨", "green")
         return output
@@ -943,12 +943,12 @@ def log_processed_idea(idea: str, strategy_name: str = "Unknown") -> None:
     # Create the log file if it doesn't exist
     if not RBI_PROCESSED_IDEAS_LOG.exists():
         RBI_PROCESSED_IDEAS_LOG.parent.mkdir(parents=True, exist_ok=True)
-        with open(RBI_PROCESSED_IDEAS_LOG, 'w') as f:
+        with open(RBI_PROCESSED_IDEAS_LOG, 'w', encoding='utf-8') as f:
             f.write("# Moon Dev's RBI AI - Processed Ideas Log 🌙\n")
             f.write("# Format: hash,timestamp,strategy_name,idea_snippet\n")
-    
+
     # Append the processed idea to the log
-    with open(RBI_PROCESSED_IDEAS_LOG, 'a') as f:
+    with open(RBI_PROCESSED_IDEAS_LOG, 'a', encoding='utf-8') as f:
         # Truncate idea if too long for the log
         idea_snippet = idea[:100] + ('...' if len(idea) > 100 else '')
         f.write(f"{idea_hash},{timestamp},{strategy_name},{idea_snippet}\n")
@@ -1027,7 +1027,7 @@ def process_trading_idea(idea: str) -> None:
             
         # Save final backtest
         final_file = FINAL_RBI_BACKTEST_DIR / f"{strategy_name}_BTFinal.py"
-        with open(final_file, 'w') as f:
+        with open(final_file, 'w', encoding='utf-8') as f:
             f.write(final_backtest)
             
         print("\n🎉 Mission Accomplished!")
@@ -1095,7 +1095,7 @@ def main():
     if not ideas_file.exists():
         cprint("❌ ideas.txt not found! Creating template...", "red")
         ideas_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(ideas_file, 'w') as f:
+        with open(ideas_file, 'w', encoding='utf-8') as f:
             f.write("# Add your trading ideas here (one per line)\n")
             f.write("# Can be YouTube URLs, PDF links, or text descriptions\n")
         return

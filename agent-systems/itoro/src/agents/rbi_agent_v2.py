@@ -352,7 +352,7 @@ def execute_backtest(file_path: str, strategy_name: str) -> dict:
     
     # Save execution results
     result_file = EXECUTION_DIR / f"{strategy_name}_{datetime.now().strftime('%H%M%S')}.json"
-    with open(result_file, 'w') as f:
+    with open(result_file, 'w', encoding='utf-8') as f:
         json.dump(output, f, indent=2)
     
     # Print results
@@ -404,13 +404,13 @@ def log_processed_idea(idea: str, strategy_name: str = "Unknown") -> None:
     # Create the log file if it doesn't exist
     if not PROCESSED_IDEAS_LOG.exists():
         PROCESSED_IDEAS_LOG.parent.mkdir(parents=True, exist_ok=True)
-        with open(PROCESSED_IDEAS_LOG, 'w') as f:
+        with open(PROCESSED_IDEAS_LOG, 'w', encoding='utf-8') as f:
             f.write("# Moon Dev's RBI AI - Processed Ideas Log 🌙\n")
             f.write("# Format: hash,timestamp,strategy_name,idea_snippet\n")
-    
+
     # Add the entry
     idea_snippet = idea[:50].replace(',', ';') + ('...' if len(idea) > 50 else '')
-    with open(PROCESSED_IDEAS_LOG, 'a') as f:
+    with open(PROCESSED_IDEAS_LOG, 'a', encoding='utf-8') as f:
         f.write(f"{idea_hash},{timestamp},{strategy_name},{idea_snippet}\n")
     
     cprint(f"📝 Logged processed idea: {strategy_name}", "green")
@@ -596,7 +596,7 @@ def research_strategy(content):
         
         # Save research output
         filepath = RESEARCH_DIR / f"{strategy_name}_strategy.txt"
-        with open(filepath, 'w') as f:
+        with open(filepath, 'w', encoding='utf-8') as f:
             f.write(output)
         cprint(f"📝 Research saved to {filepath}", "green")
         return output, strategy_name
@@ -618,7 +618,7 @@ def create_backtest(strategy, strategy_name="UnknownStrategy"):
         output = clean_model_output(output, "code")
         
         filepath = BACKTEST_DIR / f"{strategy_name}_BT.py"
-        with open(filepath, 'w') as f:
+        with open(filepath, 'w', encoding='utf-8') as f:
             f.write(output)
         cprint(f"🔥 Backtest saved to {filepath}", "green")
         return output
@@ -640,7 +640,7 @@ def package_check(backtest_code, strategy_name="UnknownStrategy"):
         output = clean_model_output(output, "code")
         
         filepath = PACKAGE_DIR / f"{strategy_name}_PKG.py"
-        with open(filepath, 'w') as f:
+        with open(filepath, 'w', encoding='utf-8') as f:
             f.write(output)
         cprint(f"📦 Package-fixed code saved to {filepath}", "green")
         return output
@@ -666,7 +666,7 @@ def debug_backtest(backtest_code, error_message, strategy_name="UnknownStrategy"
         output = clean_model_output(output, "code")
         
         filepath = FINAL_BACKTEST_DIR / f"{strategy_name}_BTFinal_v{iteration}.py"
-        with open(filepath, 'w') as f:
+        with open(filepath, 'w', encoding='utf-8') as f:
             f.write(output)
         cprint(f"🔧 Debugged code saved to {filepath}", "green")
         return output
@@ -761,7 +761,7 @@ def process_trading_idea_with_execution(idea: str) -> None:
                 
                 # Save final working version
                 final_file = FINAL_BACKTEST_DIR / f"{strategy_name}_BTFinal_WORKING.py"
-                with open(final_file, 'w') as f:
+                with open(final_file, 'w', encoding='utf-8') as f:
                     f.write(current_code)
                 
                 print(f"✅ Final working backtest saved to: {final_file}")
@@ -822,7 +822,7 @@ def main():
     if not ideas_file.exists():
         cprint("❌ ideas.txt not found! Creating template...", "red")
         ideas_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(ideas_file, 'w') as f:
+        with open(ideas_file, 'w', encoding='utf-8') as f:
             f.write("# Add your trading ideas here (one per line)\n")
             f.write("# Can be YouTube URLs, PDF links, or text descriptions\n")
             f.write("# Lines starting with # are ignored\n\n")
