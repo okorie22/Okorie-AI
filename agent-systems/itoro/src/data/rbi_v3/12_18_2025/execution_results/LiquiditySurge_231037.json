@@ -1,0 +1,8 @@
+{
+  "success": false,
+  "return_code": 1,
+  "stdout": "[INFO] Loading OHLCV data...\n[INFO] Data loaded: 2880 rows\n[INFO] Data columns: ['Open', 'High', 'Low', 'Close', 'Volume', 'Open_Interest']\n[INFO] Data date range: 2025-11-18 20:45:00 to 2025-12-18 20:30:00\n\n[INFO] Starting backtest...\n",
+  "stderr": "\nBacktest.run:   0%|          | 0/2860 [00:00<?, ?bar/s]\n                                                       \nTraceback (most recent call last):\n  File \"C:\\Users\\Top Cash Pawn\\ITORO\\agent-systems\\itoro\\src\\data\\rbi_v3\\12_18_2025\\backtests_optimized\\LiquiditySurge_OPT_v2.py\", line 312, in <module>\n    stats = bt.run()\n            ^^^^^^^^\n  File \"C:\\Users\\Top Cash Pawn\\AppData\\Local\\anaconda3\\envs\\tflow\\Lib\\site-packages\\backtesting\\backtesting.py\", line 1339, in run\n    strategy.next()\n  File \"C:\\Users\\Top Cash Pawn\\ITORO\\agent-systems\\itoro\\src\\data\\rbi_v3\\12_18_2025\\backtests_optimized\\LiquiditySurge_OPT_v2.py\", line 185, in next\n    position_size = int(round(position_size))\n                        ^^^^^^^^^^^^^^^^^^^^\nTypeError: type _Indicator doesn't define __round__ method\n",
+  "execution_time": 4.32806,
+  "timestamp": "2025-12-18T23:10:37.288541"
+}

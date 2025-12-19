@@ -1,0 +1,46 @@
+STRATEGY_NAME: AdoptionMomentum
+
+STRATEGY_DETAILS:
+This strategy focuses on tracking holder count dynamics as a primary indicator of token adoption and community interest, using specific percentage thresholds to trigger trading decisions.
+
+KEY STRATEGY COMPONENTS:
+1. Holder Count Data: Requires access to real-time or daily updated holder count data for the specific token
+2. Percentage Change Calculation: Tracks the percentage change in holder count over a defined period
+3. Threshold-Based Triggers: Uses fixed 20% thresholds for both entry and exit signals
+
+ENTRY RULES:
+- BUY SIGNAL: When holder count increases by 20% or more from the previous measurement point
+- Entry Timing: Enter long position immediately upon detecting the 20%+ holder growth
+- Position Size: Full position allocation on signal confirmation
+- Confirmation: No additional technical confirmation required - pure holder count signal
+
+EXIT RULES:
+- SELL SIGNAL: When holder count decreases by 20% or more from the previous measurement point
+- Exit Timing: Exit entire position immediately upon detecting the 20%+ holder decline
+- Stop Loss: No traditional stop loss - exit based solely on holder count dynamics
+- Profit Taking: No profit targets - hold until holder count decline triggers exit
+
+RISK MANAGEMENT:
+1. Single Position Only: Trade only one position at a time per token
+2. No Leverage: Use spot trading only to avoid liquidation risks
+3. Portfolio Allocation: Allocate 100% of designated capital to each signal
+4. Timeframe Consideration: Holder count data should be measured consistently (daily recommended)
+5. Data Reliability: Ensure holder count data source is accurate and timely
+
+REQUIRED INDICATORS:
+1. Holder Count Metric: Primary data stream showing total number of token holders
+2. Percentage Change Calculator: Calculates % change between current and previous holder counts
+3. Threshold Monitor: Continuously monitors for 20% increase/decrease thresholds
+
+ADDITIONAL CONSIDERATIONS:
+- Data Frequency: Daily holder count checks recommended to avoid noise from intraday fluctuations
+- Token Selection: Works best with newer tokens where holder count changes are more significant
+- Market Conditions: May perform poorly during broad market downturns regardless of holder count
+- False Signals: Rapid holder count fluctuations could trigger multiple quick entries/exits
+- Complementary Metrics: Consider adding trading volume confirmation to validate holder count signals
+
+IMPLEMENTATION NOTES:
+- This strategy requires reliable access to holder count data, which may be available through blockchain explorers or specialized data providers
+- The 20% threshold should be optimized based on historical backtesting for specific tokens
+- Consider implementing a minimum time between signals to prevent whipsaw trading
+- Works best in trending adoption phases rather than sideways market conditions

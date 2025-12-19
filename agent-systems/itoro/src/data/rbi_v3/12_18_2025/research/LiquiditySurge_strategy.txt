@@ -1,0 +1,35 @@
+STRATEGY_NAME: LiquiditySurge
+
+STRATEGY_DETAILS:
+This is a sentiment-based mean reversion strategy that capitalizes on extreme, short-term shifts in market liquidity to anticipate price reversals. The core thesis is that liquidity changes of ±40% represent unsustainable sentiment extremes (panic selling or FOMO buying) that often precede a counter-trend move as the market digests the liquidity shock.
+
+**KEY COMPONENTS:**
+1.  **Liquidity Metric:** The primary indicator is the percentage change in liquidity over a defined lookback period. Liquidity is typically measured as the product of volume and a volatility-adjusted price range (e.g., (High - Low) / Close), or more simply as volume * average price. The strategy requires a precise, consistent formula for calculating the "liquidity" value.
+2.  **Thresholds:** The strategy uses two asymmetric but high-conviction thresholds:
+    *   **Bullish Entry Signal:** A liquidity **increase > +40%** from the previous period.
+    *   **Bearish Entry Signal:** A liquidity **decrease < -40%** from the previous period.
+3.  **Mean Reversion Framework:** It assumes these extreme liquidity events are transient. A massive surge suggests a buying climax (sell opportunity incoming), while a massive drain suggests a selling climax (buy opportunity incoming).
+
+**ENTRY RULES:**
+*   **LONG ENTRY:** Triggered when the calculated liquidity change is **less than -40%** (a severe liquidity drop). This indicates potential capitulation and is a signal to buy in anticipation of a bounce. Entry occurs on the next candle's open after the signal is confirmed.
+*   **SHORT ENTRY:** Triggered when the calculated liquidity change is **greater than +40%** (a severe liquidity spike). This indicates potential euphoric buying and is a signal to sell short in anticipation of a pullback. Entry occurs on the next candle's open after the signal is confirmed.
+
+**EXIT RULES:**
+*   **Profit Target:** Use a fixed risk-reward ratio (e.g., 1:1.5 or 1:2). If the stop loss is 1%, the profit target would be 1.5% or 2%.
+*   **Time-Based Exit:** Exit all positions after a fixed number of bars (e.g., 5-10 periods) if neither the stop loss nor profit target has been hit, as the momentum from the liquidity shock may have dissipated.
+*   **Contrary Signal Exit:** Exit a long position if a new bearish liquidity spike (>+40%) signal occurs, and exit a short position if a new bullish liquidity drain (<-40%) signal occurs.
+
+**RISK MANAGEMENT:**
+*   **Position Sizing:** Use a fixed fractional risk model (e.g., risk 1% of capital per trade).
+*   **Stop Loss:** A stop loss is **CRITICAL** as extreme moves can continue. Place the stop loss below the recent swing low (for longs) or above the recent swing high (for shorts). Alternatively, use an Average True Range (ATR) multiple (e.g., 1.5 x ATR) from the entry price.
+*   **Maximum Concurrent Trades:** Limit to 1-2 open positions to avoid overexposure to a single market regime.
+
+**REQUIRED INDICATORS & CONFIGURATION:**
+1.  **Liquidity Calculation:** A custom formula must be defined and applied consistently. Example: `Liquidity = Volume * ((High + Low + Close)/3)`. The percentage change is then: `(Current_Liquidity / Previous_Liquidity - 1) * 100`.
+2.  **Lookback Period:** The period over which the liquidity change is calculated. This is a key parameter to optimize (e.g., 1 bar, 2 bars, or a rolling window like a 5-bar Z-score). The provided strategy implies a single-period lookback.
+3.  **Supporting Indicator (Optional but Recommended):** Use a momentum oscillator (like RSI) or a volatility band (like Bollinger Bands) to confirm the price is at an extreme when the liquidity signal triggers, increasing the probability of a reversal.
+
+**ADDITIONAL CONSIDERATIONS:**
+*   **Market Context:** This strategy will perform poorly in strong, sustained trending markets where liquidity surges/decreases follow the trend direction. It is best applied in ranging or volatile markets.
+*   **Parameter Sensitivity:** The 40% threshold is arbitrary and must be optimized for the specific asset and timeframe. Backtesting is essential to find the optimal trigger level and lookback period.
+*   **False Signals:** To filter false signals, consider adding a confirmation rule, such as requiring the price to also be outside its Bollinger Bands or for the RSI to be in overbought/oversold territory (>70 / <30) concurrently with the liquidity extreme.

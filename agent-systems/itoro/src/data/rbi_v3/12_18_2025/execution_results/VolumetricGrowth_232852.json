@@ -1,0 +1,8 @@
+{
+  "success": false,
+  "return_code": 1,
+  "stdout": "[INFO] Price data shape: (2880, 5)\n[INFO] Price data columns: ['Open', 'High', 'Low', 'Close', 'Volume']\n[INFO] Price data range: 2025-11-18 20:45:00 to 2025-12-18 20:30:00\n[DEBUG] Onchain data shape: (7, 2)\n[DEBUG] Onchain data columns: ['timestamp', 'tokens']\n",
+  "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\Top Cash Pawn\\ITORO\\agent-systems\\itoro\\src\\data\\rbi_v3\\12_18_2025\\backtests_package\\VolumetricGrowth_PKG.py\", line 268, in <module>\n    stats = bt.run()\n            ^^^^^^^^\n  File \"C:\\Users\\Top Cash Pawn\\AppData\\Local\\anaconda3\\envs\\tflow\\Lib\\site-packages\\backtesting\\backtesting.py\", line 1310, in run\n    strategy.init()\n  File \"C:\\Users\\Top Cash Pawn\\ITORO\\agent-systems\\itoro\\src\\data\\rbi_v3\\12_18_2025\\backtests_package\\VolumetricGrowth_PKG.py\", line 70, in init\n    self.volume_ma = self.I(talib.SMA, self.transaction_volume, timeperiod=self.volume_ma_period)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Top Cash Pawn\\AppData\\Local\\anaconda3\\envs\\tflow\\Lib\\site-packages\\backtesting\\backtesting.py\", line 162, in I\n    raise ValueError(\nValueError: Indicators must return (optionally a tuple of) numpy.arrays of same length as `data` (data shape: (2880,); indicator \"SMA(20)\" shape: (7,), returned value: [nan nan nan nan nan nan nan])\n",
+  "execution_time": 2.001582,
+  "timestamp": "2025-12-18T23:28:52.102329"
+}

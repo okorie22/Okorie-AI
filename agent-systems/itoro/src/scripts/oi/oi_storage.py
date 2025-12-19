@@ -75,12 +75,43 @@ class OIStorage:
             filename = f"oi_{current_date.strftime('%Y%m%d')}.parquet"
             filepath = self.data_dir / filename
 
-            # IMPORTANT:
-            # Do NOT try to read/append the existing file.
-            # Just overwrite today's file with the latest snapshot.
+            # IMPORTANT: Append new records instead of overwriting to preserve historical timestamps
+            # This allows analytics engine to calculate 4h/24h/7d changes
+            if filepath.exists():
+                try:
+                    # Load existing data for today
+                    existing_df = pd.read_parquet(filepath)
+                    # Ensure timestamp is datetime
+                    if 'timestamp' in existing_df.columns:
+                        existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'])
+                    
+                    # Combine existing and new data
+                    combined_df = pd.concat([existing_df, df], ignore_index=True)
+                    
+                    # Remove duplicates based on (timestamp, symbol) combination
+                    # Keep the most recent record if duplicates exist
+                    combined_df = combined_df.drop_duplicates(
+                        subset=['timestamp', 'symbol'], 
+                        keep='last'
+                    )
+                    
+                    # Sort by timestamp
+                    combined_df = combined_df.sort_values('timestamp')
+                    
+                    # Use combined data
+                    df = combined_df
+                    info(f"📊 Appended to existing file: {len(existing_df)} existing + {len(oi_data)} new = {len(df)} total records")
+                except Exception as e:
+                    warning(f"Failed to read existing file, overwriting: {str(e)}")
+                    # Fall back to overwrite if read fails
+                    df.to_parquet(filepath, engine='pyarrow', compression='snappy', index=False)
+                    info(f"✅ Saved {len(oi_data)} OI records to {filename} (overwrote due to read error)")
+                    return True
+            
+            # Save to Parquet (either new file or combined data)
             df.to_parquet(filepath, engine='pyarrow', compression='snappy', index=False)
 
-            info(f"✅ Saved {len(oi_data)} OI records to {filename}")
+            info(f"✅ Saved {len(df)} OI records to {filename}")
 
             return True
 

@@ -239,6 +239,21 @@ INDICATOR CALCULATION RULES:
    - Instead of: self.data.High.rolling(window=20).max()
    - Use: self.I(talib.MAX, self.data.High, timeperiod=20)
 
+CRITICAL BACKTESTING.PY DATA ACCESS RULES:
+1. self.data.* columns are _Array objects, NOT pandas Series or DataFrames
+2. FORBIDDEN operations on self.data.* columns:
+   - .values (not needed - already an array)
+   - .iloc (use array indexing instead)
+   - .loc (use array indexing instead)
+   - .shift() (calculate shifts outside and use self.I())
+   - .rolling() (use talib functions with self.I() instead)
+   - Any other pandas Series methods
+3. CORRECT usage examples:
+   - Instead of: self.data.OI.values → use: self.data.OI (already an array)
+   - Instead of: self.data.OI.iloc[-1] → use: self.data.OI[-1] (array indexing)
+   - Instead of: self.data.OI.shift(1) → calculate shift in pandas before backtest, then use self.I()
+   - Instead of: self.data.Close.rolling(20) → use: self.I(talib.SMA, self.data.Close, timeperiod=20)
+
 BACKTEST EXECUTION ORDER:
 1. Run initial backtest with default parameters first
 2. Print full stats using print(stats) and print(stats._strategy)
@@ -274,8 +289,15 @@ CRITICAL DATA LOADING INSTRUCTIONS:
      * OI data contains multiple symbols - filter for specific symbol: oi_data = oi_data[oi_data['symbol'] == 'BTC']
      * Use 'open_interest' column (NOT 'OI' or 'oi_value')
    - For Funding data: funding_data = pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/funding/funding_20251218.parquet')
+     * Funding data contains multiple symbols - DO NOT filter for BTC only
+     * Test all symbols in the funding data, or iterate through symbols that have extreme funding rates
+     * Example: for symbol in funding_data['symbol'].unique(): process_symbol_data(symbol)
    - For OHLCV data: price_data = pd.read_csv('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/rbi/BTC-USD-15m.csv')
    - For Onchain data: onchain_data = pd.read_json('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/token_onchain_data.json')
+     * On-chain data has nested JSON structure - normalize to flat DataFrame
+     * Extract: timestamp, symbol, whale_concentration (from holder_distribution.whale_pct), market_cap (estimate from liquidity_usd * 10)
+     * Also extract: holder_count, transaction_volume (volume_24h), transaction_count (tx_count_24h)
+     * Align timestamps with OHLCV data using merge and forward-fill to match price data frequency
 2. Clean column names if needed: data.columns = data.columns.str.strip().str.lower()
 3. Drop unnamed columns if needed: data = data.drop(columns=[col for col in data.columns if 'unnamed' in col.lower()])
 4. Set datetime index: data = data.set_index(pd.to_datetime(data['timestamp']))
@@ -333,6 +355,11 @@ CRITICAL BACKTESTING REQUIREMENTS:
    - Cannot use .shift() on backtesting indicators
    - Use array indexing like indicator[-2] for previous values
    - All indicators must be wrapped in self.I()
+   - CRITICAL: Cannot use pandas methods on backtesting.py data columns
+   - self.data.* columns are _Array objects, NOT pandas Series
+   - FORBIDDEN on self.data.*: .values, .iloc, .loc, .shift(), .rolling()
+   - Use array indexing: self.data.OI[-1] instead of self.data.OI.iloc[-1]
+   - Use self.data.OI directly instead of self.data.OI.values
 
 4. Position Object Issues:
    - Position object does NOT have .entry_price attribute
@@ -396,6 +423,10 @@ Your job is to ensure the backtest code NEVER uses ANY backtesting.lib imports o
      * onchain_data = load_onchain_data() → onchain_data = pd.read_json('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/token_onchain_data.json')
      * For liquidation data: try pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/liquidations/liquidations_20251218.parquet') and handle if file doesn't exist
    - REMOVE any function definitions for load_oi_data, load_funding_data, load_ohlcv_data, load_onchain_data
+   - CRITICAL: self.data.* columns are _Array objects, NOT pandas Series
+   - NEVER use on self.data.*: .values, .iloc, .loc, .shift(), .rolling()
+   - Correct usage: self.data.OI[-1] (array indexing)
+   - Wrong usage: self.data.OI.values or self.data.OI.iloc[-1]
    - FIX backtesting.py OI calculation: Replace pandas .shift() with numpy operations that work with _Array objects:
      * self.oi_pct_change = self.I(lambda x: ((x - x.shift(n)) / x.shift(n)) * 100, data)
        → Calculate oi_pct_change outside self.I(): oi_pct_change = ((oi_data - oi_data.shift(n)) / oi_data.shift(n)) * 100
@@ -416,7 +447,14 @@ Example conversions:
 ❌     # custom implementation
 ❌ oi_data = load_oi_data('BTC')  # but this was defined above
 
+❌ oi_array = self.data.OI.values
+✅ oi_array = self.data.OI  # Already an array, no .values needed
+
+❌ oi_value = self.data.OI.iloc[-1]
+✅ oi_value = self.data.OI[-1]  # Use array indexing
+
 IMPORTANT: Scan the ENTIRE code for any backtesting.lib usage AND any custom data loading function definitions, then replace ALL instances!
+IMPORTANT: Scan for any .values, .iloc, .loc usage on self.data.* columns and replace with array indexing!
 Return the complete fixed code with simple debug prints using plain text only.
 ONLY SEND BACK CODE, NO OTHER TEXT.
 """
@@ -2232,6 +2270,11 @@ def ensure_oi_data_exists():
                     cprint(f"[DEBUG] Sample OI data (first 3 rows):", "white")
                     cprint(str(oi_data.head(3)), "white")
 
+            except ImportError:
+                # Pandas not available in base environment - this is expected
+                # The backtest will run in tflow environment where pandas is available
+                cprint("[INFO] Pandas not available in base environment - skipping detailed inspection", "yellow")
+                cprint("[INFO] OI data files exist and will be accessible in backtest environment", "cyan")
             except Exception as e:
                 cprint(f"[ERROR] Failed to load OI data for inspection: {e}", "red")
 
@@ -2266,7 +2309,7 @@ def ensure_liquidation_data_exists():
     """Ensure liquidation data exists for liquidation-based strategies"""
     cprint("[LIQUIDATION] Checking for liquidation data...", "cyan")
 
-    liquidation_dir = PROJECT_ROOT / "data" / "liquidations"
+    liquidation_dir = PROJECT_ROOT / "src" / "data" / "liquidations"
     liquidation_files = list(liquidation_dir.glob("*.parquet")) if liquidation_dir.exists() else []
 
     if liquidation_files:
@@ -2441,6 +2484,8 @@ def load_liquidation_data(symbol='BTC'):
 
         # Try multiple path resolution strategies
         possible_dirs = [
+            # Try using PROJECT_ROOT (most reliable)
+            PROJECT_ROOT / "src" / "data" / "liquidations",
             # Try relative to current script
             Path(__file__).parent.parent / "data" / "liquidations",
             # Try absolute path
@@ -2470,8 +2515,156 @@ def load_liquidation_data(symbol='BTC'):
         return None
 
 
+def normalize_onchain_data(raw_data, ohlcv_data=None):
+    """
+    Normalize on-chain data structure to match strategy requirements.
+    
+    Converts nested JSON structure to flat DataFrame with required columns:
+    - timestamp, symbol (or token_address), whale_concentration, market_cap
+    - holder_count, transaction_volume, transaction_count, liquidity_usd
+    
+    Args:
+        raw_data: Raw JSON data from token_onchain_data.json or token_onchain_history.json
+        ohlcv_data: Optional OHLCV DataFrame for timestamp alignment
+        
+    Returns:
+        Normalized DataFrame with required columns
+    """
+    try:
+        import pandas as pd
+        import numpy as np
+        from datetime import datetime
+        
+        if raw_data is None:
+            return None
+        
+        records = []
+        
+        # Handle different JSON structures
+        if isinstance(raw_data, dict):
+            # Structure 1: token_onchain_data.json - has 'timestamp' and 'tokens' keys
+            if 'tokens' in raw_data:
+                root_timestamp = pd.to_datetime(raw_data.get('timestamp', datetime.now()))
+                tokens = raw_data['tokens']
+                
+                for token_address, token_data in tokens.items():
+                    # Extract timestamp (use token-specific or root)
+                    token_timestamp = pd.to_datetime(
+                        token_data.get('timestamp', root_timestamp)
+                    )
+                    
+                    # Extract whale concentration from holder_distribution
+                    holder_dist = token_data.get('holder_distribution', {})
+                    whale_pct = holder_dist.get('whale_pct', 0.0)
+                    whale_concentration = float(whale_pct) if whale_pct is not None else 0.0
+                    
+                    # Calculate market cap estimate from liquidity (rough estimate: liquidity * multiplier)
+                    # If we have price data, we could use price * supply, but for now use liquidity as proxy
+                    liquidity_usd = float(token_data.get('liquidity_usd', 0.0) or 0.0)
+                    # Estimate market cap as liquidity * 10 (rough multiplier for DeFi tokens)
+                    # This is a placeholder - real market cap would need price and supply data
+                    market_cap = liquidity_usd * 10 if liquidity_usd > 0 else 0.0
+                    
+                    record = {
+                        'timestamp': token_timestamp,
+                        'symbol': token_address[:8],  # Use first 8 chars of address as symbol
+                        'token_address': token_address,
+                        'whale_concentration': whale_concentration,
+                        'market_cap': market_cap,
+                        'holder_count': int(token_data.get('holder_count', 0) or 0),
+                        'holder_change_pct': float(token_data.get('holder_change_pct', 0.0) or 0.0),
+                        'transaction_volume': float(token_data.get('volume_24h', 0.0) or 0.0),
+                        'transaction_count': int(token_data.get('tx_count_24h', 0) or 0),
+                        'liquidity_usd': liquidity_usd,
+                    }
+                    records.append(record)
+            
+            # Structure 2: token_onchain_history.json - token addresses as keys, arrays as values
+            else:
+                for token_address, history_array in raw_data.items():
+                    if isinstance(history_array, list):
+                        for entry in history_array:
+                            token_timestamp = pd.to_datetime(entry.get('timestamp', datetime.now()))
+                            
+                            # Extract whale concentration (may not be in history, use 0.0 as default)
+                            whale_concentration = 0.0
+                            
+                            # Calculate market cap estimate
+                            liquidity_usd = float(entry.get('liquidity_usd', 0.0) or 0.0)
+                            market_cap = liquidity_usd * 10 if liquidity_usd > 0 else 0.0
+                            
+                            record = {
+                                'timestamp': token_timestamp,
+                                'symbol': token_address[:8],
+                                'token_address': token_address,
+                                'whale_concentration': whale_concentration,
+                                'market_cap': market_cap,
+                                'holder_count': int(entry.get('holder_count', 0) or 0),
+                                'holder_change_pct': float(entry.get('holder_change_pct', 0.0) or 0.0),
+                                'transaction_volume': float(entry.get('volume_24h', 0.0) or 0.0),
+                                'transaction_count': int(entry.get('tx_count_24h', 0) or 0),
+                                'liquidity_usd': liquidity_usd,
+                            }
+                            records.append(record)
+        
+        if not records:
+            print("[WARN] No on-chain records extracted from data")
+            return None
+        
+        # Create DataFrame
+        df = pd.DataFrame(records)
+        
+        # Ensure timestamp is datetime
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        
+        # Sort by timestamp
+        df = df.sort_values('timestamp')
+        
+        # If OHLCV data provided, align timestamps
+        if ohlcv_data is not None and not ohlcv_data.empty:
+            # Get OHLCV timestamp range
+            if 'timestamp' in ohlcv_data.columns:
+                ohlcv_timestamps = pd.to_datetime(ohlcv_data['timestamp'])
+            elif ohlcv_data.index.name == 'timestamp' or isinstance(ohlcv_data.index, pd.DatetimeIndex):
+                ohlcv_timestamps = pd.to_datetime(ohlcv_data.index)
+            else:
+                ohlcv_timestamps = None
+            
+            if ohlcv_timestamps is not None:
+                # Forward-fill on-chain data to match OHLCV timestamps
+                # Create a merged DataFrame with OHLCV timestamps
+                ohlcv_df = pd.DataFrame({'timestamp': ohlcv_timestamps})
+                ohlcv_df = ohlcv_df.sort_values('timestamp')
+                
+                # Merge and forward-fill
+                merged = ohlcv_df.merge(df, on='timestamp', how='left', sort=True)
+                # Forward-fill missing values (using ffill() instead of deprecated fillna(method='ffill'))
+                for col in ['whale_concentration', 'market_cap', 'holder_count', 
+                           'transaction_volume', 'transaction_count', 'liquidity_usd']:
+                    if col in merged.columns:
+                        merged[col] = merged[col].ffill().fillna(0)
+                
+                # Fill symbol and token_address with last known value
+                merged['symbol'] = merged['symbol'].ffill()
+                merged['token_address'] = merged['token_address'].ffill()
+                
+                df = merged
+        
+        print(f"[INFO] Normalized {len(df)} on-chain records")
+        print(f"[DEBUG] On-chain data columns: {list(df.columns)}")
+        print(f"[DEBUG] On-chain data date range: {df['timestamp'].min()} to {df['timestamp'].max()}")
+        
+        return df
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to normalize on-chain data: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 def load_onchain_data():
-    """Load onchain data from JSON files"""
+    """Load onchain data from JSON files and normalize structure"""
     try:
         import json
         import pandas as pd
@@ -2491,30 +2684,37 @@ def load_onchain_data():
              Path.cwd() / "src" / "data" / "token_onchain_data.json"),
         ]
 
+        raw_data = None
         for history_file, data_file in possible_files:
             # Try to load historical data first
             if history_file.exists():
                 absolute_path = str(history_file.resolve())
                 print(f"[SUCCESS] Loading onchain history data from: {absolute_path}")
                 with open(history_file, 'r') as f:
-                    data = json.load(f)
-                # Convert to DataFrame (this will need customization based on your JSON structure)
-                # For now, return the raw data
-                return data
+                    raw_data = json.load(f)
+                break
 
             # Fallback to current data
             if data_file.exists():
                 absolute_path = str(data_file.resolve())
                 print(f"[SUCCESS] Loading onchain data from: {absolute_path}")
                 with open(data_file, 'r') as f:
-                    data = json.load(f)
-                return data
+                    raw_data = json.load(f)
+                break
 
-        print("[ERROR] Onchain data files not found in any expected location")
-        print(f"[DEBUG] Searched file pairs: {[(str(h), str(d)) for h, d in possible_files]}")
-        return None
+        if raw_data is None:
+            print("[ERROR] Onchain data files not found in any expected location")
+            print(f"[DEBUG] Searched file pairs: {[(str(h), str(d)) for h, d in possible_files]}")
+            return None
+        
+        # Normalize the data structure
+        normalized_df = normalize_onchain_data(raw_data)
+        return normalized_df
+        
     except Exception as e:
         print(f"[ERROR] Failed to load onchain data: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -2536,7 +2736,14 @@ def customize_backtest_prompt_for_data_type(base_prompt, data_type):
         DATA LOADING FOR FUNDING STRATEGY:
         Load funding data directly: funding_data = pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/funding/funding_20251218.parquet')
         This script runs standalone and must load data directly.
-        Expected columns: timestamp, funding_rate, mark_price, index_price, symbol
+        Expected columns: timestamp (or event_time), funding_rate, mark_price, index_price, symbol
+        IMPORTANT: DO NOT filter for BTC only. Test all symbols in the funding data.
+        The funding data contains multiple symbols (BTC, ETH, DOT, SUSHI, etc.) - iterate through all symbols
+        or focus on symbols with extreme funding rates (below -0.05% or above +0.05%).
+        Example multi-symbol approach:
+        for symbol in funding_data['symbol'].unique():
+            symbol_funding = funding_data[funding_data['symbol'] == symbol]
+            # Process each symbol's funding data
         """
     elif data_type == "liquidation":
         data_loading_instruction = """
@@ -2551,8 +2758,18 @@ def customize_backtest_prompt_for_data_type(base_prompt, data_type):
         DATA LOADING FOR ONCHAIN STRATEGY:
         Load onchain data directly: onchain_data = pd.read_json('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/token_onchain_data.json')
         This script runs standalone and must load data directly.
-        Data structure: timestamp, tokens: {token: {metrics...}}
-        Convert to DataFrame as needed for backtesting
+        
+        IMPORTANT: The raw JSON has nested structure. You need to normalize it:
+        1. Extract tokens from the 'tokens' key (if present)
+        2. For each token, extract: timestamp, symbol (or token_address), whale_concentration, market_cap
+        3. Also extract: holder_count, transaction_volume (volume_24h), transaction_count (tx_count_24h), liquidity_usd
+        4. whale_concentration comes from holder_distribution.whale_pct (convert to decimal, e.g., 30.0% -> 30.0)
+        5. market_cap can be estimated from liquidity_usd * 10 (or use actual if available)
+        6. Create a DataFrame with columns: timestamp, symbol, whale_concentration, market_cap, holder_count, transaction_volume, transaction_count
+        7. Align timestamps with OHLCV data using merge and forward-fill (ffill()) to match price data frequency
+        8. Handle missing values: forward-fill numeric columns, fill remaining NaN with 0
+        
+        Expected normalized columns: timestamp, symbol, whale_concentration, market_cap, holder_count, transaction_volume, transaction_count, liquidity_usd
         """
     else:  # indicator/ohlcv
         data_loading_instruction = """

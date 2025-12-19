@@ -1,0 +1,42 @@
+STRATEGY_NAME: InstitutionalFlowMomentum
+
+STRATEGY_DETAILS:
+This strategy capitalizes on institutional accumulation and distribution by tracking significant changes in Open Interest (OI) on a 4-hour timeframe. The core premise is that a rapid 15%+ increase in OI signals strong institutional buying pressure (accumulation), while a 15%+ decrease signals institutional selling or unwinding (distribution). The strategy is purely momentum-based on this derivative flow data.
+
+**KEY STRATEGY COMPONENTS:**
+1.  **Primary Data:** 4-Hour Candlestick Charts with Open Interest (OI) data.
+2.  **Core Logic:** Monitors the percentage change in OI from one 4-hour candle's close to the next.
+3.  **Signal Threshold:** A fixed 15% change in OI is required to generate a trading signal, filtering out minor noise and focusing on significant institutional moves.
+4.  **Trend Context (Optional but Recommended):** To improve win rate, consider adding a simple trend filter (e.g., price above/below a 50-period SMA on the 4H chart) to align OI signals with the broader trend. For a pure OI momentum play, this can be omitted.
+
+**REQUIRED INDICATORS & DATA:**
+1.  **Open Interest (OI):** The absolute, non-derivative value is mandatory.
+2.  **Percentage Change Calculator:** A custom script or formula to calculate: `((Current_OI - Previous_OI) / Previous_OI) * 100`.
+3.  **Simple Moving Average (SMA) - Optional Filter:** A 50-period SMA applied to the price chart to determine trend bias.
+
+**ENTRY RULES (LONG):**
+*   **Condition:** The OI percentage change from the previous 4H candle to the current 4H candle closes at **+15% or higher**.
+*   **Action:** Enter a **BUY/LONG** position at the market price following the close of the 4H candle that triggered the condition.
+*   **Optional Trend Filter:** For a more conservative approach, only take the long signal if the price is also trading **above the 50-period SMA**.
+
+**ENTRY RULES (SHORT):**
+*   **Condition:** The OI percentage change from the previous 4H candle to the current 4H candle closes at **-15% or lower**.
+*   **Action:** Enter a **SELL/SHORT** position at the market price following the close of the 4H candle that triggered the condition.
+*   **Optional Trend Filter:** For a more conservative approach, only take the short signal if the price is also trading **below the 50-period SMA**.
+
+**EXIT RULES:**
+*   **Primary Exit (Signal Reversal):** Exit the current position when an **opposite OI signal** is generated. (e.g., Exit a long position when a -15% OI signal occurs; exit a short position when a +15% OI signal occurs).
+*   **Stop-Loss (Risk Management):** A stop-loss is **CRITICAL** as OI can reverse quickly. Place a stop-loss at a price level representing a 1-2% account risk or below a recent swing low/high. This protects against false signals or sudden reversals not yet reflected in OI.
+*   **Time-Based Exit (Optional):** Consider exiting if no opposing signal occurs within a set number of candles (e.g., 10-15 four-hour periods) to avoid capital being tied up in a stagnant trade.
+
+**RISK MANAGEMENT:**
+1.  **Position Sizing:** Never risk more than 1-2% of total trading capital on any single trade.
+2.  **Stop-Loss:** **MANDATORY.** The OI signal does not predict price magnitude. Always use a protective stop-loss order based on price action, not OI.
+3.  **Correlation Risk:** This strategy may perform poorly in ranging markets where OI changes are choppy and lack follow-through. Be selective with market conditions.
+4.  **Data Integrity:** Ensure the OI data is accurate and timely. Delayed or incorrect OI data will render the strategy useless.
+5.  **Asset Suitability:** Best applied to liquid futures or options markets with significant institutional participation (e.g., Index Futures, Major Cryptocurrency Perpetuals, Active Commodities).
+
+**ADDITIONAL NOTES:**
+*   **Backtesting:** Thoroughly backtest this concept across different market regimes (trending, volatile, ranging) to establish its typical win rate and profit factor.
+*   **False Signals:** A large OI increase can sometimes precede a market top if it represents excessive speculation (capitulation), not accumulation. The optional trend filter helps mitigate this.
+*   **Combination with Price:** For enhanced confirmation, look for the OI signal to coincide with a bullish/bearish price candle closing near its high/low.
