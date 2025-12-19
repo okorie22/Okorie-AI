@@ -338,8 +338,11 @@ def debug_birdeye_api_key():
     """Debug function to verify BIRDEYE_API_KEY loading"""
     api_key = os.getenv("BIRDEYE_API_KEY")
     if api_key:
-        from src.scripts.shared_services.logger import info
-        info(f"BIRDEYE_API_KEY loaded successfully: {api_key[:8]}...{api_key[-4:]}")
+        try:
+            from src.scripts.shared_services.logger import info
+            info(f"BIRDEYE_API_KEY loaded successfully: {api_key[:8]}...{api_key[-4:]}")
+        except ImportError:
+            print(f"BIRDEYE_API_KEY loaded successfully: {api_key[:8]}...{api_key[-4:]}")
         return True
     else:
         print("BIRDEYE_API_KEY not found in environment variables")
@@ -1175,6 +1178,10 @@ TOKEN_TO_HL_MAPPING = {
 DAYSBACK_4_DATA = 6
 DATA_TIMEFRAME = '1H'
 
+# OHLCV Data Collection Settings
+SAVE_OHLCV_DATA = True
+RBI_DATA_SYMBOLS = ['BTC', 'ETH', 'SOL']  # Major crypto symbols for RBI backtesting
+
 # =============================================================================
 # 🛡️ AI PROMPTS (PORTFOLIO-BASED DECISION MAKING)
 # =============================================================================
@@ -1546,11 +1553,19 @@ else:
     # Local development - auto-detect IP
     WEBHOOK_HOST = get_local_ip_address()
     WEBHOOK_BASE_URL = os.getenv('WEBHOOK_BASE_URL', f"http://{WEBHOOK_HOST}:{WEBHOOK_PORT}")
-    from src.scripts.shared_services.logger import info
-    info(f"Local environment detected - auto-detected webhook host: {WEBHOOK_HOST}")
+    try:
+        from src.scripts.shared_services.logger import info
+        info(f"Local environment detected - auto-detected webhook host: {WEBHOOK_HOST}")
+    except ImportError:
+        # Fallback if logger import fails
+        print(f"Local environment detected - auto-detected webhook host: {WEBHOOK_HOST}")
 
-from src.scripts.shared_services.logger import info
-info(f"Webhook URL: {WEBHOOK_BASE_URL}")
+try:
+    from src.scripts.shared_services.logger import info
+    info(f"Webhook URL: {WEBHOOK_BASE_URL}")
+except ImportError:
+    # Fallback if logger import fails
+    print(f"Webhook URL: {WEBHOOK_BASE_URL}")
 
 # Webhook processing settings
 WEBHOOK_MIN_TOKEN_VALUE_USD = 0.001  # Minimum token value to process (lowered for testing)
@@ -1972,7 +1987,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 
 # RBI Data Directory Structure
-RBI_DATA_DIR = PROJECT_ROOT / "data" / "rbi"
+RBI_DATA_DIR = PROJECT_ROOT / "src" / "data" / "rbi"
 RBI_IDEAS_FILE = RBI_DATA_DIR / "ideas.txt"
 RBI_PROCESSED_IDEAS_LOG = RBI_DATA_DIR / "processed_ideas.log"
 

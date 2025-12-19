@@ -1,31 +1,27 @@
-# Moon Dev's RBI Trading Strategy Ideas 🌙
-# Add your trading ideas here (one per line)
-# Can be YouTube URLs, PDF links, or text descriptions
-# Lines starting with # are ignored
-#
-# Examples:
-# YouTube videos: https://www.youtube.com/watch?v=VIDEO_ID
-# PDFs: https://example.com/trading_strategy.pdf
-# Text ideas: RSI divergence strategy with volume confirmation
+# === OUR EVENT-DRIVEN ALERT STRATEGIES ===
+# These are the strategies we built for the real-time alert system
+# Let's backtest them to see if they're profitable!
 
-# Sample YouTube Trading Strategy Videos
-https://www.youtube.com/watch?v=6cOsxaNCW3g
-https://www.youtube.com/watch?v=9PFQ7HBv1KM
-https://www.youtube.com/watch?v=8P2QgXH2Dgc
+# OI Momentum Strategy - Trades based on Open Interest changes
+Create an OI momentum strategy that buys when OI increases by 15%+ (institutional accumulation) and sells when OI decreases by 15%+ (distribution), using 4h timeframe data
 
-# Sample PDF Trading Resources
-# https://example.com/sample_trading_strategy.pdf
+# Funding Arbitrage Strategy - Exploits funding rate extremes
+Implement a funding rate arbitrage strategy that goes long when funding rates are extremely negative (< -0.05%) and goes short when funding rates are extremely positive (> 0.05%), with position sizing based on rate extremity
 
-# Sample Text-Based Trading Ideas
-Create a momentum strategy using RSI and MACD divergence with volume confirmation
-Implement a mean reversion strategy that buys oversold conditions and sells overbought conditions
-Build a breakout strategy that identifies key support/resistance levels and trades breakouts with proper risk management
-Develop a volatility-based strategy that increases position size during low volatility periods
-Create a trend-following strategy using moving averages and ADX for trend strength confirmation
+# Liquidation Reversal Strategy - Trades heavy liquidation events
+Build a liquidation reversal strategy that buys after heavy long liquidations (60%+ of total) and sells after heavy short liquidations, using liquidation data from exchanges
 
-# Advanced Strategy Ideas
-Implement a multi-timeframe analysis strategy combining daily and hourly charts
-Create an options-based strategy using implied volatility and Greeks
-Build a statistical arbitrage strategy between correlated assets
-Develop a machine learning enhanced strategy using technical indicators as features
-Create a risk parity strategy that balances risk across different asset classes
+# Whale Concentration Strategy - Detects manipulation risk
+Develop a whale concentration strategy that sells when top 10 holders control >30% of supply (distribution/manipulation risk), especially on large cap tokens
+
+# Liquidity Change Strategy - Reacts to liquidity shifts
+Create a liquidity change strategy that buys on strong liquidity increases (>40%) suggesting bullish sentiment and sells on strong liquidity decreases (<-40%) indicating bearish sentiment
+
+# Holder Growth Strategy - Tracks adoption trends
+Implement a holder growth strategy that buys when holder count increases by 20%+ (adoption growth) and sells when holder count decreases by 20%+ (decreasing interest)
+
+# OnChain Activity Strategy - Momentum from transaction patterns
+Build an on-chain activity strategy that buys when transaction volume and count show GROWING trend patterns and sells when showing SHRINKING trends, with minimum volume thresholds
+
+# === ADDITIONAL TRADING IDEAS ===
+

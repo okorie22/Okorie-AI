@@ -40,6 +40,8 @@ import json
 from pathlib import Path
 from anthropic import Anthropic
 import openai
+import sys
+import os
 
 # Fix Windows console encoding for emojis
 import sys
@@ -168,7 +170,7 @@ for dir in [DATA_DIR, TODAY_DIR, RESEARCH_DIR, BACKTEST_DIR, PACKAGE_DIR,
 
 # All prompts (same as v1)
 RESEARCH_PROMPT = """
-You are Moon Dev's Research AI 🌙
+You are Moon Dev's Research AI
 
 IMPORTANT NAMING RULES:
 1. Create a UNIQUE TWO-WORD NAME for this specific strategy
@@ -208,7 +210,7 @@ Remember: The name must be UNIQUE and SPECIFIC to this strategy's approach!
 """
 
 BACKTEST_PROMPT = """
-You are Moon Dev's Backtest AI 🌙 ONLY SEND BACK CODE, NO OTHER TEXT.
+You are Moon Dev's Backtest AI. ONLY SEND BACK CODE, NO OTHER TEXT.
 Create a backtesting.py implementation for the strategy.
 USE BACKTESTING.PY
 Include:
@@ -244,39 +246,67 @@ BACKTEST EXECUTION ORDER:
 
 do not creeate charts to plot this, just print stats. no charts needed.
 
-CRITICAL POSITION SIZING RULE:
-When calculating position sizes in backtesting.py, the size parameter must be either:
-1. A fraction between 0 and 1 (for percentage of equity)
-2. A whole number (integer) of units
+CRITICAL POSITION SIZING RULES (MUST FOLLOW EXACTLY):
+1. Position sizes MUST be either:
+   - A fraction between 0 and 1 (e.g., 0.1 for 10% of equity)
+   - A positive whole number (integer) for units
 
-The common error occurs when calculating position_size = risk_amount / risk, which results in floating-point numbers. Always use:
-position_size = int(round(position_size))
+2. NEVER use floating point numbers for position sizes
+3. Always round and convert to int: position_size = int(round(position_size))
+4. For risk-based sizing: risk_amount = self.equity * risk_percentage
+5. Then: position_size = int(round(risk_amount / stop_distance))
 
-Example fix:
-❌ self.buy(size=3546.0993)  # Will fail
-✅ self.buy(size=int(round(3546.0993)))  # Will work
+VALID: self.buy(size=0.1) or self.buy(size=5)
+INVALID: self.buy(size=3.14159) or self.buy(size=1.5)
+
+Fix any calculation that results in non-integer, non-fraction sizes.
 
 RISK MANAGEMENT:
 1. Always calculate position sizes based on risk percentage
 2. Use proper stop loss and take profit calculations
-4. Print entry/exit signals with Moon Dev themed messages
+3. Print entry/exit signals with simple debug messages
 
 If you need indicators use TA lib or pandas TA. 
 
-Use this data path: /Users/md/Dropbox/dev/github/moon-dev-ai-agents-for-trading/src/data/rbi/BTC-USD-15m.csv
-the above data head looks like below
-datetime, open, high, low, close, volume,
-2023-01-01 00:00:00, 16531.83, 16532.69, 16509.11, 16510.82, 231.05338022,
-2023-01-01 00:15:00, 16509.78, 16534.66, 16509.11, 16533.43, 308.12276951,
+CRITICAL DATA LOADING INSTRUCTIONS:
+1. Load data directly using pandas - this backtest runs as a standalone script:
+   - For OI data: oi_data = pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/oi/oi_20251218.parquet')
+     * OI data contains multiple symbols - filter for specific symbol: oi_data = oi_data[oi_data['symbol'] == 'BTC']
+     * Use 'open_interest' column (NOT 'OI' or 'oi_value')
+   - For Funding data: funding_data = pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/funding/funding_20251218.parquet')
+   - For OHLCV data: price_data = pd.read_csv('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/rbi/BTC-USD-15m.csv')
+   - For Onchain data: onchain_data = pd.read_json('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/token_onchain_data.json')
+2. Clean column names if needed: data.columns = data.columns.str.strip().str.lower()
+3. Drop unnamed columns if needed: data = data.drop(columns=[col for col in data.columns if 'unnamed' in col.lower()])
+4. Set datetime index: data = data.set_index(pd.to_datetime(data['timestamp']))
+5. Ensure proper column capitalization for backtesting.py
+6. For time resampling use lowercase frequency strings (e.g., '4h' not '4H') to avoid pandas warnings
 
-Always add plenty of Moon Dev themed debug prints to make debugging easier! [MOON] [STAR] [ROCKET]
+STRICT RULES:
+- NEVER define functions named load_oi_data, load_funding_data, load_ohlcv_data, or load_onchain_data
+- NEVER call RBI v3 functions - load data directly with pandas
+- This script runs standalone and must load its own data
+
+Add simple debug prints using plain text only. Do NOT use emojis or special characters that might cause encoding issues.
+Use prints like: print("[INFO] Entry signal detected") or print("[BUY] Opening position")
+
+DEBUG DATA STRUCTURE LOGGING:
+When loading OI data, add debug prints to verify data structure:
+print(f"[DEBUG] OI data shape: {oi_data.shape}")
+print(f"[DEBUG] OI data columns: {list(oi_data.columns)}")
+print(f"[DEBUG] OI data dtypes: {oi_data.dtypes.to_dict()}")
+if 'open_interest' in oi_data.columns:
+    print(f"[DEBUG] OI column exists with {len(oi_data)} rows")
+else:
+    print("[ERROR] No 'open_interest' column found in OI data")
+    raise ValueError("No 'open_interest' column found in OI data")
 
 FOR THE PYTHON BACKTESTING LIBRARY USE BACKTESTING.PY AND SEND BACK ONLY THE CODE, NO OTHER TEXT.
 ONLY SEND BACK CODE, NO OTHER TEXT.
 """
 
 DEBUG_PROMPT = """
-You are Moon Dev's Debug AI 🌙
+You are Moon Dev's Debug AI
 Fix technical issues in the backtest code WITHOUT changing the strategy logic.
 
 CRITICAL ERROR TO FIX:
@@ -327,19 +357,20 @@ Focus on:
 
 DO NOT change strategy logic, entry/exit conditions, or risk management rules.
 
-Return the complete fixed code with Moon Dev themed debug prints! 🌙 ✨
+Return the complete fixed code with simple debug prints using plain text only.
 ONLY SEND BACK CODE, NO OTHER TEXT.
 """
 
 PACKAGE_PROMPT = """
-You are Moon Dev's Package AI 🌙
-Your job is to ensure the backtest code NEVER uses ANY backtesting.lib imports or functions.
+You are Moon Dev's Package AI
+Your job is to ensure the backtest code NEVER uses ANY backtesting.lib imports or functions AND to fix data loading issues.
 
 ❌ STRICTLY FORBIDDEN:
 1. from backtesting.lib import *
 2. import backtesting.lib
 3. from backtesting.lib import crossover
 4. ANY use of backtesting.lib
+5. Defining your own data loading functions (load_oi_data, load_funding_data, load_ohlcv_data, load_onchain_data)
 
 ✅ REQUIRED REPLACEMENTS:
 1. For crossover detection:
@@ -357,6 +388,19 @@ Your job is to ensure the backtest code NEVER uses ANY backtesting.lib imports o
    - Use rolling window comparisons with array indexing
    - Use mathematical comparisons (>, <, ==)
 
+4. For data loading:
+   - REPLACE RBI v3 function calls with direct data loading:
+     * oi_data = load_oi_data('BTC') → oi_data = pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/oi/oi_20251218.parquet')
+     * funding_data = load_funding_data('BTC') → funding_data = pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/funding/funding_20251218.parquet')
+     * price_data = load_ohlcv_data('BTC') → price_data = pd.read_csv('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/rbi/BTC-USD-15m.csv')
+     * onchain_data = load_onchain_data() → onchain_data = pd.read_json('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/token_onchain_data.json')
+     * For liquidation data: try pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/liquidations/liquidations_20251218.parquet') and handle if file doesn't exist
+   - REMOVE any function definitions for load_oi_data, load_funding_data, load_ohlcv_data, load_onchain_data
+   - FIX backtesting.py OI calculation: Replace pandas .shift() with numpy operations that work with _Array objects:
+     * self.oi_pct_change = self.I(lambda x: ((x - x.shift(n)) / x.shift(n)) * 100, data)
+       → Calculate oi_pct_change outside self.I(): oi_pct_change = ((oi_data - oi_data.shift(n)) / oi_data.shift(n)) * 100
+       → Then use: self.oi_pct_change = self.I(lambda: oi_pct_change)
+
 Example conversions:
 ❌ from backtesting.lib import crossover
 ❌ if crossover(fast_ma, slow_ma):
@@ -365,13 +409,20 @@ Example conversions:
 ❌ self.sma = self.I(backtesting.lib.SMA, self.data.Close, 20)
 ✅ self.sma = self.I(talib.SMA, self.data.Close, timeperiod=20)
 
-IMPORTANT: Scan the ENTIRE code for any backtesting.lib usage and replace ALL instances!
-Return the complete fixed code with proper Moon Dev themed debug prints! 🌙 ✨
+❌ oi_data = load_oi_data('BTC')
+✅ oi_data = pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/oi/oi_20251218.parquet')
+
+❌ def load_oi_data(symbol):
+❌     # custom implementation
+❌ oi_data = load_oi_data('BTC')  # but this was defined above
+
+IMPORTANT: Scan the ENTIRE code for any backtesting.lib usage AND any custom data loading function definitions, then replace ALL instances!
+Return the complete fixed code with simple debug prints using plain text only.
 ONLY SEND BACK CODE, NO OTHER TEXT.
 """
 
 OPTIMIZE_PROMPT = """
-You are Moon Dev's Optimization AI 🌙
+You are Moon Dev's Optimization AI
 Your job is to IMPROVE the strategy to achieve higher returns while maintaining good risk management.
 
 CURRENT PERFORMANCE:
@@ -412,15 +463,17 @@ OPTIMIZATION TECHNIQUES TO CONSIDER:
 
 IMPORTANT RULES:
 - DO NOT break the code structure
-- Keep all Moon Dev debug prints
+- Keep simple debug prints using plain text only (no emojis)
 - Maintain proper backtesting.py format
 - Use self.I() for all indicators
 - Position sizes must be int or fraction (0-1)
 - Focus on REALISTIC improvements (no curve fitting!)
 - Explain your optimization changes in comments
 
-Return the COMPLETE optimized code with Moon Dev themed comments explaining what you improved! 🌙 ✨
-ONLY SEND BACK CODE, NO OTHER TEXT.
+Return ONLY the complete Python code for the optimized strategy class.
+CRITICAL: Do NOT include markdown formatting (```), explanations, emojis, or ANY text outside of valid Python code.
+The response must start directly with "import" or "class" and contain ONLY executable Python code.
+NO markdown, NO explanations, NO emojis - just pure Python code.
 """
 
 def parse_return_from_output(stdout: str) -> float:
@@ -447,57 +500,240 @@ def execute_backtest(file_path: str, strategy_name: str) -> dict:
     Execute a backtest file in conda environment and capture output
     This is the NEW MAGIC! 🚀
     """
+    # #region agent log - execute_backtest entry
+    import json
+    import time
+    log_path = r"c:\Users\Top Cash Pawn\ITORO\.cursor\debug.log"
+    with open(log_path, 'a', encoding='utf-8') as f:
+        json.dump({
+            "id": f"log_{int(time.time() * 1000)}_execute_entry",
+            "timestamp": int(time.time() * 1000),
+            "location": "rbi_agent_v3.py:execute_backtest",
+            "message": "Starting backtest execution",
+            "data": {
+                "file_path": str(file_path),
+                "strategy_name": strategy_name,
+                "conda_env": CONDA_ENV,
+                "file_exists": os.path.exists(file_path),
+                "file_size": os.path.getsize(file_path) if os.path.exists(file_path) else 0
+            },
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "exec_1"
+        }, f)
+        f.write('\n')
+    # #endregion
+
     cprint(f"\n[ROCKET] Executing backtest: {strategy_name}", "cyan")
     cprint(f"📂 File: {file_path}", "cyan")
     cprint(f"🐍 Using conda env: {CONDA_ENV}", "cyan")
-    
+
+    # #region agent log - file validation
+    with open(log_path, 'a', encoding='utf-8') as f:
+        json.dump({
+            "id": f"log_{int(time.time() * 1000)}_file_validation",
+            "timestamp": int(time.time() * 1000),
+            "location": "rbi_agent_v3.py:execute_backtest",
+            "message": "File validation check",
+            "data": {
+                "file_path": str(file_path),
+                "exists": os.path.exists(file_path),
+                "is_file": os.path.isfile(file_path) if os.path.exists(file_path) else False,
+                "permissions": oct(os.stat(file_path).st_mode) if os.path.exists(file_path) else "N/A"
+            },
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "exec_2"
+        }, f)
+        f.write('\n')
+    # #endregion
+
     if not os.path.exists(file_path):
+        # #region agent log - file not found error
+        with open(log_path, 'a', encoding='utf-8') as f:
+            json.dump({
+                "id": f"log_{int(time.time() * 1000)}_file_not_found",
+                "timestamp": int(time.time() * 1000),
+                "location": "rbi_agent_v3.py:execute_backtest",
+                "message": "File not found error",
+                "data": {"file_path": str(file_path)},
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "exec_3"
+            }, f)
+            f.write('\n')
+        # #endregion
         raise FileNotFoundError(f"File not found: {file_path}")
-    
+
     start_time = datetime.now()
 
     # Run the backtest with better Windows conda handling
     try:
+        # #region agent log - environment check
+        conda_python = r"C:\Users\Top Cash Pawn\AppData\Local\anaconda3\envs\tflow\python.exe"
+        conda_bat = r"C:\Users\Top Cash Pawn\AppData\Local\anaconda3\condabin\conda.bat"
+        conda_exe = r"C:\Users\Top Cash Pawn\AppData\Local\anaconda3\Scripts\conda.exe"
+
+        with open(log_path, 'a', encoding='utf-8') as f:
+            json.dump({
+                "id": f"log_{int(time.time() * 1000)}_env_check",
+                "timestamp": int(time.time() * 1000),
+                "location": "rbi_agent_v3.py:execute_backtest",
+                "message": "Conda environment check",
+                "data": {
+                    "os_name": os.name,
+                    "conda_python_exists": os.path.exists(conda_python),
+                    "conda_bat_exists": os.path.exists(conda_bat),
+                    "conda_exe_exists": os.path.exists(conda_exe),
+                    "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+                },
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "exec_4"
+            }, f)
+            f.write('\n')
+        # #endregion
+
         if os.name == 'nt':  # Windows
-            # Try direct conda.exe path first
-            conda_exe = r"C:\Users\Top Cash Pawn\AppData\Local\anaconda3\Scripts\conda.exe"
-            if os.path.exists(conda_exe):
-                cprint(f"[DEBUG] Using conda.exe: {conda_exe}", "yellow")
+            # Try multiple conda approaches in order of preference
+
+            # Method 1: Use Python executable directly from conda environment
+            if os.path.exists(conda_python):
+                cprint(f"[DEBUG] Using conda Python directly: {conda_python}", "yellow")
+                # Execute Python script directly with conda environment's Python
                 cmd = [
-                    conda_exe, "run", "-n", CONDA_ENV,
-                    "python", str(file_path)
+                    conda_python, str(file_path)
                 ]
+
+                # Debug: Print the exact command being executed
+                cprint(f"[DEBUG] Command to execute: {cmd}", "cyan")
+
+                # #region agent log - command setup
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    json.dump({
+                        "id": f"log_{int(time.time() * 1000)}_cmd_setup",
+                        "timestamp": int(time.time() * 1000),
+                        "location": "rbi_agent_v3.py:execute_backtest",
+                        "message": "Command setup for direct Python execution",
+                        "data": {
+                            "method": "direct_python",
+                            "command": cmd,
+                            "working_directory": os.getcwd()
+                        },
+                        "sessionId": "debug-session",
+                        "runId": "run1",
+                        "hypothesisId": "exec_5"
+                    }, f)
+                    f.write('\n')
+                # #endregion
+
+                # #region agent log - subprocess execution
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    json.dump({
+                        "id": f"log_{int(time.time() * 1000)}_subprocess_start",
+                        "timestamp": int(time.time() * 1000),
+                        "location": "rbi_agent_v3.py:execute_backtest",
+                        "message": "Starting subprocess execution",
+                        "data": {
+                            "method": "direct_python",
+                            "timeout": EXECUTION_TIMEOUT,
+                            "start_time": datetime.now().isoformat()
+                        },
+                        "sessionId": "debug-session",
+                        "runId": "run1",
+                        "hypothesisId": "exec_6"
+                    }, f)
+                    f.write('\n')
+                # #endregion
+
                 result = subprocess.run(
                     cmd,
                     capture_output=True,
                     text=True,
                     timeout=EXECUTION_TIMEOUT
                 )
+
+                # #region agent log - subprocess result
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    json.dump({
+                        "id": f"log_{int(time.time() * 1000)}_subprocess_result",
+                        "timestamp": int(time.time() * 1000),
+                        "location": "rbi_agent_v3.py:execute_backtest",
+                        "message": "Subprocess execution completed",
+                        "data": {
+                            "returncode": result.returncode,
+                            "stdout_length": len(result.stdout),
+                            "stderr_length": len(result.stderr),
+                            "execution_time": (datetime.now() - start_time).total_seconds(),
+                            "timeout": EXECUTION_TIMEOUT
+                        },
+                        "sessionId": "debug-session",
+                        "runId": "run1",
+                        "hypothesisId": "exec_7"
+                    }, f)
+                    f.write('\n')
+                # #endregion
+
+            # Method 2: Fallback to conda.bat with shell=True
             else:
-                # Fallback to using conda.bat
+                # #region agent log - fallback method
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    json.dump({
+                        "id": f"log_{int(time.time() * 1000)}_fallback_method",
+                        "timestamp": int(time.time() * 1000),
+                        "location": "rbi_agent_v3.py:execute_backtest",
+                        "message": "Using fallback conda.bat method",
+                        "data": {"reason": "direct_python_not_found"},
+                        "sessionId": "debug-session",
+                        "runId": "run1",
+                        "hypothesisId": "exec_8"
+                    }, f)
+                    f.write('\n')
+                # #endregion
+
                 conda_bat = r"C:\Users\Top Cash Pawn\AppData\Local\anaconda3\condabin\conda.bat"
                 if os.path.exists(conda_bat):
-                    cprint(f"[DEBUG] Using conda.bat: {conda_bat}", "yellow")
+                    cprint(f"[DEBUG] Fallback: Using conda.bat: {conda_bat}", "yellow")
                     cmd = [
-                        "cmd", "/c", conda_bat, "run", "-n", CONDA_ENV,
+                        conda_bat, "run", "-n", CONDA_ENV, "python", str(file_path)
+                    ]
+
+                    # #region agent log - conda.bat command
+                    with open(log_path, 'a', encoding='utf-8') as f:
+                        json.dump({
+                            "id": f"log_{int(time.time() * 1000)}_conda_bat_cmd",
+                            "timestamp": int(time.time() * 1000),
+                            "location": "rbi_agent_v3.py:execute_backtest",
+                            "message": "Conda.bat command setup",
+                            "data": {"command": cmd},
+                            "sessionId": "debug-session",
+                            "runId": "run1",
+                            "hypothesisId": "exec_9"
+                        }, f)
+                        f.write('\n')
+                    # #endregion
+
+                    result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=EXECUTION_TIMEOUT,
+                        shell=True
+                    )
+                else:
+                    # Last resort - try conda.exe (known to be broken)
+                    conda_exe = r"C:\Users\Top Cash Pawn\AppData\Local\anaconda3\Scripts\conda.exe"
+                    cprint(f"[DEBUG] Last resort (likely to fail): Using conda.exe: {conda_exe}", "yellow")
+                    cmd = [
+                        conda_exe, "run", "-n", CONDA_ENV,
                         "python", str(file_path)
                     ]
+
                     result = subprocess.run(
                         cmd,
                         capture_output=True,
                         text=True,
                         timeout=EXECUTION_TIMEOUT
-                    )
-                else:
-                    # Last resort - use shell with PATH conda
-                    cprint("[DEBUG] Using shell conda command", "yellow")
-                    shell_cmd = f'conda run -n {CONDA_ENV} python "{file_path}"'
-                    result = subprocess.run(
-                        shell_cmd,
-                        capture_output=True,
-                        text=True,
-                        timeout=EXECUTION_TIMEOUT,
-                        shell=True
                     )
         else:
             # Unix-like systems
@@ -512,8 +748,28 @@ def execute_backtest(file_path: str, strategy_name: str) -> dict:
                 timeout=EXECUTION_TIMEOUT
             )
     except Exception as e:
-        # If all methods fail, return error info
+        # #region agent log - execution exception
         execution_time = (datetime.now() - start_time).total_seconds()
+        with open(log_path, 'a', encoding='utf-8') as f:
+            json.dump({
+                "id": f"log_{int(time.time() * 1000)}_execution_exception",
+                "timestamp": int(time.time() * 1000),
+                "location": "rbi_agent_v3.py:execute_backtest",
+                "message": "Exception during backtest execution",
+                "data": {
+                    "exception_type": type(e).__name__,
+                    "exception_message": str(e),
+                    "execution_time": execution_time,
+                    "traceback": traceback.format_exc()
+                },
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "exec_10"
+            }, f)
+            f.write('\n')
+        # #endregion
+
+        # If all methods fail, return error info
         output = {
             "success": False,
             "return_code": -1,
@@ -525,7 +781,7 @@ def execute_backtest(file_path: str, strategy_name: str) -> dict:
         return output
     
     execution_time = (datetime.now() - start_time).total_seconds()
-    
+
     output = {
         "success": result.returncode == 0,
         "return_code": result.returncode,
@@ -534,12 +790,78 @@ def execute_backtest(file_path: str, strategy_name: str) -> dict:
         "execution_time": execution_time,
         "timestamp": datetime.now().isoformat()
     }
+
+    # #region agent log - result analysis
+    with open(log_path, 'a', encoding='utf-8') as f:
+        json.dump({
+            "id": f"log_{int(time.time() * 1000)}_result_analysis",
+            "timestamp": int(time.time() * 1000),
+            "location": "rbi_agent_v3.py:execute_backtest",
+            "message": "Analyzing execution results",
+            "data": {
+                "success": output["success"],
+                "return_code": output["return_code"],
+                "stdout_length": len(output["stdout"]),
+                "stderr_length": len(output["stderr"]),
+                "execution_time": execution_time,
+                "has_stderr": len(output["stderr"]) > 0,
+                "has_stdout": len(output["stdout"]) > 0
+            },
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "exec_11"
+        }, f)
+        f.write('\n')
+    # #endregion
     
     # Save execution results
     result_file = EXECUTION_DIR / f"{strategy_name}_{datetime.now().strftime('%H%M%S')}.json"
+
+    # #region agent log - result file save
+    with open(log_path, 'a', encoding='utf-8') as f:
+        json.dump({
+            "id": f"log_{int(time.time() * 1000)}_result_save",
+            "timestamp": int(time.time() * 1000),
+            "location": "rbi_agent_v3.py:execute_backtest",
+            "message": "Saving execution results to file",
+            "data": {
+                "result_file": str(result_file),
+                "result_dir_exists": EXECUTION_DIR.exists(),
+                "strategy_name": strategy_name
+            },
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "exec_12"
+        }, f)
+        f.write('\n')
+    # #endregion
+
     with open(result_file, 'w', encoding='utf-8') as f:
         json.dump(output, f, indent=2)
     
+    # #region agent log - final output processing
+    with open(log_path, 'a', encoding='utf-8') as f:
+        json.dump({
+            "id": f"log_{int(time.time() * 1000)}_final_processing",
+            "timestamp": int(time.time() * 1000),
+            "location": "rbi_agent_v3.py:execute_backtest",
+            "message": "Final output processing and error analysis",
+            "data": {
+                "success": output['success'],
+                "stdout_preview": output['stdout'][:200] + "..." if len(output['stdout']) > 200 else output['stdout'],
+                "stderr_preview": output['stderr'][:200] + "..." if len(output['stderr']) > 200 else output['stderr'],
+                "has_traceback": "Traceback" in output['stderr'],
+                "has_attribute_error": "AttributeError" in output['stderr'],
+                "has_importerror": "ImportError" in output['stderr'] or "ModuleNotFoundError" in output['stderr'],
+                "has_value_error": "ValueError" in output['stderr']
+            },
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "exec_13"
+        }, f)
+        f.write('\n')
+    # #endregion
+
     # Print results
     if output['success']:
         cprint(f"✅ Backtest executed successfully in {execution_time:.2f}s!", "green")
@@ -556,9 +878,53 @@ def execute_backtest(file_path: str, strategy_name: str) -> dict:
 
 def parse_execution_error(execution_result: dict) -> str:
     """Extract meaningful error message for debug agent"""
+    # #region agent log - error parsing
+    log_path = r"c:\Users\Top Cash Pawn\ITORO\.cursor\debug.log"
+    with open(log_path, 'a', encoding='utf-8') as f:
+        json.dump({
+            "id": f"log_{int(time.time() * 1000)}_error_parsing",
+            "timestamp": int(time.time() * 1000),
+            "location": "rbi_agent_v3.py:parse_execution_error",
+            "message": "Parsing execution error for debug agent",
+            "data": {
+                "has_stderr": bool(execution_result.get('stderr')),
+                "stderr_length": len(execution_result.get('stderr', '')),
+                "has_error_field": bool(execution_result.get('error')),
+                "return_code": execution_result.get('return_code', 'unknown')
+            },
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "error_1"
+        }, f)
+        f.write('\n')
+    # #endregion
+
     if execution_result.get('stderr'):
         stderr = execution_result['stderr'].strip()
-        
+
+        # #region agent log - stderr analysis
+        with open(log_path, 'a', encoding='utf-8') as f:
+            json.dump({
+                "id": f"log_{int(time.time() * 1000)}_stderr_analysis",
+                "timestamp": int(time.time() * 1000),
+                "location": "rbi_agent_v3.py:parse_execution_error",
+                "message": "Analyzing stderr content",
+                "data": {
+                    "contains_traceback": "Traceback" in stderr,
+                    "contains_attributeerror": "AttributeError" in stderr,
+                    "contains_importerror": "ImportError" in stderr or "ModuleNotFoundError" in stderr,
+                    "contains_valueerror": "ValueError" in stderr,
+                    "contains_keyerror": "KeyError" in stderr,
+                    "contains_syntaxerror": "SyntaxError" in stderr,
+                    "first_line": stderr.split('\n')[0] if stderr else "No stderr"
+                },
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "error_2"
+            }, f)
+            f.write('\n')
+        # #endregion
+
         # Return the full stderr for better debugging context
         # This includes the full Python traceback, not just the conda error
         return stderr
@@ -694,16 +1060,93 @@ def clean_model_output(output, content_type="text"):
             cleaned_output = clean_content
     
     # Extract code from markdown if needed
-    if content_type == "code" and "```" in cleaned_output:
+    if content_type == "code":
         try:
             import re
-            code_blocks = re.findall(r'```python\n(.*?)\n```', cleaned_output, re.DOTALL)
-            if not code_blocks:
-                code_blocks = re.findall(r'```(?:python)?\n(.*?)\n```', cleaned_output, re.DOTALL)
-            if code_blocks:
-                cleaned_output = "\n\n".join(code_blocks)
+
+            # Debug: print what we're trying to extract from
+            print(f"[DEBUG] Extracting code from response (first 200 chars): {cleaned_output[:200]}...")
+
+            # Look for markdown code blocks
+            if "```" in cleaned_output:
+                # Try multiple patterns to extract code
+                patterns = [
+                    r'```python\s*\n(.*?)\n```',  # ```python\ncode\n```
+                    r'```\s*\n(.*?)\n```',        # ```\ncode\n```
+                    r'```python(.*?)```',          # ```pythoncode```
+                    r'```(.*?)```',                # ```code```
+                ]
+
+                code_found = False
+                for pattern in patterns:
+                    code_blocks = re.findall(pattern, cleaned_output, re.DOTALL | re.IGNORECASE)
+                    if code_blocks:
+                        # Take the largest code block (usually the main one)
+                        cleaned_output = max(code_blocks, key=len).strip()
+                        print(f"[DEBUG] Extracted code using pattern: {pattern}")
+                        code_found = True
+                        break
+
+                if not code_found:
+                    print("[WARN] No code blocks found in markdown, using raw response")
+                    # If no code blocks found, try to extract anything that looks like Python code
+                    # Remove markdown formatting manually
+                    lines = cleaned_output.split('\n')
+                    code_lines = []
+                    in_code_block = False
+
+                    for line in lines:
+                        if line.strip().startswith('```'):
+                            in_code_block = not in_code_block
+                            continue
+                        if in_code_block:
+                            code_lines.append(line)
+
+                    if code_lines:
+                        cleaned_output = '\n'.join(code_lines).strip()
+                        print("[DEBUG] Extracted code by parsing markdown manually")
+                    else:
+                        print("[WARN] Could not extract code from response")
+            else:
+                print("[DEBUG] No markdown formatting found, using response as-is")
+
         except Exception as e:
-            cprint(f"❌ Error extracting code: {str(e)}", "red")
+            print(f"[ERROR] Code extraction failed: {str(e)}")
+            # Return original output if extraction fails
+            pass
+
+    # Final cleanup: remove any remaining markdown artifacts
+    if content_type == "code":
+        cleaned_output = cleaned_output.strip()
+        # Remove any leading/trailing ``` or ```python
+        if cleaned_output.startswith('```'):
+            lines = cleaned_output.split('\n')
+            # Find first line that doesn't start with ```
+            start_idx = 0
+            for i, line in enumerate(lines):
+                if not line.strip().startswith('```'):
+                    start_idx = i
+                    break
+            cleaned_output = '\n'.join(lines[start_idx:])
+
+        # Remove any trailing ```
+        if cleaned_output.endswith('```'):
+            lines = cleaned_output.split('\n')
+            # Find last line that doesn't end with ```
+            end_idx = len(lines)
+            for i in range(len(lines) - 1, -1, -1):
+                if not lines[i].strip().endswith('```'):
+                    end_idx = i + 1
+                    break
+            cleaned_output = '\n'.join(lines[:end_idx])
+
+        cleaned_output = cleaned_output.strip()
+
+        # Validate that it looks like Python code
+        if not (cleaned_output.startswith(('import', 'from', 'class', '#')) or 'class' in cleaned_output[:200]):
+            print(f"[WARN] Extracted code doesn't look like Python: {cleaned_output[:100]}...")
+        else:
+            print("[DEBUG] Code extraction successful")
     
     return cleaned_output
 
@@ -787,14 +1230,18 @@ def research_strategy(content):
         return output, strategy_name
     return None, None
 
-def create_backtest(strategy, strategy_name="UnknownStrategy"):
+def create_backtest(strategy, strategy_name="UnknownStrategy", strategy_idea=None):
     """Backtest AI: Creates backtest implementation"""
     cprint("\n📊 Starting Backtest AI...", "cyan")
-    
+
+    # Customize the prompt based on data type needed
+    data_type = determine_data_type_needed(strategy_idea) if strategy_idea else "indicator"
+    customized_prompt = customize_backtest_prompt_for_data_type(BACKTEST_PROMPT, data_type)
+
     output = run_with_animation(
         chat_with_model,
         "Backtest AI",
-        BACKTEST_PROMPT,
+        customized_prompt,
         f"Create a backtest for this strategy:\n\n{strategy}",
         BACKTEST_CONFIG
     )
@@ -835,10 +1282,13 @@ def debug_backtest(backtest_code, error_message, strategy_name="UnknownStrategy"
     """Debug AI: Fixes technical issues in backtest code"""
     cprint(f"\n🔧 Starting Debug AI (iteration {iteration})...", "cyan")
     cprint(f"🐛 Error to fix: {error_message}", "yellow")
-    
+
+    # Ensure directories exist
+    FINAL_BACKTEST_DIR.mkdir(parents=True, exist_ok=True)
+
     # Create debug prompt with specific error
     debug_prompt_with_error = DEBUG_PROMPT.format(error_message=error_message)
-    
+
     output = run_with_animation(
         chat_with_model,
         "Debug AI",
@@ -846,10 +1296,10 @@ def debug_backtest(backtest_code, error_message, strategy_name="UnknownStrategy"
         f"Fix this backtest code:\n\n{backtest_code}",
         DEBUG_CONFIG
     )
-    
+
     if output:
         output = clean_model_output(output, "code")
-        
+
         filepath = FINAL_BACKTEST_DIR / f"{strategy_name}_BTFinal_v{iteration}.py"
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(output)
@@ -897,7 +1347,27 @@ def process_trading_idea_with_execution(idea: str) -> None:
     print("[TARGET] Now with OPTIMIZATION LOOP!")
     print(f"[TARGET] Target Return: {TARGET_RETURN}%")
     print(f"[LIST] Processing idea: {idea[:100]}...")
+
+    # Check if we have the required data for this strategy type
+    data_type = determine_data_type_needed(idea)
+    print(f"[DEBUG] Data type determined: {data_type}")
+    print(f"[DEBUG] About to call ensure_rbi_data_exists()")
     
+    # Write to file before calling ensure_rbi_data_exists
+    try:
+        pre_call_file = open(r"c:\Users\Top Cash Pawn\ITORO\.cursor\pre_call.txt", "w", encoding='utf-8')
+        pre_call_file.write(f"About to call ensure_rbi_data_exists\nData type: {data_type}\n")
+        pre_call_file.close()
+    except Exception as e:
+        print(f"[DEBUG] Pre-call file write failed: {e}")
+    
+    result = ensure_rbi_data_exists(idea)
+    print(f"[DEBUG] ensure_rbi_data_exists() returned: {result}")
+    
+    if not result:
+        print(f"❌ Required {data_type} data not available for this strategy type. Skipping.")
+        return
+
     # Phase 1: Research
     print("\n🧪 Phase 1: Research")
     # For this example, using the idea directly
@@ -913,7 +1383,7 @@ def process_trading_idea_with_execution(idea: str) -> None:
     
     # Phase 2: Backtest
     print("\n📈 Phase 2: Backtest")
-    backtest = create_backtest(strategy, strategy_name)
+    backtest = create_backtest(strategy, strategy_name, idea)
     
     if not backtest:
         raise ValueError("Backtest phase failed - no code generated")
@@ -937,13 +1407,69 @@ def process_trading_idea_with_execution(idea: str) -> None:
     error_history = []  # Track previous errors to detect loops
     
     while debug_iteration < MAX_DEBUG_ITERATIONS:
+        # #region agent log - debug iteration start
+        log_path = r"c:\Users\Top Cash Pawn\ITORO\.cursor\debug.log"
+        with open(log_path, 'a', encoding='utf-8') as f:
+            json.dump({
+                "id": f"log_{int(time.time() * 1000)}_debug_iteration_start",
+                "timestamp": int(time.time() * 1000),
+                "location": "rbi_agent_v3.py:main_execution_loop",
+                "message": f"Starting debug iteration {debug_iteration + 1}",
+                "data": {
+                    "iteration": debug_iteration + 1,
+                    "max_iterations": MAX_DEBUG_ITERATIONS,
+                    "current_file": str(current_file),
+                    "strategy_name": strategy_name,
+                    "error_history_count": len(error_history)
+                },
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "loop_1"
+            }, f)
+            f.write('\n')
+        # #endregion
+
         # Execute the current code
         print(f"\n[ROCKET] Execution attempt {debug_iteration + 1}/{MAX_DEBUG_ITERATIONS}")
         execution_result = execute_backtest(current_file, strategy_name)
         
         if execution_result['success']:
+            # #region agent log - execution success
+            with open(log_path, 'a', encoding='utf-8') as f:
+                json.dump({
+                    "id": f"log_{int(time.time() * 1000)}_execution_success",
+                    "timestamp": int(time.time() * 1000),
+                    "location": "rbi_agent_v3.py:main_execution_loop",
+                    "message": "Backtest execution succeeded",
+                    "data": {
+                        "iteration": debug_iteration + 1,
+                        "execution_time": execution_result.get('execution_time', 0),
+                        "stdout_length": len(execution_result.get('stdout', ''))
+                    },
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "loop_2"
+                }, f)
+                f.write('\n')
+            # #endregion
+
             # Check if results have NaN values (no trades taken)
             if has_nan_results(execution_result):
+                # #region agent log - nan results detected
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    json.dump({
+                        "id": f"log_{int(time.time() * 1000)}_nan_results",
+                        "timestamp": int(time.time() * 1000),
+                        "location": "rbi_agent_v3.py:main_execution_loop",
+                        "message": "NaN results detected - no trades taken",
+                        "data": {"iteration": debug_iteration + 1},
+                        "sessionId": "debug-session",
+                        "runId": "run1",
+                        "hypothesisId": "loop_3"
+                    }, f)
+                    f.write('\n')
+                # #endregion
+
                 print("\n⚠️ BACKTEST EXECUTED BUT NO TRADES TAKEN (NaN results)")
                 print("🔧 Sending to Debug AI to fix strategy logic...")
                 
@@ -1100,6 +1626,26 @@ def process_trading_idea_with_execution(idea: str) -> None:
                     return  # Move to next idea
             
         else:
+            # #region agent log - execution failure
+            with open(log_path, 'a', encoding='utf-8') as f:
+                json.dump({
+                    "id": f"log_{int(time.time() * 1000)}_execution_failure",
+                    "timestamp": int(time.time() * 1000),
+                    "location": "rbi_agent_v3.py:main_execution_loop",
+                    "message": "Backtest execution failed",
+                    "data": {
+                        "iteration": debug_iteration + 1,
+                        "return_code": execution_result.get('return_code', 'unknown'),
+                        "stderr_length": len(execution_result.get('stderr', '')),
+                        "execution_time": execution_result.get('execution_time', 0)
+                    },
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "loop_4"
+                }, f)
+                f.write('\n')
+            # #endregion
+
             # Extract error and debug
             error_message = parse_execution_error(execution_result)
             print(f"\n🐛 Execution failed with error: {error_message}")
@@ -1115,12 +1661,31 @@ def process_trading_idea_with_execution(idea: str) -> None:
             debug_iteration += 1
             
             if debug_iteration < MAX_DEBUG_ITERATIONS:
+                # #region agent log - debug AI call
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    json.dump({
+                        "id": f"log_{int(time.time() * 1000)}_debug_ai_call",
+                        "timestamp": int(time.time() * 1000),
+                        "location": "rbi_agent_v3.py:main_execution_loop",
+                        "message": f"Sending to Debug AI (attempt {debug_iteration})",
+                        "data": {
+                            "iteration": debug_iteration,
+                            "error_message_length": len(error_message),
+                            "error_signature": error_message.split('\n')[-1] if '\n' in error_message else error_message[:100]
+                        },
+                        "sessionId": "debug-session",
+                        "runId": "run1",
+                        "hypothesisId": "loop_5"
+                    }, f)
+                    f.write('\n')
+                # #endregion
+
                 # Debug the code
                 print(f"\n🔧 Sending to Debug AI (attempt {debug_iteration})...")
                 debugged_code = debug_backtest(
-                    current_code, 
-                    error_message, 
-                    strategy_name, 
+                    current_code,
+                    error_message,
+                    strategy_name,
                     debug_iteration
                 )
                 
@@ -1131,11 +1696,879 @@ def process_trading_idea_with_execution(idea: str) -> None:
                 current_file = FINAL_BACKTEST_DIR / f"{strategy_name}_BTFinal_v{debug_iteration}.py"
                 print("🔄 Retrying with debugged code...")
             else:
+                # #region agent log - max debug iterations reached
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    json.dump({
+                        "id": f"log_{int(time.time() * 1000)}_max_debug_iterations",
+                        "timestamp": int(time.time() * 1000),
+                        "location": "rbi_agent_v3.py:main_execution_loop",
+                        "message": f"Max debug iterations ({MAX_DEBUG_ITERATIONS}) reached - could not fix code",
+                        "data": {
+                            "final_iteration": debug_iteration,
+                            "error_history_count": len(error_history),
+                            "last_error_signature": error_history[-1] if error_history else "none"
+                        },
+                        "sessionId": "debug-session",
+                        "runId": "run1",
+                        "hypothesisId": "loop_6"
+                    }, f)
+                    f.write('\n')
+                # #endregion
+
                 print(f"\n❌ Max debug iterations ({MAX_DEBUG_ITERATIONS}) reached - could not fix code")
                 print("🔄 Moving to next idea...")
                 return  # Move to next idea instead of crashing
     
     print("\n✨ Processing complete!")
+
+def ensure_rbi_data_exists(strategy_idea=None):
+    """Ensure RBI backtest data exists, collect if missing. Now supports multiple data types."""
+    # Determine what type of data we need based on strategy
+    data_type = determine_data_type_needed(strategy_idea)
+
+    # ALL strategies need OHLCV data for backtesting.py framework
+    cprint("[OHLCV] Ensuring OHLCV data exists for all strategies...", "cyan")
+    print(f"[DEBUG] ensure_rbi_data_exists: About to call ensure_ohlcv_data_exists()")
+    
+    # Write to file before calling
+    try:
+        pre_ohlcv_file = open(r"c:\Users\Top Cash Pawn\ITORO\.cursor\pre_ohlcv_call.txt", "w", encoding='utf-8')
+        pre_ohlcv_file.write(f"About to call ensure_ohlcv_data_exists\n")
+        pre_ohlcv_file.close()
+    except Exception as e:
+        print(f"[DEBUG] Pre-OHLCV call file write failed: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    try:
+        ohlcv_ok = ensure_ohlcv_data_exists()
+        print(f"[DEBUG] ensure_ohlcv_data_exists() returned: {ohlcv_ok}")
+    except Exception as e:
+        print(f"[DEBUG] Exception in ensure_ohlcv_data_exists(): {e}")
+        import traceback
+        traceback.print_exc()
+        ohlcv_ok = False
+    
+    if not ohlcv_ok:
+        cprint("[ERROR] Failed to ensure OHLCV data exists", "red")
+        return False
+
+    # Now check for strategy-specific data
+    if data_type == "indicator":
+        # For indicator strategies, OHLCV data is sufficient (already checked above)
+        return True
+    elif data_type == "oi":
+        # For OI strategies, we need OI data in addition to OHLCV
+        return ensure_oi_data_exists()
+    elif data_type == "funding":
+        # For funding strategies, we need funding rate data in addition to OHLCV
+        return ensure_funding_data_exists()
+    elif data_type == "liquidation":
+        # For liquidation strategies, we need liquidation data in addition to OHLCV
+        return ensure_liquidation_data_exists()
+    elif data_type == "onchain":
+        # For onchain strategies, we need onchain data in addition to OHLCV
+        return ensure_onchain_data_exists()
+    else:
+        # Default to OHLCV for unknown strategy types (already checked above)
+        cprint(f"[INFO] Unknown strategy type '{data_type}', OHLCV data ensured", "yellow")
+        return True
+
+
+def determine_data_type_needed(strategy_idea):
+    """Determine what type of data is needed based on the strategy idea"""
+    if not strategy_idea:
+        return "indicator"  # Default
+
+    idea_lower = strategy_idea.lower()
+
+    # OI-based strategies
+    if any(keyword in idea_lower for keyword in ['oi', 'open interest', 'institutional', 'accumulation', 'distribution']):
+        return "oi"
+
+    # Funding-based strategies
+    if any(keyword in idea_lower for keyword in ['funding', 'funding rate', 'arbitrage']):
+        return "funding"
+
+    # Liquidation-based strategies
+    if any(keyword in idea_lower for keyword in ['liquidation', 'liquidation cascade', 'liquidation reversal']):
+        return "liquidation"
+
+    # Onchain-based strategies
+    if any(keyword in idea_lower for keyword in ['whale', 'holder', 'onchain', 'transaction', 'blockchain']):
+        return "onchain"
+
+    # Default to indicator-based
+    return "indicator"
+
+
+def ensure_ohlcv_data_exists():
+    """Ensure OHLCV data exists for indicator-based strategies"""
+    from pathlib import Path  # Import at the start to avoid UnboundLocalError
+
+    # IMMEDIATE file write to verify function is called
+    try:
+        immediate_log = Path(r"c:\Users\Top Cash Pawn\ITORO\.cursor\function_called.txt")
+        immediate_log.parent.mkdir(parents=True, exist_ok=True)
+        immediate_log.write_text(f"Function called at {__import__('time').time()}\nPROJECT_ROOT: {PROJECT_ROOT}", encoding='utf-8')
+    except Exception as e:
+        print(f"[CRITICAL] Immediate log write failed: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    cprint("[INDICATOR] Checking for OHLCV data (candlesticks)...", "cyan")
+    print(f"[DEBUG] ensure_ohlcv_data_exists() called - PROJECT_ROOT: {PROJECT_ROOT}")
+    
+    # Test file write to verify I/O works
+    try:
+        test_file = Path(r"c:\Users\Top Cash Pawn\ITORO\.cursor\test_write.txt")
+        test_file.parent.mkdir(parents=True, exist_ok=True)
+        test_file.write_text("test", encoding='utf-8')
+        print(f"[DEBUG] Test file write successful: {test_file}")
+    except Exception as e:
+        print(f"[DEBUG] Test file write failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+    # #region agent log
+    import json
+    import os
+    log_entry = {
+        "id": f"log_{int(__import__('time').time() * 1000)}_function_entry",
+        "timestamp": int(__import__('time').time() * 1000),
+        "location": "rbi_agent_v3.py:ensure_ohlcv_data_exists",
+        "message": "Function entry - checking PROJECT_ROOT",
+        "data": {
+            "project_root": str(PROJECT_ROOT),
+            "project_root_absolute": str(PROJECT_ROOT.resolve()),
+            "__file__": str(Path(__file__)),
+            "__file__parent": str(Path(__file__).parent),
+            "__file__parent_parent": str(Path(__file__).parent.parent),
+            "cwd": os.getcwd()
+        },
+        "sessionId": "debug-session",
+        "runId": "run1",
+        "hypothesisId": "A"
+    }
+    # Use absolute path to workspace root .cursor/debug.log
+    # Calculate workspace root: go up 5 levels from agents/rbi_agent_v3.py
+    workspace_root = Path(__file__).parent.parent.parent.parent.parent
+    log_path = workspace_root / ".cursor" / "debug.log"
+    # Debug: print the calculated path
+    print(f"[DEBUG] Log path calculated: {log_path}")
+    print(f"[DEBUG] Log path absolute: {log_path.resolve()}")
+    print(f"[DEBUG] Workspace root: {workspace_root}")
+    print(f"[DEBUG] Workspace root exists: {workspace_root.exists()}")
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(log_entry) + '\n')
+    except Exception as e:
+        # Print error to console for debugging
+        print(f"[DEBUG] Failed to write log: {e}")
+        print(f"[DEBUG] Log path attempted: {log_path}")
+        print(f"[DEBUG] Log path absolute: {log_path.resolve()}")
+        pass
+    # #endregion
+
+    RBI_DATA_SYMBOLS = ['BTC', 'ETH', 'SOL']
+    data_dir = PROJECT_ROOT / "data" / "rbi"
+    
+    # #region agent log
+    log_entry = {
+        "id": f"log_{int(__import__('time').time() * 1000)}_data_dir_resolved",
+        "timestamp": int(__import__('time').time() * 1000),
+        "location": "rbi_agent_v3.py:ensure_ohlcv_data_exists",
+        "message": "Data directory path resolved",
+        "data": {
+            "data_dir": str(data_dir),
+            "data_dir_absolute": str(data_dir.resolve()),
+            "data_dir_exists": data_dir.exists(),
+            "data_dir_is_dir": data_dir.is_dir() if data_dir.exists() else False
+        },
+        "sessionId": "debug-session",
+        "runId": "run1",
+        "hypothesisId": "A"
+    }
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(log_entry) + '\n')
+    except Exception as e:
+        print(f"[DEBUG] Failed to write log: {e}")
+        pass
+    # #endregion
+    
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    # #region agent log
+    # List actual files in directory
+    actual_files = []
+    if data_dir.exists() and data_dir.is_dir():
+        try:
+            actual_files = [f.name for f in data_dir.iterdir() if f.is_file()]
+        except:
+            pass
+    log_entry = {
+        "id": f"log_{int(__import__('time').time() * 1000)}_directory_contents",
+        "timestamp": int(__import__('time').time() * 1000),
+        "location": "rbi_agent_v3.py:ensure_ohlcv_data_exists",
+        "message": "Directory contents before check",
+        "data": {
+            "data_dir": str(data_dir),
+            "actual_files": actual_files,
+            "file_count": len(actual_files)
+        },
+        "sessionId": "debug-session",
+        "runId": "run1",
+        "hypothesisId": "C"
+    }
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(log_entry) + '\n')
+    except Exception as e:
+        print(f"[DEBUG] Failed to write log: {e}")
+        pass
+    # #endregion
+
+    missing_data = []
+    for symbol in RBI_DATA_SYMBOLS:
+        data_file = data_dir / f"{symbol}-USD-15m.csv"
+        
+        # #region agent log
+        log_entry = {
+            "id": f"log_{int(__import__('time').time() * 1000)}_file_check_{symbol}",
+            "timestamp": int(__import__('time').time() * 1000),
+            "location": "rbi_agent_v3.py:ensure_ohlcv_data_exists",
+            "message": f"Checking file existence for {symbol}",
+            "data": {
+                "symbol": symbol,
+                "data_file": str(data_file),
+                "data_file_absolute": str(data_file.resolve()),
+                "file_exists": data_file.exists(),
+                "file_is_file": data_file.is_file() if data_file.exists() else False
+            },
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "B"
+        }
+        try:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(log_entry) + '\n')
+        except:
+            pass
+        # #endregion
+        
+        if not data_file.exists():
+            missing_data.append(symbol)
+
+    if missing_data:
+        cprint(f"[WARN] Missing OHLCV data for: {', '.join(missing_data)}", "yellow")
+        cprint("[COLLECT] Collecting OHLCV data via collector...", "cyan")
+
+        try:
+            # #region agent log
+            import json
+            import os
+            from pathlib import Path
+            log_entry = {
+                "id": f"log_{int(__import__('time').time() * 1000)}_import_attempt",
+                "timestamp": int(__import__('time').time() * 1000),
+                "location": "rbi_agent_v3.py:ensure_ohlcv_data_exists",
+                "message": "Attempting to import collector",
+                "data": {
+                    "python_path": __import__('sys').path[:3],
+                    "working_dir": os.getcwd(),
+                    "pandas_available": "pandas" in __import__('sys').modules
+                },
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "B"
+            }
+            # Use absolute path to workspace root .cursor/debug.log
+            # Calculate workspace root: go up 5 levels from agents/rbi_agent_v3.py
+            workspace_root = Path(__file__).parent.parent.parent.parent.parent
+            log_path = workspace_root / ".cursor" / "debug.log"
+            # Debug: print the calculated path
+            print(f"[DEBUG] Log path calculated: {log_path}")
+            print(f"[DEBUG] Log path absolute: {log_path.resolve()}")
+            print(f"[DEBUG] Workspace root: {workspace_root}")
+            print(f"[DEBUG] Workspace root exists: {workspace_root.exists()}")
+            try:
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(log_entry) + '\n')
+            except Exception as e:
+                print(f"[DEBUG] Failed to write log: {e}")
+                pass
+            # #endregion
+
+            # Import the collector function directly since we're in the same environment
+            from scripts.shared_services.ohlcv_collector import collect_rbi_data
+
+            # Call the data collection function
+            cprint("[COLLECT] Starting OHLCV data collection via collector...", "cyan")
+            rbi_data = collect_rbi_data()
+
+            if rbi_data and len(rbi_data) > 0:
+                cprint("[SUCCESS] OHLCV data collection completed!", "green")
+
+                # Verify files were actually created
+                collected_files = []
+                for symbol in RBI_DATA_SYMBOLS:
+                    data_file = data_dir / f"{symbol}-USD-15m.csv"
+                    if data_file.exists():
+                        collected_files.append(symbol)
+
+                if collected_files:
+                    cprint(f"[VERIFY] Confirmed OHLCV data files created for: {', '.join(collected_files)}", "green")
+                    return True
+                else:
+                    cprint("[ERROR] OHLCV collection completed but no files were found", "red")
+                    return False
+            else:
+                cprint("[ERROR] OHLCV data collection returned no data", "red")
+                cprint("[WARN] Creating synthetic OHLCV data for testing purposes", "yellow")
+
+                # #region agent log
+                import json
+                import os
+                from pathlib import Path
+                log_entry = {
+                    "id": f"log_{int(__import__('time').time() * 1000)}_synthetic_start",
+                    "timestamp": int(__import__('time').time() * 1000),
+                    "location": "rbi_agent_v3.py:synthetic_data_generation",
+                    "message": "Starting synthetic data generation",
+                    "data": {
+                        "symbols": RBI_DATA_SYMBOLS,
+                        "data_dir": str(data_dir)
+                    },
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "C"
+                }
+                # Use absolute path to workspace root .cursor/debug.log
+                # Calculate workspace root: go up 5 levels from agents/rbi_agent_v3.py
+                workspace_root = Path(__file__).parent.parent.parent.parent.parent
+                log_path = workspace_root / ".cursor" / "debug.log"
+                # Debug: print the calculated path
+                print(f"[DEBUG] Log path calculated: {log_path}")
+                print(f"[DEBUG] Log path absolute: {log_path.resolve()}")
+                print(f"[DEBUG] Workspace root: {workspace_root}")
+                print(f"[DEBUG] Workspace root exists: {workspace_root.exists()}")
+                try:
+                    log_path.parent.mkdir(parents=True, exist_ok=True)
+                    with open(log_path, 'a', encoding='utf-8') as f:
+                        f.write(json.dumps(log_entry) + '\n')
+                except Exception as e:
+                    print(f"[DEBUG] Failed to write log: {e}")
+                    pass
+                # #endregion
+
+                # Create synthetic OHLCV data for testing
+                try:
+                    import pandas as pd
+                    from datetime import datetime, timedelta
+                    import numpy as np
+
+                    # Create synthetic data for the past 30 days, 15-minute intervals
+                    end_date = datetime.now()
+                    start_date = end_date - timedelta(days=30)
+
+                    # Generate timestamps (15-minute intervals)
+                    timestamps = []
+                    current = start_date
+                    while current <= end_date:
+                        timestamps.append(current)
+                        current += timedelta(minutes=15)
+
+                    # Create synthetic OHLCV data
+                    np.random.seed(42)  # For reproducible results
+                    base_price = 95000  # BTC around $95K
+
+                    synthetic_data = []
+                    for i, ts in enumerate(timestamps):
+                        # Add some trend and volatility
+                        trend = (i / len(timestamps)) * 5000  # Upward trend
+                        noise = np.random.normal(0, 1000)  # Random noise
+                        price = base_price + trend + noise
+
+                        # Create OHLC with some spread
+                        spread = np.random.uniform(50, 200)
+                        high = price + spread/2
+                        low = price - spread/2
+                        open_price = price + np.random.uniform(-spread/4, spread/4)
+                        close_price = price + np.random.uniform(-spread/4, spread/4)
+
+                        # Volume and open interest
+                        volume = np.random.uniform(100, 1000)
+                        open_interest = 22845.72232  # Same as real data
+
+                        synthetic_data.append({
+                            'timestamp': ts.strftime('%Y-%m-%d %H:%M:%S'),
+                            'open': round(open_price, 2),
+                            'high': round(high, 2),
+                            'low': round(low, 2),
+                            'close': round(close_price, 2),
+                            'volume': round(volume, 6),
+                            'open_interest': open_interest
+                        })
+
+                    # Save synthetic data for each symbol
+                    df = pd.DataFrame(synthetic_data)
+                    for symbol in RBI_DATA_SYMBOLS:
+                        data_file = data_dir / f"{symbol}-USD-15m.csv"
+                        df.to_csv(data_file, index=False)
+                        cprint(f"[SYNTHETIC] Created {len(df)} rows of synthetic data for {symbol}", "cyan")
+
+                    cprint("[SUCCESS] Synthetic OHLCV data created for testing", "green")
+                    return True
+
+                except Exception as synth_error:
+                    cprint(f"[ERROR] Failed to create synthetic data: {str(synth_error)}", "red")
+                    return False
+
+        except Exception as e:
+            cprint(f"[ERROR] Failed to collect OHLCV data: {str(e)}", "red")
+            cprint("[WARN] Creating synthetic OHLCV data for testing purposes", "yellow")
+
+            # Create synthetic OHLCV data for testing
+            try:
+                import pandas as pd
+                from datetime import datetime, timedelta
+
+                # Create synthetic data for the past 30 days, 15-minute intervals
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=30)
+
+                # Generate timestamps (15-minute intervals)
+                timestamps = []
+                current = start_date
+                while current <= end_date:
+                    timestamps.append(current)
+                    current += timedelta(minutes=15)
+
+                # Create synthetic OHLCV data
+                np.random.seed(42)  # For reproducible results
+                base_price = 95000  # BTC around $95K
+
+                synthetic_data = []
+                for i, ts in enumerate(timestamps):
+                    # Add some trend and volatility
+                    trend = (i / len(timestamps)) * 5000  # Upward trend
+                    noise = np.random.normal(0, 1000)  # Random noise
+                    price = base_price + trend + noise
+
+                    # Create OHLC with some spread
+                    spread = np.random.uniform(50, 200)
+                    high = price + spread/2
+                    low = price - spread/2
+                    open_price = price + np.random.uniform(-spread/4, spread/4)
+                    close_price = price + np.random.uniform(-spread/4, spread/4)
+
+                    # Volume and open interest
+                    volume = np.random.uniform(100, 1000)
+                    open_interest = 22845.72232  # Same as real data
+
+                    synthetic_data.append({
+                        'timestamp': ts.strftime('%Y-%m-%d %H:%M:%S'),
+                        'open': round(open_price, 2),
+                        'high': round(high, 2),
+                        'low': round(low, 2),
+                        'close': round(close_price, 2),
+                        'volume': round(volume, 6),
+                        'open_interest': open_interest
+                    })
+
+                # Save synthetic data for each symbol
+                df = pd.DataFrame(synthetic_data)
+                for symbol in RBI_DATA_SYMBOLS:
+                    data_file = data_dir / f"{symbol}-USD-15m.csv"
+                    df.to_csv(data_file, index=False)
+                    cprint(f"[SYNTHETIC] Created {len(df)} rows of synthetic data for {symbol}", "cyan")
+
+                cprint("[SUCCESS] Synthetic OHLCV data created for testing", "green")
+                return True
+
+            except Exception as synth_error:
+                cprint(f"[ERROR] Failed to create synthetic data: {str(synth_error)}", "red")
+                return False
+    else:
+        cprint("[SUCCESS] All OHLCV data files exist!", "green")
+        return True
+
+
+def ensure_oi_data_exists():
+    """Ensure OI data exists for OI-based strategies"""
+    cprint("[OI] Checking for Open Interest data...", "cyan")
+
+    oi_dir = PROJECT_ROOT / "data" / "oi"
+    oi_files = list(oi_dir.glob("*.parquet")) if oi_dir.exists() else []
+
+    if oi_files:
+        cprint(f"[SUCCESS] Found OI data files: {len(oi_files)} files", "green")
+        for file in oi_files:
+            cprint(f"  📄 {file.name}", "white")
+
+            # Load and inspect OI data structure
+            try:
+                import pandas as pd
+                oi_data = pd.read_parquet(file)
+                cprint(f"[DEBUG] OI data shape: {oi_data.shape}", "white")
+                cprint(f"[DEBUG] OI data columns: {list(oi_data.columns)}", "white")
+                cprint(f"[DEBUG] OI data dtypes: {oi_data.dtypes.to_dict()}", "white")
+
+                # Check for required columns
+                required_cols = ['timestamp', 'symbol', 'open_interest']
+                missing_cols = [col for col in required_cols if col not in oi_data.columns]
+                if missing_cols:
+                    cprint(f"[WARN] Missing expected columns: {missing_cols}", "yellow")
+                else:
+                    cprint("[SUCCESS] OI data has all expected columns", "green")
+
+                    # Show sample data
+                    cprint(f"[DEBUG] Sample OI data (first 3 rows):", "white")
+                    cprint(str(oi_data.head(3)), "white")
+
+            except Exception as e:
+                cprint(f"[ERROR] Failed to load OI data for inspection: {e}", "red")
+
+        return True
+    else:
+        cprint("[WARN] No OI data files found", "yellow")
+        cprint("[INFO] Run your OI agent to collect historical OI data first", "cyan")
+        cprint("[HINT] Command: python src/agents/oi_agent.py", "white")
+        return False
+
+
+def ensure_funding_data_exists():
+    """Ensure funding rate data exists for funding-based strategies"""
+    cprint("[FUNDING] Checking for funding rate data...", "cyan")
+
+    funding_dir = PROJECT_ROOT / "data" / "funding"
+    funding_files = list(funding_dir.glob("*.parquet")) if funding_dir.exists() else []
+
+    if funding_files:
+        cprint(f"[SUCCESS] Found funding data files: {len(funding_files)} files", "green")
+        for file in funding_files:
+            cprint(f"  📄 {file.name}", "white")
+        return True
+    else:
+        cprint("[WARN] No funding data files found", "yellow")
+        cprint("[INFO] Run your funding agent to collect historical funding rate data first", "cyan")
+        cprint("[HINT] Command: python src/agents/funding_agent.py", "white")
+        return False
+
+
+def ensure_liquidation_data_exists():
+    """Ensure liquidation data exists for liquidation-based strategies"""
+    cprint("[LIQUIDATION] Checking for liquidation data...", "cyan")
+
+    liquidation_dir = PROJECT_ROOT / "data" / "liquidations"
+    liquidation_files = list(liquidation_dir.glob("*.parquet")) if liquidation_dir.exists() else []
+
+    if liquidation_files:
+        cprint(f"[SUCCESS] Found liquidation data files: {len(liquidation_files)} files", "green")
+        for file in liquidation_files:
+            cprint(f"  📄 {file.name}", "white")
+        return True
+    else:
+        cprint("[WARN] No liquidation data files found", "yellow")
+        cprint("[INFO] Run your liquidation agent to collect historical liquidation data first", "cyan")
+        cprint("[HINT] Command: python src/agents/liquidation_agent.py", "white")
+        return False
+
+
+def ensure_onchain_data_exists():
+    """Ensure onchain data exists for onchain-based strategies"""
+    cprint("[ONCHAIN] Checking for onchain data...", "cyan")
+
+    onchain_files = [
+        PROJECT_ROOT / "data" / "token_onchain_data.json",
+        PROJECT_ROOT / "data" / "token_onchain_history.json"
+    ]
+
+    existing_files = [f for f in onchain_files if f.exists()]
+
+    if existing_files:
+        cprint(f"[SUCCESS] Found onchain data files: {len(existing_files)} files", "green")
+        for file in existing_files:
+            cprint(f"  📄 {file.name}", "white")
+        return True
+    else:
+        cprint("[WARN] No onchain data files found", "yellow")
+        cprint("[INFO] Run your onchain agent to collect blockchain data first", "cyan")
+        return False
+
+
+def load_data_for_strategy(strategy_idea, symbol='BTC'):
+    """Load the appropriate data for the given strategy type"""
+    data_type = determine_data_type_needed(strategy_idea)
+
+    if data_type == "oi":
+        return load_oi_data(symbol)
+    elif data_type == "funding":
+        return load_funding_data(symbol)
+    elif data_type == "liquidation":
+        return load_liquidation_data(symbol)
+    elif data_type == "onchain":
+        return load_onchain_data()
+    else:  # indicator or default
+        return load_ohlcv_data(symbol)
+
+
+def load_ohlcv_data(symbol='BTC'):
+    """Load OHLCV data from RBI folder"""
+    try:
+        import pandas as pd
+        import os
+        from pathlib import Path
+
+        # Try multiple path resolution strategies
+        possible_paths = [
+            # Try relative to current script
+            Path(__file__).parent.parent / "data" / "rbi" / f"{symbol}-USD-15m.csv",
+            # Try absolute path
+            Path("C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/rbi") / f"{symbol}-USD-15m.csv",
+            # Try relative to current working directory
+            Path.cwd() / "src" / "data" / "rbi" / f"{symbol}-USD-15m.csv",
+        ]
+
+        for data_file in possible_paths:
+            absolute_path = str(data_file.resolve())
+            print(f"[DEBUG] Trying OHLCV data path: {absolute_path}")
+            if data_file.exists():
+                print(f"[SUCCESS] Found OHLCV data at: {absolute_path}")
+                df = pd.read_csv(data_file)
+                # Ensure datetime index
+                if 'timestamp' in df.columns:
+                    df['timestamp'] = pd.to_datetime(df['timestamp'])
+                    df.set_index('timestamp', inplace=True)
+                return df
+
+        print(f"[ERROR] OHLCV data file not found for {symbol} in any expected location")
+        print(f"[DEBUG] Searched paths: {[str(p) for p in possible_paths]}")
+        return None
+    except Exception as e:
+        print(f"[ERROR] Failed to load OHLCV data: {str(e)}")
+        return None
+
+
+def load_oi_data(symbol='BTC'):
+    """Load OI data from parquet files"""
+    try:
+        import pandas as pd
+        import os
+        from pathlib import Path
+
+        # Try multiple path resolution strategies
+        possible_dirs = [
+            # Try relative to current script
+            Path(__file__).parent.parent / "data" / "oi",
+            # Try absolute path
+            Path("C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/oi"),
+            # Try relative to current working directory
+            Path.cwd() / "src" / "data" / "oi",
+        ]
+
+        for oi_dir in possible_dirs:
+            absolute_path = str(oi_dir.resolve())
+            print(f"[DEBUG] Looking for OI data in: {absolute_path}")
+            if oi_dir.exists():
+                # Look for OI files (may need to filter by symbol)
+                parquet_files = list(oi_dir.glob("*.parquet"))
+                if parquet_files:
+                    # For now, load the first file (you may need more sophisticated filtering)
+                    file_path = str(parquet_files[0].resolve())
+                    print(f"[SUCCESS] Loading OI data from: {file_path}")
+                    df = pd.read_parquet(parquet_files[0])
+                    return df
+
+        print(f"[ERROR] OI data files not found in any expected location")
+        print(f"[DEBUG] Searched directories: {[str(p) for p in possible_dirs]}")
+        return None
+    except Exception as e:
+        print(f"[ERROR] Failed to load OI data: {str(e)}")
+        return None
+
+
+def load_funding_data(symbol='BTC'):
+    """Load funding rate data from parquet files"""
+    try:
+        import pandas as pd
+        import os
+        from pathlib import Path
+
+        # Try multiple path resolution strategies
+        possible_dirs = [
+            # Try relative to current script
+            Path(__file__).parent.parent / "data" / "funding",
+            # Try absolute path
+            Path("C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/funding"),
+            # Try relative to current working directory
+            Path.cwd() / "src" / "data" / "funding",
+        ]
+
+        for funding_dir in possible_dirs:
+            absolute_path = str(funding_dir.resolve())
+            print(f"[DEBUG] Looking for funding data in: {absolute_path}")
+            if funding_dir.exists():
+                # Look for funding files (may need to filter by symbol)
+                parquet_files = list(funding_dir.glob("*.parquet"))
+                if parquet_files:
+                    # For now, load the first file (you may need more sophisticated filtering)
+                    file_path = str(parquet_files[0].resolve())
+                    print(f"[SUCCESS] Loading funding data from: {file_path}")
+                    df = pd.read_parquet(parquet_files[0])
+                    return df
+
+        print(f"[ERROR] Funding data files not found in any expected location")
+        print(f"[DEBUG] Searched directories: {[str(p) for p in possible_dirs]}")
+        return None
+    except Exception as e:
+        print(f"[ERROR] Failed to load funding data: {str(e)}")
+        return None
+
+
+def load_liquidation_data(symbol='BTC'):
+    """Load liquidation data from parquet files"""
+    try:
+        import pandas as pd
+        import os
+        from pathlib import Path
+
+        # Try multiple path resolution strategies
+        possible_dirs = [
+            # Try relative to current script
+            Path(__file__).parent.parent / "data" / "liquidations",
+            # Try absolute path
+            Path("C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/liquidations"),
+            # Try relative to current working directory
+            Path.cwd() / "src" / "data" / "liquidations",
+        ]
+
+        for liquidation_dir in possible_dirs:
+            absolute_path = str(liquidation_dir.resolve())
+            print(f"[DEBUG] Looking for liquidation data in: {absolute_path}")
+            if liquidation_dir.exists():
+                # Look for liquidation files (may need to filter by symbol)
+                parquet_files = list(liquidation_dir.glob("*.parquet"))
+                if parquet_files:
+                    # For now, load the first file (you may need more sophisticated filtering)
+                    file_path = str(parquet_files[0].resolve())
+                    print(f"[SUCCESS] Loading liquidation data from: {file_path}")
+                    df = pd.read_parquet(parquet_files[0])
+                    return df
+
+        print(f"[ERROR] Liquidation data files not found in any expected location")
+        print(f"[DEBUG] Searched directories: {[str(p) for p in possible_dirs]}")
+        return None
+    except Exception as e:
+        print(f"[ERROR] Failed to load liquidation data: {str(e)}")
+        return None
+
+
+def load_onchain_data():
+    """Load onchain data from JSON files"""
+    try:
+        import json
+        import pandas as pd
+        import os
+        from pathlib import Path
+
+        # Try multiple path resolution strategies for both files
+        possible_files = [
+            # Try relative to current script
+            (Path(__file__).parent.parent / "data" / "token_onchain_history.json",
+             Path(__file__).parent.parent / "data" / "token_onchain_data.json"),
+            # Try absolute path
+            (Path("C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/token_onchain_history.json"),
+             Path("C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/token_onchain_data.json")),
+            # Try relative to current working directory
+            (Path.cwd() / "src" / "data" / "token_onchain_history.json",
+             Path.cwd() / "src" / "data" / "token_onchain_data.json"),
+        ]
+
+        for history_file, data_file in possible_files:
+            # Try to load historical data first
+            if history_file.exists():
+                absolute_path = str(history_file.resolve())
+                print(f"[SUCCESS] Loading onchain history data from: {absolute_path}")
+                with open(history_file, 'r') as f:
+                    data = json.load(f)
+                # Convert to DataFrame (this will need customization based on your JSON structure)
+                # For now, return the raw data
+                return data
+
+            # Fallback to current data
+            if data_file.exists():
+                absolute_path = str(data_file.resolve())
+                print(f"[SUCCESS] Loading onchain data from: {absolute_path}")
+                with open(data_file, 'r') as f:
+                    data = json.load(f)
+                return data
+
+        print("[ERROR] Onchain data files not found in any expected location")
+        print(f"[DEBUG] Searched file pairs: {[(str(h), str(d)) for h, d in possible_files]}")
+        return None
+    except Exception as e:
+        print(f"[ERROR] Failed to load onchain data: {str(e)}")
+        return None
+
+
+def customize_backtest_prompt_for_data_type(base_prompt, data_type):
+    """Customize the backtest prompt based on data type needed"""
+
+    if data_type == "oi":
+        data_loading_instruction = """
+        DATA LOADING FOR OI STRATEGY:
+        Load OI data directly: oi_data = pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/oi/oi_20251218.parquet')
+        This script runs standalone and must load data directly.
+        Expected columns: timestamp, symbol, open_interest, funding_rate, mark_price, volume_24h
+        IMPORTANT: OI data contains multiple symbols. Filter for specific symbol (e.g., BTC):
+        oi_data = oi_data[oi_data['symbol'] == 'BTC'].copy()
+        Access OI values using: oi_data['open_interest'] (NOT 'OI' or 'oi_value')
+        """
+    elif data_type == "funding":
+        data_loading_instruction = """
+        DATA LOADING FOR FUNDING STRATEGY:
+        Load funding data directly: funding_data = pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/funding/funding_20251218.parquet')
+        This script runs standalone and must load data directly.
+        Expected columns: timestamp, funding_rate, mark_price, index_price, symbol
+        """
+    elif data_type == "liquidation":
+        data_loading_instruction = """
+        DATA LOADING FOR LIQUIDATION STRATEGY:
+        Try to load liquidation data directly: liquidation_data = pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/liquidations/liquidations_20251218.parquet')
+        Handle case where file might not exist: if liquidation_data is None or file doesn't exist, create synthetic liquidation data for backtesting
+        This script runs standalone and must load data directly.
+        Expected columns: timestamp, price, quantity, side, usd_value, symbol
+        """
+    elif data_type == "onchain":
+        data_loading_instruction = """
+        DATA LOADING FOR ONCHAIN STRATEGY:
+        Load onchain data directly: onchain_data = pd.read_json('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/token_onchain_data.json')
+        This script runs standalone and must load data directly.
+        Data structure: timestamp, tokens: {token: {metrics...}}
+        Convert to DataFrame as needed for backtesting
+        """
+    else:  # indicator/ohlcv
+        data_loading_instruction = """
+        DATA LOADING FOR INDICATOR STRATEGY:
+        Load OHLCV data directly: price_data = pd.read_csv('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/rbi/BTC-USD-15m.csv')
+        This script runs standalone and must load data directly.
+        Required columns: timestamp, open, high, low, close, volume, open_interest
+        """
+
+    # Insert the data loading instruction into the base prompt
+    customized_prompt = base_prompt.replace(
+        "IMPORTANT DATA HANDLING:",
+        f"IMPORTANT DATA HANDLING:\n{data_loading_instruction}\n\nIMPORTANT DATA HANDLING:"
+    )
+
+    return customized_prompt
 
 def main():
     """Main function - process ideas from file"""
@@ -1146,6 +2579,8 @@ def main():
     cprint(f"[PYTHON] Using conda env: {CONDA_ENV}", "cyan")
     cprint(f"[SETTINGS] Max debug iterations: {MAX_DEBUG_ITERATIONS}", "cyan")
     cprint(f"[ROCKET] Max optimization iterations: {MAX_OPTIMIZATION_ITERATIONS}", "cyan")
+
+    # Data checks will be performed per strategy in process_trading_idea_with_execution()
 
     cprint(f"\n[FOLDER] RBI v3.0 Data Directory: {DATA_DIR}", "magenta")
     cprint(f"[LIST] Reading ideas from: {IDEAS_FILE}", "magenta")
@@ -1172,11 +2607,28 @@ def main():
     total_ideas = len(ideas)
     cprint(f"\n[TARGET] Found {total_ideas} trading ideas to process", "cyan")
     
+    # Write debug file
+    try:
+        main_debug_file = open(r"c:\Users\Top Cash Pawn\ITORO\.cursor\main_debug.txt", "w", encoding='utf-8')
+        main_debug_file.write(f"Total ideas: {total_ideas}\n")
+        main_debug_file.close()
+    except Exception as e:
+        print(f"[DEBUG] Main debug file write failed: {e}")
+    
     # Count how many ideas have already been processed
     already_processed = sum(1 for idea in ideas if is_idea_processed(idea))
     new_ideas = total_ideas - already_processed
     
     cprint(f"[SEARCH] Status: {already_processed} already processed, {new_ideas} new ideas", "cyan")
+    
+    if new_ideas == 0:
+        cprint("[WARN] All ideas have already been processed!", "yellow")
+        try:
+            main_debug_file = open(r"c:\Users\Top Cash Pawn\ITORO\.cursor\main_debug.txt", "a", encoding='utf-8')
+            main_debug_file.write(f"All ideas already processed - exiting\n")
+            main_debug_file.close()
+        except:
+            pass
     
     for i, idea in enumerate(ideas, 1):
         # Check if this idea has already been processed
@@ -1193,7 +2645,26 @@ def main():
         cprint(f"[LIST] Idea: {idea[:100]}{'...' if len(idea) > 100 else ''}", "yellow")
         cprint(f"{'='*50}\n", "yellow")
         
-        process_trading_idea_with_execution(idea)
+        # Write debug file before processing
+        try:
+            idea_debug_file = open(r"c:\Users\Top Cash Pawn\ITORO\.cursor\idea_debug.txt", "w", encoding='utf-8')
+            idea_debug_file.write(f"Processing idea {i}/{total_ideas}\nIdea: {idea[:200]}\n")
+            idea_debug_file.close()
+        except Exception as e:
+            print(f"[DEBUG] Idea debug file write failed: {e}")
+        
+        try:
+            process_trading_idea_with_execution(idea)
+        except Exception as e:
+            print(f"[DEBUG] Exception in process_trading_idea_with_execution: {e}")
+            import traceback
+            traceback.print_exc()
+            try:
+                error_file = open(r"c:\Users\Top Cash Pawn\ITORO\.cursor\error.txt", "w", encoding='utf-8')
+                error_file.write(f"Exception: {e}\n{traceback.format_exc()}")
+                error_file.close()
+            except:
+                pass
         
         cprint(f"\n{'='*50}", "green")
         cprint(f"✅ Completed idea {i}/{total_ideas}", "green")

@@ -16,7 +16,15 @@ except (ImportError, ModuleNotFoundError):
     # Fallback to Windows-compatible implementation
     from src.ta_indicators import ta  # For technical indicators
 import traceback
-from src.scripts.shared_services.logger import debug, info, warning, error, critical
+try:
+    from src.scripts.shared_services.logger import debug, info, warning, error, critical
+except ImportError:
+    # Fallback if logger is not available
+    def debug(msg, **kwargs): print(f"[DEBUG] {msg}")
+    def info(msg, **kwargs): print(f"[INFO] {msg}")
+    def warning(msg, **kwargs): print(f"[WARN] {msg}")
+    def error(msg, **kwargs): print(f"[ERROR] {msg}")
+    def critical(msg, **kwargs): print(f"[CRITICAL] {msg}")
 
 # Constants
 BATCH_SIZE = 5000  # MAX IS 5000 FOR HYPERLIQUID

@@ -9,6 +9,8 @@ import signal
 import threading
 import time
 import logging
+import socket
+import subprocess
 from datetime import datetime, timedelta
 from typing import Dict
 import traceback
@@ -85,6 +87,70 @@ class ColorTheme:
         """Print success with theme"""
         print(f"{cls.GREEN_BRIGHT}[✓]{cls.RESET} {cls.GREEN}{msg}{cls.RESET}")
 
+def ensure_redis_running(redis_path=None, port=6379):
+    """Ensure Redis is running, start it if not"""
+    # Check if Redis is already running
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        result = sock.connect_ex(('localhost', port))
+        sock.close()
+        if result == 0:
+            ColorTheme.print_success(f"Redis already running on port {port}")
+            return True
+    except:
+        pass
+
+    # Find Redis executable
+    if redis_path is None:
+        # Look in common locations
+        possible_paths = [
+            r"C:\Temp\redis\redis-server.exe",  # Where we installed it
+            r"C:\Redis\redis-server.exe",
+            r"C:\Program Files\Redis\redis-server.exe"
+        ]
+
+        for path in possible_paths:
+            if os.path.exists(path):
+                redis_path = path
+                break
+
+    if not redis_path or not os.path.exists(redis_path):
+        ColorTheme.print_error("Redis executable not found. Please install Redis or specify path.")
+        print("   Download: https://github.com/microsoftarchive/redis/releases/download/win-3.0.504/Redis-x64-3.0.504.zip")
+        return False
+
+    try:
+        ColorTheme.print_system_msg(f"Starting Redis server from: {redis_path}", "🚀")
+        # Start Redis as background process
+        subprocess.Popen(
+            [redis_path, "--port", str(port)],
+            creationflags=subprocess.CREATE_NO_WINDOW,  # Hide console window
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
+        # Wait for Redis to start
+        for i in range(10):  # Wait up to 10 seconds
+            time.sleep(1)
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(1)
+                result = sock.connect_ex(('localhost', port))
+                sock.close()
+                if result == 0:
+                    ColorTheme.print_success(f"Redis started successfully on port {port}")
+                    return True
+            except:
+                continue
+
+        ColorTheme.print_error("Redis failed to start within timeout")
+        return False
+
+    except Exception as e:
+        ColorTheme.print_error(f"Failed to start Redis: {e}")
+        return False
+
 # Add project root to Python path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
@@ -102,7 +168,10 @@ logging.basicConfig(
 
 # Load environment variables first
 from dotenv import load_dotenv
-load_dotenv()
+# .env file is in the main ITORO root directory (parent of agent-systems)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+env_path = os.path.join(project_root, '.env')
+load_dotenv(env_path)
 
 # Import configuration
 from src.config import (
@@ -150,13 +219,13 @@ class MultiAgentScheduler:
     def _initialize_agents(self):
         """Initialize all agents with their execution methods and intervals"""
         try:
-            # Define agent execution order: OnChain -> Chart Analysis -> Whale -> OI -> Funding
+            # Define agent execution order: OI -> Funding -> OnChain -> Chart Analysis -> Whale
             if TOKEN_ONCHAIN_ENABLED:
-                self.agent_execution_order = ['onchain', 'chartanalysis', 'whale', 'oi', 'funding']
+                self.agent_execution_order = ['oi', 'funding', 'onchain', 'chartanalysis', 'whale']
             else:
-                self.agent_execution_order = ['chartanalysis', 'whale', 'oi', 'funding']
+                self.agent_execution_order = ['oi', 'funding', 'chartanalysis', 'whale']
             
-            # OnChain Agent - runs every hour (FIRST)
+            # OnChain Agent - runs every hour (THIRD)
             if TOKEN_ONCHAIN_ENABLED:
                 from src.agents.onchain_agent import OnChainAgent
                 onchain_agent = OnChainAgent()
@@ -164,73 +233,73 @@ class MultiAgentScheduler:
                     'instance': onchain_agent,
                     'interval_minutes': TOKEN_ONCHAIN_UPDATE_INTERVAL_MINUTES,
                     'last_run': None,
-                    'next_run': datetime.now(),
+                    'next_run': datetime.now() + timedelta(minutes=30),  # Start 30 minutes after launch
                     'execution_method': self._execute_onchain_analysis,
                     'status': 'idle',
                     'error_count': 0,
                     'max_retries': 3,
                     'max_runtime_minutes': 10,
-                    'order': 1
+                    'order': 3
                 }
             
-            # Chart Analysis Agent - runs every hour (SECOND)
+            # Chart Analysis Agent - runs every hour (FOURTH)
             chart_agent = ChartAnalysisAgent()
             self.agents['chartanalysis'] = {
                 'instance': chart_agent,
                 'interval_minutes': CHART_ANALYSIS_INTERVAL_MINUTES,
                 'last_run': None,
-                'next_run': datetime.now() + timedelta(minutes=15),  # Start 15 minutes after onchain
+                'next_run': datetime.now() + timedelta(minutes=45),  # Start 45 minutes after launch
                 'execution_method': self._execute_chart_analysis,
                 'status': 'idle',
                 'error_count': 0,
                 'max_retries': 3,
                 'max_runtime_minutes': 5,  # 5 minutes timeout
-                'order': 2
+                'order': 4
             }
             
-            # Whale Agent - runs every 48 hours (THIRD)
+            # Whale Agent - runs every 48 hours (FIFTH)
             whale_agent = WhaleAgent()
             self.agents['whale'] = {
                 'instance': whale_agent,
                 'interval_minutes': WHALE_UPDATE_INTERVAL_HOURS * 60,  # Convert hours to minutes
                 'last_run': None,
-                'next_run': datetime.now() + timedelta(minutes=30),  # Start 30 minutes after start
+                'next_run': datetime.now() + timedelta(minutes=60),  # Start 60 minutes after launch
                 'execution_method': self._execute_whale_analysis,
                 'status': 'idle',
                 'error_count': 0,
                 'max_retries': 3,
                 'max_runtime_minutes': 15,  # 15 minutes timeout
-                'order': 3
+                'order': 5
             }
             
-            # OI Agent - runs every 4 hours (FOURTH)
+            # OI Agent - runs every 4 hours (FIRST)
             oi_agent = OIAgent()
             self.agents['oi'] = {
                 'instance': oi_agent,
                 'interval_minutes': OI_CHECK_INTERVAL_HOURS * 60,  # Convert hours to minutes
                 'last_run': None,
-                'next_run': datetime.now() + timedelta(minutes=45),  # Start 45 minutes after launch (after whale)
+                'next_run': datetime.now(),  # Start immediately
                 'execution_method': self._execute_oi_analysis,
                 'status': 'idle',
                 'error_count': 0,
                 'max_retries': 3,
                 'max_runtime_minutes': 10,  # 10 minutes timeout
-                'order': 4
+                'order': 1
             }
             
-            # Funding Agent - runs every 2 hours (FIFTH)
+            # Funding Agent - runs every 2 hours (SECOND)
             funding_agent = FundingAgent()
             self.agents['funding'] = {
                 'instance': funding_agent,
                 'interval_minutes': FUNDING_CHECK_INTERVAL_MINUTES,  # Already in minutes
                 'last_run': None,
-                'next_run': datetime.now() + timedelta(minutes=60),  # Start 60 minutes after launch (after OI)
+                'next_run': datetime.now() + timedelta(minutes=15),  # Start 15 minutes after OI
                 'execution_method': self._execute_funding_analysis,
                 'status': 'idle',
                 'error_count': 0,
                 'max_retries': 3,
                 'max_runtime_minutes': 10,  # 10 minutes timeout
-                'order': 5
+                'order': 2
             }
             
             # Initialize locks for each agent
@@ -700,7 +769,15 @@ def main():
         
         # Print the banner
         ColorTheme.print_banner()
-        
+
+        # Ensure Redis is running before starting data collection
+        print(f"\n{ColorTheme.CYAN_BRIGHT}Checking Redis infrastructure...{ColorTheme.RESET}")
+        if not ensure_redis_running():
+            ColorTheme.print_error("Cannot start Data Farm without Redis. Please install Redis and try again.")
+            print(f"{ColorTheme.GRAY}Redis is required for real-time agent communication.{ColorTheme.RESET}")
+            sys.exit(1)
+        print()
+
         # Animated loading sequence
         print(f"\n{ColorTheme.YELLOW}Initializing Data Farm Neural Network...{ColorTheme.RESET}\n")
         time.sleep(0.3)

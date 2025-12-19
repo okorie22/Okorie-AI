@@ -17,9 +17,20 @@ try:
     from src.scripts.shared_services.logger import debug, info, warning, error, critical, system, logger
     import src.config as config
 except ImportError:
-    # Try relative imports when running from test directory
-    from src.scripts.shared_services.logger import debug, info, warning, error, critical, system, logger
-    import src.config as config
+    try:
+        # Try relative imports when running from test directory
+        from src.scripts.shared_services.logger import debug, info, warning, error, critical, system, logger
+        import src.config as config
+    except ImportError:
+        # Fallback if logger is not available - define dummy functions
+        def debug(msg, **kwargs): print(f"[DEBUG] {msg}")
+        def info(msg, **kwargs): print(f"[INFO] {msg}")
+        def warning(msg, **kwargs): print(f"[WARN] {msg}")
+        def error(msg, **kwargs): print(f"[ERROR] {msg}")
+        def critical(msg, **kwargs): print(f"[CRITICAL] {msg}")
+        def system(msg, **kwargs): print(f"[SYSTEM] {msg}")
+        logger = None
+        import config  # Try to import config directly
 
 # Environment variables will be loaded by config.py import
 # We'll get the API key after the import

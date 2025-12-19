@@ -26,8 +26,8 @@ except ImportError:
     def error(msg):
         print(f"ERROR: {msg}")
 
-# Get project root
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+# Get project root (go up to itoro directory)
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 
 
 class OIStorage:

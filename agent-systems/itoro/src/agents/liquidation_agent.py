@@ -95,7 +95,20 @@ class LiquidationAgent(BaseAgent):
         print(f"🌐 Monitoring exchanges: {', '.join(self.exchanges)}")
         print(f"📈 Using {self.lookback_bars} {self.timeframe} candles for market context")
         print(f"⏱️  Comparison window: {self.comparison_window} minutes")
-        
+
+    def _serialize_for_json(self, data):
+        """Convert pandas objects to JSON-serializable format"""
+        if isinstance(data, dict):
+            return {k: self._serialize_for_json(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._serialize_for_json(item) for item in data]
+        elif hasattr(data, 'isoformat'):  # pandas Timestamp, datetime, etc.
+            return data.isoformat()
+        elif hasattr(data, 'item'):  # numpy scalars
+            return data.item()
+        else:
+            return data
+
     def _get_current_liquidations(self, symbol: str):
         """
         Get current liquidation data from local storage for a symbol

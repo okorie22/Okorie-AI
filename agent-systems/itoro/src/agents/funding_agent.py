@@ -132,7 +132,20 @@ class FundingAgent(BaseAgent):
         print(f"🎯 Mid-range alerts: below {MID_NEGATIVE_THRESHOLD}% or above {MID_POSITIVE_THRESHOLD}%")
         print(f"🚨 Extreme alerts (AI): below {NEGATIVE_THRESHOLD}% or above {POSITIVE_THRESHOLD}%")
         print(f"📊 Monitoring {len(SYMBOL_NAMES)} symbols every {CHECK_INTERVAL_MINUTES} minutes")
-        
+
+    def _serialize_for_json(self, data):
+        """Convert pandas objects to JSON-serializable format"""
+        if isinstance(data, dict):
+            return {k: self._serialize_for_json(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._serialize_for_json(item) for item in data]
+        elif hasattr(data, 'isoformat'):  # pandas Timestamp, datetime, etc.
+            return data.isoformat()
+        elif hasattr(data, 'item'):  # numpy scalars
+            return data.item()
+        else:
+            return data
+
     def _analyze_opportunity(self, symbol, funding_data, market_data):
         """Get AI analysis of the opportunity"""
         try:
@@ -719,7 +732,7 @@ class FundingAgent(BaseAgent):
                             'annual_rate': annual_rate,
                             'threshold_breached': NEGATIVE_THRESHOLD if annual_rate < NEGATIVE_THRESHOLD else POSITIVE_THRESHOLD,
                             'direction': 'negative_extreme' if annual_rate < NEGATIVE_THRESHOLD else 'positive_extreme',
-                            'market_data': row.to_dict()
+                            'market_data': self._serialize_for_json(row.to_dict())
                         },
                         timestamp=datetime.now(),
                         metadata={

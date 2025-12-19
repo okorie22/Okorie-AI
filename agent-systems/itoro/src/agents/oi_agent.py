@@ -141,6 +141,19 @@ class OIAgent(BaseAgent):
         info(f"📊 OI Agent initialized - tracking {len(TRACKED_SYMBOLS)} symbols every {CHECK_INTERVAL_HOURS}h")
         info("🔄 Event bus connected for real-time alert publishing")
 
+    def _serialize_for_json(self, data):
+        """Convert pandas objects to JSON-serializable format"""
+        if isinstance(data, dict):
+            return {k: self._serialize_for_json(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._serialize_for_json(item) for item in data]
+        elif hasattr(data, 'isoformat'):  # pandas Timestamp, datetime, etc.
+            return data.isoformat()
+        elif hasattr(data, 'item'):  # numpy scalars
+            return data.item()
+        else:
+            return data
+
     def get_funding_rates(self, symbol):
         """
         Get current funding rate for a specific coin on Hyperliquid
@@ -433,7 +446,7 @@ class OIAgent(BaseAgent):
                                     'oi_change_pct': oi_change,
                                     'timeframe': '4h',
                                     'current_oi': record.get('current_oi', 0),
-                                    'analytics': record
+                                    'analytics': self._serialize_for_json(record)
                                 },
                                 timestamp=datetime.now(),
                                 metadata={
@@ -465,7 +478,7 @@ class OIAgent(BaseAgent):
             
             # Step 5: Generate AI insights (if enabled)
             insights = []
-            if AI_INSIGHTS_ENABLED and self.ai_client:
+            if AI_INSIGHTS_ENABLED and self.ai_model:
                 info("\n🤖 Generating AI insights...")
                 insights = self.generate_ai_insights(analytics)
             
