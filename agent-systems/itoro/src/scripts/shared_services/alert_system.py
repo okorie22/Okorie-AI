@@ -21,6 +21,7 @@ class AlertType(Enum):
     """Types of market alerts that agents can generate"""
     OI_SIGNIFICANT_CHANGE = "oi_change"
     FUNDING_RATE_EXTREME = "funding_extreme"
+    FUNDING_RATE_MID_RANGE = "funding_mid_range"
     LIQUIDATION_SPIKE = "liquidation_spike"
     SENTIMENT_SHIFT = "sentiment_shift"
     PRICE_BREAKOUT = "price_breakout"
@@ -124,6 +125,7 @@ class MarketAlert:
         descriptions = {
             AlertType.OI_SIGNIFICANT_CHANGE: f"OI change: {self.data.get('oi_change_pct', 0):+.1f}%",
             AlertType.FUNDING_RATE_EXTREME: f"Funding rate: {self.data.get('funding_rate', 0):.2f}%",
+            AlertType.FUNDING_RATE_MID_RANGE: f"Funding rate: {self.data.get('funding_rate', 0):.2f}%",
             AlertType.LIQUIDATION_SPIKE: f"Liquidations: ${self.data.get('total_liquidations', 0):,.0f}",
             AlertType.SENTIMENT_SHIFT: f"Sentiment: {self.data.get('sentiment', 'unknown')}",
             AlertType.PRICE_BREAKOUT: f"Price breakout: {self.data.get('direction', 'unknown')}",

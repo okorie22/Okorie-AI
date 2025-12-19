@@ -149,7 +149,7 @@ class OIAnalytics:
             long_short_ratio = None
             
             return {
-                'timestamp': current_time,
+                'timestamp': current_time.isoformat() if hasattr(current_time, 'isoformat') else str(current_time),
                 'timeframe': timeframe,
                 'symbol': symbol,
                 'oi_change_pct': oi_change_pct,

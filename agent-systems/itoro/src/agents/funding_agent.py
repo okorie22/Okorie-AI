@@ -748,6 +748,31 @@ class FundingAgent(BaseAgent):
                 elif annual_rate < MID_NEGATIVE_THRESHOLD or annual_rate > MID_POSITIVE_THRESHOLD:
                     alert_level = "MID-RANGE⚠️"
                     status = "Monitoring"
+
+                    # Publish mid-range alerts via Redis event bus
+                    alert = MarketAlert(
+                        agent_source="funding_agent",
+                        alert_type=AlertType.FUNDING_RATE_MID_RANGE,
+                        symbol=symbol,
+                        severity=AlertSeverity.MEDIUM,
+                        confidence=0.7,  # Mid-range alerts get medium confidence
+                        data={
+                            'funding_rate': annual_rate,
+                            'annual_rate': annual_rate,
+                            'threshold_breached': MID_NEGATIVE_THRESHOLD if annual_rate < MID_NEGATIVE_THRESHOLD else MID_POSITIVE_THRESHOLD,
+                            'direction': 'negative_mid' if annual_rate < MID_NEGATIVE_THRESHOLD else 'positive_mid',
+                            'market_data': self._serialize_for_json(row.to_dict())
+                        },
+                        timestamp=datetime.now(),
+                        metadata={
+                            'alert_level': 'MID-RANGE',
+                            'funding_rate_pct': annual_rate
+                        }
+                    )
+
+                    # Publish to event bus
+                    self.event_bus.publish('market_alert', alert.to_dict())
+                    print(f"⚠️ Published mid-range funding alert for {symbol}: {annual_rate:.2f}% annual rate")
                 else:
                     alert_level = "NORMAL ✓"
                     status = "Collecting"

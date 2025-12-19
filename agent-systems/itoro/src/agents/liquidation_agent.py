@@ -301,18 +301,21 @@ Consider the ratio of long vs short liquidations and their relative changes
             
     def run_monitoring_cycle(self, reporter=None):
         """Run one monitoring cycle across all symbols
-        
+
         Args:
             reporter: Optional AgentReporter for dashboard integration
+
+        Returns:
+            int: Number of alerts detected in this cycle
         """
         try:
             print(f"\n{'='*70}")
             print(f"🌊 Liquidation Monitoring Cycle - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             print(f"{'='*70}")
-            
+
             # Track symbols status for dashboard
             symbols_data = {}
-            alert_detected = False
+            alert_count = 0
             
             # Check each symbol
             for symbol in self.symbols:
@@ -337,7 +340,7 @@ Consider the ratio of long vs short liquidations and their relative changes
                         if longs_spike or shorts_spike:
 
                             print(f"\n🚨 SIGNIFICANT LIQUIDATION SPIKE DETECTED for {symbol}!")
-                            alert_detected = True
+                            alert_count += 1
                             symbols_data[symbol] = "🚨 ALERT"
 
                             # Calculate percentage changes
@@ -415,15 +418,18 @@ Consider the ratio of long vs short liquidations and their relative changes
             # Report cycle completion to dashboard
             if reporter:
                 reporter.report_cycle_complete(
-                    metrics={'symbols_checked': len(self.symbols), 'alerts': alert_detected},
+                    metrics={'symbols_checked': len(self.symbols), 'alerts': alert_count},
                     symbols=symbols_data
                 )
-                
+
+            return alert_count
+
         except Exception as e:
             print(f"❌ Error in monitoring cycle: {str(e)}")
             if reporter:
                 reporter.report_error(f"Cycle error: {str(e)}", e)
             traceback.print_exc()
+            return 0
 
     def run(self):
         """Run the liquidation monitor continuously"""

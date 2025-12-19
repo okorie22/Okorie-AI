@@ -335,13 +335,13 @@ class OIAgent(BaseAgent):
 
             for record in analytics[:5]:  # Limit to top 5 to save tokens
                 try:
-                    # Prepare prompt
+                    # Prepare prompt with safe None handling
                     prompt = AI_INSIGHTS_PROMPT.format(
                         symbol=record.get('symbol', 'N/A'),
                         timeframe=record.get('timeframe', 'N/A'),
-                        oi_change_pct=f"{record.get('oi_change_pct', 0):.2f}",
-                        funding_change_pct=f"{record.get('funding_rate_change_pct', 0):.2f}" if record.get('funding_rate_change_pct') else "N/A",
-                        oi_volume_ratio=f"{record.get('oi_volume_ratio', 0):.2f}" if record.get('oi_volume_ratio') else "N/A",
+                        oi_change_pct=f"{record.get('oi_change_pct', 0):.2f}" if record.get('oi_change_pct') is not None else "N/A",
+                        funding_change_pct=f"{record.get('funding_rate_change_pct', 0):.2f}" if record.get('funding_rate_change_pct') is not None else "N/A",
+                        oi_volume_ratio=f"{record.get('oi_volume_ratio', 0):.2f}" if record.get('oi_volume_ratio') is not None else "N/A",
                         liquidity_status=record.get('metadata', {}).get('liquidity_status', 'unknown')
                     )
 
@@ -360,7 +360,7 @@ class OIAgent(BaseAgent):
                         'symbol': record['symbol'],
                         'timeframe': record['timeframe'],
                         'insight': insight_text,
-                        'timestamp': record['timestamp']
+                        'timestamp': record['timestamp'].isoformat() if hasattr(record['timestamp'], 'isoformat') else str(record['timestamp'])
                     })
 
                 except Exception as e:
@@ -421,10 +421,15 @@ class OIAgent(BaseAgent):
                     if record['timeframe'] == '4h':
                         symbol = record['symbol']
                         oi_change = record['oi_change_pct']
-                        symbols_data[symbol] = f"{oi_change:+.1f}%"
+
+                        # Handle None values safely
+                        if oi_change is not None:
+                            symbols_data[symbol] = f"{oi_change:+.1f}%"
+                        else:
+                            symbols_data[symbol] = "N/A"
                         
                         # Publish alerts for significant changes via Redis event bus
-                        if abs(oi_change) > 15:  # Threshold for alert
+                        if oi_change is not None and abs(oi_change) > 15:  # Threshold for alert
                             # Determine severity based on magnitude
                             if abs(oi_change) > 30:
                                 severity = AlertSeverity.CRITICAL
@@ -457,7 +462,10 @@ class OIAgent(BaseAgent):
 
                             # Publish to event bus
                             self.event_bus.publish('market_alert', alert.to_dict())
-                            info(f"🚨 Published OI alert for {symbol}: {oi_change:+.1f}% change")
+                            if oi_change is not None:
+                                info(f"🚨 Published OI alert for {symbol}: {oi_change:+.1f}% change")
+                            else:
+                                info(f"🚨 Published OI alert for {symbol}: N/A% change")
                 
                 # Display sample analytics
                 if len(analytics) > 0:
