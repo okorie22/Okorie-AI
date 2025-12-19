@@ -45,10 +45,6 @@ class LiquidationWebSocketManager:
             'url': 'wss://ws.okx.com:8443/ws/v5/public',
             'type': 'futures'
         },
-        'kucoin': {
-            'url': 'wss://ws-api-futures.kucoin.com/',
-            'type': 'futures'
-        },
         'bitfinex': {
             'url': 'wss://api-pub.bitfinex.com/ws/2',
             'type': 'futures'
@@ -70,6 +66,11 @@ class LiquidationWebSocketManager:
         self.event_counts = {exchange: 0 for exchange in self.EXCHANGES.keys()}
         self.last_event_time = {exchange: None for exchange in self.EXCHANGES.keys()}
         self.connection_status = {exchange: 'disconnected' for exchange in self.EXCHANGES.keys()}
+        
+        # Track rapid failures to disable problematic exchanges
+        self.rapid_failures = {exchange: 0 for exchange in self.EXCHANGES.keys()}
+        self.last_failure_time = {exchange: None for exchange in self.EXCHANGES.keys()}
+        self.disabled_exchanges = set()  # Exchanges that are disabled due to repeated failures
         
         # Event buffer for recent events (for calculating metrics)
         self.recent_events = deque(maxlen=1000)
@@ -109,14 +110,26 @@ class LiquidationWebSocketManager:
         """
         reconnect_delay = 1  # Start with 1 second
         max_delay = 60  # Max 60 seconds between reconnections
+        connection_start_time = None
         
         while self.running:
+            # Skip if exchange is disabled due to repeated failures
+            if exchange in self.disabled_exchanges:
+                await asyncio.sleep(300)  # Check every 5 minutes if we should retry
+                # Reset failure count after 5 minutes to allow retry
+                if time.time() - (self.last_failure_time.get(exchange, 0) or 0) > 300:
+                    self.rapid_failures[exchange] = 0
+                    self.disabled_exchanges.discard(exchange)
+                    info(f"🔄 Retrying {exchange} after cooldown period")
+                continue
+            
             try:
                 self.connection_status[exchange] = 'connecting'
                 info(f"🔌 Connecting to {exchange}...")
                 
                 exchange_config = self.EXCHANGES[exchange]
                 url = exchange_config['url']
+                connection_start_time = time.time()
                 
                 async with websockets.connect(
                     url,
@@ -131,23 +144,58 @@ class LiquidationWebSocketManager:
                     # Subscribe to liquidation streams
                     await self._subscribe_liquidations(exchange, websocket)
                     
-                    # Reset reconnect delay on successful connection
+                    # Reset failure tracking on successful connection
                     reconnect_delay = 1
+                    self.rapid_failures[exchange] = 0
+                    self.last_failure_time[exchange] = None
                     
                     # Handle incoming messages
                     await self._handle_messages(exchange, websocket)
                     
             except websockets.exceptions.ConnectionClosed as e:
                 self.connection_status[exchange] = 'disconnected'
-                warning(f"⚠️ {exchange} connection closed: {e}")
+                
+                # Check if connection closed very quickly (within 3 seconds) - indicates protocol/auth issue
+                connection_duration = time.time() - connection_start_time if connection_start_time else 0
+                
+                if connection_duration < 3:
+                    # Rapid failure - connection closed immediately
+                    self.rapid_failures[exchange] += 1
+                    self.last_failure_time[exchange] = time.time()
+                    
+                    if self.rapid_failures[exchange] >= 5:
+                        warning(f"⚠️ {exchange} failed {self.rapid_failures[exchange]} times rapidly - disabling for 5 minutes")
+                        self.disabled_exchanges.add(exchange)
+                        self.connection_status[exchange] = 'disabled'
+                        await asyncio.sleep(300)  # Wait 5 minutes before retrying
+                        self.rapid_failures[exchange] = 0
+                        continue
+                    else:
+                        warning(f"⚠️ {exchange} connection closed quickly ({connection_duration:.1f}s) - rapid failure #{self.rapid_failures[exchange]}/5")
+                else:
+                    # Normal disconnection - reset rapid failure counter
+                    self.rapid_failures[exchange] = 0
+                    warning(f"⚠️ {exchange} connection closed: {e}")
                 
             except Exception as e:
                 self.connection_status[exchange] = 'error'
                 error(f"❌ {exchange} error: {str(e)}")
                 error(traceback.format_exc())
+                
+                # Track rapid failures for exceptions too
+                self.rapid_failures[exchange] += 1
+                self.last_failure_time[exchange] = time.time()
+                
+                if self.rapid_failures[exchange] >= 5:
+                    warning(f"⚠️ {exchange} error {self.rapid_failures[exchange]} times rapidly - disabling for 5 minutes")
+                    self.disabled_exchanges.add(exchange)
+                    self.connection_status[exchange] = 'disabled'
+                    await asyncio.sleep(300)  # Wait 5 minutes before retrying
+                    self.rapid_failures[exchange] = 0
+                    continue
             
-            # Reconnect with exponential backoff
-            if self.running:
+            # Reconnect with exponential backoff (only if not disabled)
+            if self.running and exchange not in self.disabled_exchanges:
                 info(f"🔄 Reconnecting to {exchange} in {reconnect_delay}s...")
                 await asyncio.sleep(reconnect_delay)
                 reconnect_delay = min(reconnect_delay * 2, max_delay)
@@ -190,10 +238,6 @@ class LiquidationWebSocketManager:
                 }
                 await websocket.send(json.dumps(subscribe_msg))
                 debug(f"{exchange}: Subscribed to liquidation streams", file_only=True)
-                
-            elif exchange == 'kucoin':
-                # KuCoin requires token-based connection (simplified for now)
-                debug(f"{exchange}: Connection established (token auth required for full functionality)", file_only=True)
                 
             elif exchange == 'bitfinex':
                 # Subscribe to liquidation feed
@@ -262,8 +306,6 @@ class LiquidationWebSocketManager:
                 return self._normalize_bybit(raw_data)
             elif exchange == 'okx':
                 return self._normalize_okx(raw_data)
-            elif exchange == 'kucoin':
-                return self._normalize_kucoin(raw_data)
             elif exchange == 'bitfinex':
                 return self._normalize_bitfinex(raw_data)
             else:
@@ -368,36 +410,6 @@ class LiquidationWebSocketManager:
                 }
         except Exception as e:
             debug(f"OKX normalization error: {str(e)}", file_only=True)
-        return None
-    
-    def _normalize_kucoin(self, data: Dict) -> Optional[Dict]:
-        """Normalize KuCoin liquidation event"""
-        try:
-            # KuCoin liquidation format (simplified)
-            if data.get('type') == 'message' and data.get('topic', '').startswith('/contractMarket/liquidation'):
-                liq_data = data.get('data', {})
-                
-                symbol = liq_data.get('symbol', '').replace('USDTM', '')
-                
-                if symbol not in self.symbols:
-                    return None
-                
-                side = 'long' if liq_data.get('side') == 'sell' else 'short'
-                price = float(liq_data.get('filledPrice', 0))
-                quantity = float(liq_data.get('filledSize', 0))
-                
-                return {
-                    'timestamp': datetime.now(),
-                    'event_time': datetime.fromtimestamp(int(liq_data.get('createdAt', 0)) / 1000),
-                    'exchange': 'kucoin',
-                    'symbol': symbol,
-                    'side': side,
-                    'price': price,
-                    'quantity': quantity,
-                    'usd_value': price * quantity
-                }
-        except Exception as e:
-            debug(f"KuCoin normalization error: {str(e)}", file_only=True)
         return None
     
     def _normalize_bitfinex(self, data: Dict) -> Optional[Dict]:

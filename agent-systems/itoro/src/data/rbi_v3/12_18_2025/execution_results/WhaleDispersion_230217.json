@@ -1,8 +1,0 @@
-{
-  "success": false,
-  "return_code": 1,
-  "stdout": "[INFO] Loading data...\n[DEBUG] Loading on-chain data...\n[DEBUG] On-chain data shape: (7, 2)\n[DEBUG] On-chain data columns: ['timestamp', 'tokens']\n[DEBUG] Cleaned columns: ['timestamp', 'tokens']\n[ERROR] Missing columns in on-chain data: ['symbol', 'whale_concentration', 'market_cap']\n",
-  "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\Top Cash Pawn\\ITORO\\agent-systems\\itoro\\src\\data\\rbi_v3\\12_18_2025\\backtests_package\\WhaleDispersion_PKG.py\", line 27, in <module>\n    raise ValueError(f\"Missing required columns: {missing_cols}\")\nValueError: Missing required columns: ['symbol', 'whale_concentration', 'market_cap']\n",
-  "execution_time": 7.124251,
-  "timestamp": "2025-12-18T23:02:17.391098"
-}

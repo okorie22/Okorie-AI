@@ -2,7 +2,7 @@ import os
 import json
 import time
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import requests
 from src.scripts.shared_services.logger import info
@@ -732,5 +732,112 @@ class RestDatabaseManager:
         except Exception as e:
             print(f"Failed to save funding analytics via REST: {e}")
             return False
+
+    # --------------- liquidation API ---------------
+    def save_liquidation_events(self, events_list: List[Dict]) -> bool:
+        """Save liquidation events to cloud database via REST API"""
+        try:
+            if not events_list:
+                return False
+
+            success_count = 0
+            for event in events_list:
+                # Convert datetime objects to ISO strings for JSON serialization
+                event_time = event.get('event_time')
+                if hasattr(event_time, 'isoformat'):
+                    event_time_str = event_time.isoformat()
+                else:
+                    event_time_str = str(event_time)
+
+                timestamp = event.get('timestamp')
+                if hasattr(timestamp, 'isoformat'):
+                    timestamp_str = timestamp.isoformat()
+                else:
+                    timestamp_str = str(timestamp)
+
+                payload = {
+                    'timestamp': timestamp_str,
+                    'event_time': event_time_str,
+                    'exchange': event.get('exchange'),
+                    'symbol': event.get('symbol'),
+                    'side': event.get('side'),
+                    'price': event.get('price'),
+                    'quantity': event.get('quantity'),
+                    'usd_value': event.get('usd_value'),
+                    'order_type': event.get('order_type'),
+                    'time_in_force': event.get('time_in_force'),
+                    'average_price': event.get('average_price'),
+                    'cumulative_1m_usd': event.get('cumulative_1m_usd'),
+                    'event_velocity_1m': event.get('event_velocity_1m'),
+                    'cumulative_5m_usd': event.get('cumulative_5m_usd'),
+                    'cumulative_15m_usd': event.get('cumulative_15m_usd'),
+                    'cascade_score': event.get('cascade_score'),
+                    'cluster_size': event.get('cluster_size'),
+                    'concurrent_exchanges': event.get('concurrent_exchanges'),
+                    'dominant_exchange': event.get('dominant_exchange'),
+                    'batch_id': event.get('batch_id'),
+                    'event_id': event.get('event_id')
+                }
+
+                if self._post('liquidation_events', payload):
+                    success_count += 1
+
+            return success_count > 0
+
+        except Exception as e:
+            print(f"Failed to save liquidation events via REST: {e}")
+            return False
+
+    def save_liquidation_analytics(self, analytics_records: List[Dict]) -> bool:
+        """Save liquidation analytics to cloud database via REST API"""
+        try:
+            if not analytics_records:
+                return False
+
+            success_count = 0
+            for record in analytics_records:
+                # Convert datetime objects to ISO strings
+                timestamp = record.get('timestamp')
+                if hasattr(timestamp, 'isoformat'):
+                    timestamp_str = timestamp.isoformat()
+                else:
+                    timestamp_str = str(timestamp)
+
+                payload = {
+                    'timestamp': timestamp_str,
+                    'symbol': record.get('symbol'),
+                    'total_liquidations': record.get('total_liquidations', 0),
+                    'long_liquidations': record.get('long_liquidations', 0),
+                    'short_liquidations': record.get('short_liquidations', 0),
+                    'long_events': record.get('long_events', 0),
+                    'short_events': record.get('short_events', 0),
+                    'total_events': record.get('total_events', 0),
+                    'timeframe_minutes': record.get('timeframe_minutes', 15),
+                    'analysis_type': record.get('analysis_type', 'summary'),
+                    'metadata': record.get('metadata', {})
+                }
+
+                if self._post('liquidation_analytics', payload):
+                    success_count += 1
+
+            return success_count > 0
+
+        except Exception as e:
+            print(f"Failed to save liquidation analytics via REST: {e}")
+            return False
+
+    def get_recent_liquidations(self, symbol: str = None, hours: int = 24) -> List[Dict]:
+        """Get recent liquidations from cloud database via REST API"""
+        try:
+            params = {'hours': hours}
+            if symbol:
+                params['symbol'] = f'eq.{symbol}'
+
+            result = self._get('liquidation_events', params)
+            return result if result else []
+
+        except Exception as e:
+            print(f"Failed to get recent liquidations via REST: {e}")
+            return []
 
 

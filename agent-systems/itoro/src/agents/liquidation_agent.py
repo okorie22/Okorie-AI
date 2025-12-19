@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from termcolor import colored, cprint
 from dotenv import load_dotenv
 from pathlib import Path
+import json
 
 # Add project root to Python path for direct script execution
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -112,12 +113,12 @@ class LiquidationAgent(BaseAgent):
     def _get_current_liquidations(self, symbol: str):
         """
         Get current liquidation data from local storage for a symbol
-        
+
         Args:
             symbol: Symbol to analyze (e.g., 'BTC')
-        
+
         Returns:
-            Tuple of (long_liquidations, short_liquidations) or (None, None)
+            Tuple of (long_liquidations, short_liquidations, long_events, short_events) or (None, None, None, None)
         """
         try:
             print(f"\n🔍 Fetching liquidation data for {symbol}...")
@@ -125,25 +126,25 @@ class LiquidationAgent(BaseAgent):
             # Load recent data from storage
             hours_to_load = max(1, int(self.comparison_window / 60) + 1)
             history = self.storage.load_history(hours=hours_to_load)
-            
+
             if history is None or history.empty:
                 print(f"⚠️ No liquidation history found for {symbol}")
-                return None, None
-            
+                return None, None, None, None
+
             # Filter for the symbol
             symbol_history = history[history['symbol'] == symbol]
-            
+
             if symbol_history.empty:
                 print(f"⚠️ No data found for {symbol}")
-                return None, None
-            
+                return None, None, None, None
+
             # Calculate time window
             cutoff_time = datetime.now() - timedelta(minutes=self.comparison_window)
             recent_data = symbol_history[symbol_history['event_time'] >= cutoff_time]
-            
+
             if recent_data.empty:
                 print(f"⚠️ No recent data for {symbol} (window: {self.comparison_window}min)")
-                return None, None
+                return None, None, None, None
             
             # Separate long and short liquidations
             long_liquidations = recent_data[recent_data['side'] == 'long']['usd_value'].sum()
@@ -164,13 +165,13 @@ class LiquidationAgent(BaseAgent):
             print(f"║  SHORTS: ${short_liquidations:,.2f} ({short_events} events)".ljust(71) + "║")
             print(f"║  Total Events: {len(recent_data):<10} Exchanges Active: {exchanges_active}".ljust(71) + "║")
             print("╚" + "═" * 70 + "╝")
-            
-            return long_liquidations, short_liquidations
-            
+
+            return long_liquidations, short_liquidations, long_events, short_events
+
         except Exception as e:
             print(f"❌ Error getting liquidation data for {symbol}: {str(e)}")
             traceback.print_exc()
-            return None, None
+            return None, None, None, None
             
     def _analyze_opportunity(self, symbol: str, current_longs: float, current_shorts: float, 
                             previous_longs: float, previous_shorts: float):
@@ -317,8 +318,8 @@ Consider the ratio of long vs short liquidations and their relative changes
             for symbol in self.symbols:
                 try:
                     # Get current liquidation data
-                    current_longs, current_shorts = self._get_current_liquidations(symbol)
-                    
+                    current_longs, current_shorts, current_long_events, current_short_events = self._get_current_liquidations(symbol)
+
                     if current_longs is None or current_shorts is None:
                         continue
                     
@@ -327,85 +328,85 @@ Consider the ratio of long vs short liquidations and their relative changes
                     if symbol_key in self.previous_values:
                         previous_longs = self.previous_values[symbol_key]['longs']
                         previous_shorts = self.previous_values[symbol_key]['shorts']
-                        
-                        # Only trigger if we have valid previous data
-                        if previous_longs > 0 and previous_shorts > 0:
-                            # Check if we have a significant increase
-                            threshold = 1 + self.threshold
-                            if (current_longs > (previous_longs * threshold) or 
-                                current_shorts > (previous_shorts * threshold)):
-                                
-                                print(f"\n🚨 SIGNIFICANT LIQUIDATION SPIKE DETECTED for {symbol}!")
-                                alert_detected = True
-                                symbols_data[symbol] = "🚨 ALERT"
-                                
-                                # Calculate percentage changes
-                                pct_change_longs = ((current_longs - previous_longs) / previous_longs) * 100
-                                pct_change_shorts = ((current_shorts - previous_shorts) / previous_shorts) * 100
-                                
-                                # Publish alerts via Redis event bus
-                                # Determine severity based on magnitude
-                                total_change = abs(pct_change_longs) + abs(pct_change_shorts)
-                                if total_change > 100:  # Very large spike
-                                    severity = AlertSeverity.CRITICAL
-                                    confidence = min(total_change / 200, 0.95)
-                                elif total_change > 50:  # Significant spike
-                                    severity = AlertSeverity.HIGH
-                                    confidence = min(total_change / 150, 0.85)
-                                else:  # Moderate spike
-                                    severity = AlertSeverity.MEDIUM
-                                    confidence = min(total_change / 100, 0.75)
 
-                                alert = MarketAlert(
-                                    agent_source="liquidation_agent",
-                                    alert_type=AlertType.LIQUIDATION_SPIKE,
-                                    symbol=symbol,
-                                    severity=severity,
-                                    confidence=confidence,
-                                    data={
-                                        'total_liquidations': current_longs + current_shorts,
-                                        'long_liquidations': current_longs,
-                                        'short_liquidations': current_shorts,
-                                        'long_liquidations_pct': pct_change_longs,
-                                        'short_liquidations_pct': pct_change_shorts,
-                                        'total_change_pct': total_change,
-                                        'timeframe_minutes': self.comparison_window,
-                                        'threshold_triggered': self.threshold
-                                    },
-                                    timestamp=datetime.now(),
-                                    metadata={
-                                        'liquidation_analysis': True,
-                                        'market_impact': 'high' if total_change > 75 else 'medium',
-                                        'ai_analyzed': True
-                                    }
-                                )
+                        # Check for significant increases in ANY liquidation activity
+                        threshold = 1 + self.threshold
+                        longs_spike = previous_longs > 0 and current_longs > (previous_longs * threshold)
+                        shorts_spike = previous_shorts > 0 and current_shorts > (previous_shorts * threshold)
 
-                                # Publish to event bus
-                                self.event_bus.publish('market_alert', alert.to_dict())
-                                print(f"🌊 Published liquidation alert for {symbol}: ${current_longs + current_shorts:,.0f} total liquidations")
-                                
-                                # Get AI analysis
-                                analysis = self._analyze_opportunity(
-                                    symbol, current_longs, current_shorts,
-                                    previous_longs, previous_shorts
-                                )
-                                
-                                if analysis:
-                                    self._print_analysis(analysis)
-                            else:
-                                symbols_data[symbol] = "NORMAL"
+                        if longs_spike or shorts_spike:
+
+                            print(f"\n🚨 SIGNIFICANT LIQUIDATION SPIKE DETECTED for {symbol}!")
+                            alert_detected = True
+                            symbols_data[symbol] = "🚨 ALERT"
+
+                            # Calculate percentage changes
+                            pct_change_longs = ((current_longs - previous_longs) / previous_longs) * 100
+                            pct_change_shorts = ((current_shorts - previous_shorts) / previous_shorts) * 100
+
+                            # Publish alerts via Redis event bus
+                            # Determine severity based on magnitude
+                            total_change = abs(pct_change_longs) + abs(pct_change_shorts)
+                            if total_change > 100:  # Very large spike
+                                severity = AlertSeverity.CRITICAL
+                                confidence = min(total_change / 200, 0.95)
+                            elif total_change > 50:  # Significant spike
+                                severity = AlertSeverity.HIGH
+                                confidence = min(total_change / 150, 0.85)
+                            else:  # Moderate spike
+                                severity = AlertSeverity.MEDIUM
+                                confidence = min(total_change / 100, 0.75)
+
+                            alert = MarketAlert(
+                                agent_source="liquidation_agent",
+                                alert_type=AlertType.LIQUIDATION_SPIKE,
+                                symbol=symbol,
+                                severity=severity,
+                                confidence=confidence,
+                                data={
+                                    'total_liquidations': current_longs + current_shorts,
+                                    'long_liquidations': current_longs,
+                                    'short_liquidations': current_shorts,
+                                    'long_liquidations_pct': pct_change_longs,
+                                    'short_liquidations_pct': pct_change_shorts,
+                                    'total_change_pct': total_change,
+                                    'timeframe_minutes': self.comparison_window,
+                                    'threshold_triggered': self.threshold
+                                },
+                                timestamp=datetime.now(),
+                                metadata={
+                                    'liquidation_analysis': True,
+                                    'market_impact': 'high' if total_change > 75 else 'medium',
+                                    'ai_analyzed': True
+                                }
+                            )
+
+                            # Publish to event bus
+                            self.event_bus.publish('market_alert', alert.to_dict())
+                            print(f"🌊 Published liquidation alert for {symbol}: ${current_longs + current_shorts:,.0f} total liquidations")
+
+                            # Get AI analysis
+                            analysis = self._analyze_opportunity(
+                                symbol, current_longs, current_shorts,
+                                previous_longs, previous_shorts
+                            )
+
+                            if analysis:
+                                self._print_analysis(analysis)
                         else:
                             symbols_data[symbol] = "NORMAL"
                     else:
                         symbols_data[symbol] = "NORMAL"
-                    
-                    # Update previous values
+
+                    # Update previous values (always update, regardless of alerts)
                     self.previous_values[symbol_key] = {
                         'longs': current_longs,
                         'shorts': current_shorts,
+                        'long_events': current_long_events,
+                        'short_events': current_short_events,
                         'timestamp': datetime.now()
                     }
-                    
+
                 except Exception as e:
                     print(f"❌ Error processing {symbol}: {str(e)}")
                     symbols_data[symbol] = "ERROR"

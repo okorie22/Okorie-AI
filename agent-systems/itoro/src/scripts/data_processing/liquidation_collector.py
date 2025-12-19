@@ -11,10 +11,13 @@ from typing import List, Dict
 from collections import deque
 import traceback
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Import configuration
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+# Go up 4 levels: data_processing -> scripts -> src -> itoro
+project_root = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 from src import config
 from src.scripts.shared_services.liquidation_websocket_manager import LiquidationWebSocketManager
@@ -414,6 +417,9 @@ class LiquidationCollector:
 
 async def main():
     """Main entry point"""
+    # Load environment variables
+    load_dotenv()
+
     collector = LiquidationCollector()
     
     try:

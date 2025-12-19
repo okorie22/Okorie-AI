@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import traceback
 import numpy as np
+import json
+import time
 
 # Import logger
 try:
@@ -157,27 +159,28 @@ class LiquidationStorage:
         
         Args:
             hours: Number of hours of history to load
-        
+            
         Returns:
             DataFrame with liquidation history or None if no data
         """
         try:
             # Calculate date range
-            end_date = datetime.now()
-            start_date = end_date - timedelta(hours=hours)
-            
-            # Find all parquet files in date range
+            end_datetime = datetime.now()
+            start_datetime = end_datetime - timedelta(hours=hours)
+
+            # Find all parquet files in date range (use date objects for calendar day iteration)
             all_files = []
-            current_date = start_date
-            
+            current_date = start_datetime.date()
+            end_date = end_datetime.date()
+
             while current_date <= end_date:
                 date_str = current_date.strftime("%Y%m%d")
                 filename = f"liquidation_{date_str}.parquet"
                 filepath = self.data_dir / filename
-                
+
                 if filepath.exists():
                     all_files.append(filepath)
-                
+
                 current_date += timedelta(days=1)
             
             if not all_files:
@@ -193,7 +196,7 @@ class LiquidationStorage:
                 except Exception as e:
                     warning(f"Failed to load {filepath.name}: {str(e)}")
                     continue
-            
+
             if not dfs:
                 return None
             
@@ -202,11 +205,11 @@ class LiquidationStorage:
             
             # Filter by time range
             history['event_time'] = pd.to_datetime(history['event_time'])
-            history = history[history['event_time'] >= start_date]
-            
+            history = history[history['event_time'] >= start_datetime]
+
             # Sort by event_time
             history = history.sort_values('event_time')
-            
+
             # Remove duplicates
             history = history.drop_duplicates(subset=['event_time', 'exchange', 'symbol', 'side', 'price'], keep='last')
             
