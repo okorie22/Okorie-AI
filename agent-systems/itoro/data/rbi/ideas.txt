@@ -1,0 +1,6 @@
+# Add your trading ideas here (one per line)
+# Can be YouTube URLs, PDF links, or text descriptions
+# Lines starting with # are ignored
+
+Create a simple RSI strategy that buys when RSI < 30 and sells when RSI > 70
+Momentum strategy using 20/50 SMA crossover with volume confirmation

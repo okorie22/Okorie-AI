@@ -1274,7 +1274,9 @@ def create_backtest(strategy, strategy_name="UnknownStrategy", strategy_idea=Non
 
     # Customize the prompt based on data type needed
     data_type = determine_data_type_needed(strategy_idea) if strategy_idea else "indicator"
-    customized_prompt = customize_backtest_prompt_for_data_type(BACKTEST_PROMPT, data_type)
+    timeframe = extract_timeframe_from_idea(strategy_idea) if strategy_idea else "15m"
+    cprint(f"[TIMEFRAME] Extracted timeframe: {timeframe} from idea", "cyan")
+    customized_prompt = customize_backtest_prompt_for_data_type(BACKTEST_PROMPT, data_type, timeframe)
 
     output = run_with_animation(
         chat_with_model,
@@ -1910,6 +1912,8 @@ def ensure_ohlcv_data_exists():
     # #endregion
 
     RBI_DATA_SYMBOLS = ['BTC', 'ETH', 'SOL']
+    # Collect multiple timeframes: 5m for UniversalMACD/PowerTower, 15m for existing, 4h for MultiMa
+    RBI_TIMEFRAMES = ['5m', '15m', '4h']
     data_dir = PROJECT_ROOT / "data" / "rbi"
     
     # #region agent log
@@ -1972,35 +1976,37 @@ def ensure_ohlcv_data_exists():
 
     missing_data = []
     for symbol in RBI_DATA_SYMBOLS:
-        data_file = data_dir / f"{symbol}-USD-15m.csv"
-        
-        # #region agent log
-        log_entry = {
-            "id": f"log_{int(__import__('time').time() * 1000)}_file_check_{symbol}",
-            "timestamp": int(__import__('time').time() * 1000),
-            "location": "rbi_agent_v3.py:ensure_ohlcv_data_exists",
-            "message": f"Checking file existence for {symbol}",
-            "data": {
-                "symbol": symbol,
-                "data_file": str(data_file),
-                "data_file_absolute": str(data_file.resolve()),
-                "file_exists": data_file.exists(),
-                "file_is_file": data_file.is_file() if data_file.exists() else False
-            },
-            "sessionId": "debug-session",
-            "runId": "run1",
-            "hypothesisId": "B"
-        }
-        try:
-            log_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps(log_entry) + '\n')
-        except:
-            pass
-        # #endregion
-        
-        if not data_file.exists():
-            missing_data.append(symbol)
+        for timeframe in RBI_TIMEFRAMES:
+            data_file = data_dir / f"{symbol}-USD-{timeframe}.csv"
+            
+            # #region agent log
+            log_entry = {
+                "id": f"log_{int(__import__('time').time() * 1000)}_file_check_{symbol}_{timeframe}",
+                "timestamp": int(__import__('time').time() * 1000),
+                "location": "rbi_agent_v3.py:ensure_ohlcv_data_exists",
+                "message": f"Checking file existence for {symbol} {timeframe}",
+                "data": {
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "data_file": str(data_file),
+                    "data_file_absolute": str(data_file.resolve()),
+                    "file_exists": data_file.exists(),
+                    "file_is_file": data_file.is_file() if data_file.exists() else False
+                },
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "B"
+            }
+            try:
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(log_entry) + '\n')
+            except:
+                pass
+            # #endregion
+            
+            if not data_file.exists():
+                missing_data.append(f"{symbol}-{timeframe}")
 
     if missing_data:
         cprint(f"[WARN] Missing OHLCV data for: {', '.join(missing_data)}", "yellow")
@@ -2056,9 +2062,10 @@ def ensure_ohlcv_data_exists():
                 # Verify files were actually created
                 collected_files = []
                 for symbol in RBI_DATA_SYMBOLS:
-                    data_file = data_dir / f"{symbol}-USD-15m.csv"
-                    if data_file.exists():
-                        collected_files.append(symbol)
+                    for timeframe in RBI_TIMEFRAMES:
+                        data_file = data_dir / f"{symbol}-USD-{timeframe}.csv"
+                        if data_file.exists():
+                            collected_files.append(f"{symbol}-{timeframe}")
 
                 if collected_files:
                     cprint(f"[VERIFY] Confirmed OHLCV data files created for: {', '.join(collected_files)}", "green")
@@ -2111,6 +2118,9 @@ def ensure_ohlcv_data_exists():
                     from datetime import datetime, timedelta
                     import numpy as np
 
+                    # Define timeframes (same as above)
+                    RBI_TIMEFRAMES = ['5m', '15m', '4h']
+
                     # Create synthetic data for the past 30 days, 15-minute intervals
                     end_date = datetime.now()
                     start_date = end_date - timedelta(days=30)
@@ -2154,12 +2164,25 @@ def ensure_ohlcv_data_exists():
                             'open_interest': open_interest
                         })
 
-                    # Save synthetic data for each symbol
+                    # Save synthetic data for each symbol and timeframe
                     df = pd.DataFrame(synthetic_data)
                     for symbol in RBI_DATA_SYMBOLS:
-                        data_file = data_dir / f"{symbol}-USD-15m.csv"
-                        df.to_csv(data_file, index=False)
-                        cprint(f"[SYNTHETIC] Created {len(df)} rows of synthetic data for {symbol}", "cyan")
+                        for timeframe in RBI_TIMEFRAMES:
+                            # Adjust timestamps based on timeframe
+                            if timeframe == '5m':
+                                # Resample to 5m intervals
+                                df_5m = df.iloc[::3].copy()  # Every 3rd row (15m -> 5m)
+                                df_to_save = df_5m
+                            elif timeframe == '4h':
+                                # Resample to 4h intervals (16 * 15m = 4h)
+                                df_4h = df.iloc[::16].copy()
+                                df_to_save = df_4h
+                            else:
+                                df_to_save = df  # 15m stays as is
+                            
+                            data_file = data_dir / f"{symbol}-USD-{timeframe}.csv"
+                            df_to_save.to_csv(data_file, index=False)
+                            cprint(f"[SYNTHETIC] Created {len(df_to_save)} rows of synthetic {timeframe} data for {symbol}", "cyan")
 
                     cprint("[SUCCESS] Synthetic OHLCV data created for testing", "green")
                     return True
@@ -2176,6 +2199,10 @@ def ensure_ohlcv_data_exists():
             try:
                 import pandas as pd
                 from datetime import datetime, timedelta
+                import numpy as np
+
+                # Define timeframes (same as above)
+                RBI_TIMEFRAMES = ['5m', '15m', '4h']
 
                 # Create synthetic data for the past 30 days, 15-minute intervals
                 end_date = datetime.now()
@@ -2220,12 +2247,25 @@ def ensure_ohlcv_data_exists():
                         'open_interest': open_interest
                     })
 
-                # Save synthetic data for each symbol
+                # Save synthetic data for each symbol and timeframe
                 df = pd.DataFrame(synthetic_data)
                 for symbol in RBI_DATA_SYMBOLS:
-                    data_file = data_dir / f"{symbol}-USD-15m.csv"
-                    df.to_csv(data_file, index=False)
-                    cprint(f"[SYNTHETIC] Created {len(df)} rows of synthetic data for {symbol}", "cyan")
+                    for timeframe in RBI_TIMEFRAMES:
+                        # Adjust timestamps based on timeframe
+                        if timeframe == '5m':
+                            # Resample to 5m intervals
+                            df_5m = df.iloc[::3].copy()  # Every 3rd row (15m -> 5m)
+                            df_to_save = df_5m
+                        elif timeframe == '4h':
+                            # Resample to 4h intervals (16 * 15m = 4h)
+                            df_4h = df.iloc[::16].copy()
+                            df_to_save = df_4h
+                        else:
+                            df_to_save = df  # 15m stays as is
+                        
+                        data_file = data_dir / f"{symbol}-USD-{timeframe}.csv"
+                        df_to_save.to_csv(data_file, index=False)
+                        cprint(f"[SYNTHETIC] Created {len(df_to_save)} rows of synthetic {timeframe} data for {symbol}", "cyan")
 
                 cprint("[SUCCESS] Synthetic OHLCV data created for testing", "green")
                 return True
@@ -2718,7 +2758,29 @@ def load_onchain_data():
         return None
 
 
-def customize_backtest_prompt_for_data_type(base_prompt, data_type):
+def extract_timeframe_from_idea(idea_text):
+    """Extract timeframe from idea text (looks for '# Timeframe: 5m' pattern)"""
+    import re
+    if not idea_text:
+        return "15m"  # Default
+    
+    # Look for pattern like "# Timeframe: 5m" or "Timeframe: 5m"
+    patterns = [
+        r'#\s*Timeframe:\s*(\d+[mhd])',
+        r'Timeframe:\s*(\d+[mhd])',
+        r'timeframe\s*[=:]\s*[\'"]?(\d+[mhd])',
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, idea_text, re.IGNORECASE)
+        if match:
+            timeframe = match.group(1).lower()
+            return timeframe
+    
+    return "15m"  # Default if not found
+
+
+def customize_backtest_prompt_for_data_type(base_prompt, data_type, timeframe="15m"):
     """Customize the backtest prompt based on data type needed"""
 
     if data_type == "oi":
@@ -2772,11 +2834,12 @@ def customize_backtest_prompt_for_data_type(base_prompt, data_type):
         Expected normalized columns: timestamp, symbol, whale_concentration, market_cap, holder_count, transaction_volume, transaction_count, liquidity_usd
         """
     else:  # indicator/ohlcv
-        data_loading_instruction = """
+        data_loading_instruction = f"""
         DATA LOADING FOR INDICATOR STRATEGY:
-        Load OHLCV data directly: price_data = pd.read_csv('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/rbi/BTC-USD-15m.csv')
+        Load OHLCV data directly: price_data = pd.read_csv('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/rbi/BTC-USD-{timeframe}.csv')
         This script runs standalone and must load data directly.
         Required columns: timestamp, open, high, low, close, volume, open_interest
+        IMPORTANT: Use the {timeframe} timeframe data file as specified in the strategy requirements. The file name format is BTC-USD-{timeframe}.csv
         """
 
     # Insert the data loading instruction into the base prompt

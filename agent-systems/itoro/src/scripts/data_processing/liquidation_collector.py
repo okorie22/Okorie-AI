@@ -39,7 +39,7 @@ except ImportError:
 
 # Import cloud database (optional - graceful fallback if not available)
 try:
-    from src.scripts.database.cloud_database import CloudDatabaseManager
+    from src.scripts.database.cloud_database import get_cloud_database_manager
     CLOUD_DB_AVAILABLE = True
 except:
     CLOUD_DB_AVAILABLE = False
@@ -82,8 +82,11 @@ class LiquidationCollector:
         self.cloud_db = None
         if CLOUD_DB_AVAILABLE:
             try:
-                self.cloud_db = CloudDatabaseManager()
-                info("☁️ Cloud database connected")
+                self.cloud_db = get_cloud_database_manager()
+                if self.cloud_db:
+                    info("☁️ Cloud database connected")
+                else:
+                    warning("Cloud database unavailable")
             except Exception as e:
                 warning(f"Cloud database unavailable: {str(e)}")
                 self.cloud_db = None

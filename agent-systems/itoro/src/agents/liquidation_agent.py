@@ -78,11 +78,24 @@ class LiquidationAgent(BaseAgent):
         
         # Initialize storage
         self.storage = LiquidationStorage()
-        
+
         # Create data directory if doesn't exist
         self.data_dir = PROJECT_ROOT / "src" / "data"
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        
+
+        # Initialize cloud database if available
+        try:
+            from src.scripts.database.cloud_database import get_cloud_database_manager
+            self.cloud_db = get_cloud_database_manager()
+            if self.cloud_db:
+                print("✅ Cloud database connected")
+            else:
+                print("⚠️ Cloud database not available")
+                self.cloud_db = None
+        except ImportError:
+            print("⚠️ Cloud database not available")
+            self.cloud_db = None
+
         # Initialize tracking for previous values
         self.previous_values = {}
 
@@ -415,6 +428,28 @@ Consider the ratio of long vs short liquidations and their relative changes
                     symbols_data[symbol] = "ERROR"
                     continue
             
+            # Save analytics to cloud database if available
+            if self.cloud_db and alert_count > 0:
+                try:
+                    # Create analytics record for this monitoring cycle
+                    analytics_record = {
+                        'timestamp': datetime.now(),
+                        'symbols_monitored': len(self.symbols),
+                        'alerts_detected': alert_count,
+                        'symbols_data': symbols_data,
+                        'timeframe_minutes': self.comparison_window,
+                        'threshold_used': self.threshold
+                    }
+
+                    # Save to cloud
+                    if self.cloud_db.save_liquidation_analytics([analytics_record]):
+                        print(f"☁️ Saved liquidation analytics to cloud ({alert_count} alerts)")
+                    else:
+                        print("⚠️ Failed to save liquidation analytics to cloud")
+
+                except Exception as e:
+                    print(f"⚠️ Error saving liquidation analytics to cloud: {str(e)}")
+
             # Report cycle completion to dashboard
             if reporter:
                 reporter.report_cycle_complete(

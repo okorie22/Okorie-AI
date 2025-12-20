@@ -1,0 +1,74 @@
+STRATEGY_NAME: AdaptiveMomentumDivergence
+
+STRATEGY_DETAILS:
+
+**Core Strategy Components:**
+1. **Universal MACD Calculation:** 
+   - EMA(12) and EMA(26) of close prices
+   - Universal MACD = (EMA12 / EMA26) - 1
+   - This creates a percentage-based oscillator that measures relative momentum between short and long EMAs
+
+2. **Adaptive Entry System:**
+   - Calculate 20-period rolling mean and standard deviation of Universal MACD
+   - Dynamic entry range: [mean - 1.5*std, mean - 0.5*std]
+   - This range automatically adjusts to current market volatility and conditions
+   - Entry triggers when Universal MACD falls within this adaptive range
+
+3. **Fractional Position Sizing:**
+   - position_size = (equity * 0.02) / stop_distance
+   - Uses 2% risk per trade (risk_per_trade = 0.02)
+   - stop_distance = entry_price * 0.318 (31.8% stop loss)
+   - position_size is used directly without rounding (fractional sizes supported)
+
+4. **Holding Period Management:**
+   - Track candles_since_entry counter
+   - Minimum 5-candle holding period before checking MACD exit conditions
+   - Prevents premature exits due to short-term noise
+
+**Entry Rules:**
+1. Calculate Universal MACD = (EMA12 / EMA26) - 1
+2. Calculate 20-period rolling mean and std of Universal MACD
+3. Determine adaptive entry range: [mean - 1.5*std, mean - 0.5*std]
+4. ENTER LONG when:
+   - Universal MACD is within adaptive entry range
+   - This indicates bullish momentum is building relative to recent market conditions
+
+**Exit Rules (in order of priority):**
+1. **Stop Loss:** Exit immediately if price reaches -31.8% from entry
+2. **ROI Targets:** Exit when reaching scaled profit targets:
+   - 21.3% ROI at entry (immediate exit if reached)
+   - Scales down linearly to 9.9% after 27 candles
+   - Scales down to 3% after 60 candles
+   - Scales down to 0% after 164 candles
+3. **MACD Exit Signal:** Sell when ALL conditions are met:
+   - Position held for at least 5 candles
+   - Universal MACD is between -0.02323 and -0.00707
+   - This indicates momentum is weakening into a specific threshold range
+
+**Risk Management:**
+- Fixed 2% risk per trade (0.02)
+- Stop loss: -31.8% from entry price
+- Fractional position sizing based on stop distance
+- Minimum 5-candle holding period prevents overtrading
+
+**Required Indicators:**
+1. EMA(12) - Exponential Moving Average 12 periods
+2. EMA(26) - Exponential Moving Average 26 periods
+3. Universal MACD = (EMA12 / EMA26) - 1
+4. 20-period rolling mean of Universal MACD
+5. 20-period rolling standard deviation of Universal MACD
+
+**Debug Information to Log:**
+- Entry MACD value
+- Exit MACD value
+- Candles held count
+- Exit reason (stop loss, ROI target, MACD signal)
+- Adaptive entry range values: mean, std, range_min, range_max
+- Calculated position size
+
+**Implementation Notes:**
+- The strategy adapts to changing market conditions through the dynamic entry range
+- Fractional position sizing allows precise risk management
+- The 5-candle holding period filter reduces false exits
+- Scaled ROI targets lock in profits while allowing runners to continue
+- Universal MACD provides a percentage-based momentum measure that's more stable than traditional MACD

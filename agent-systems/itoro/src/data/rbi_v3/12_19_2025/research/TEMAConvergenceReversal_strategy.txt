@@ -1,0 +1,66 @@
+STRATEGY_NAME: TEMAConvergenceReversal
+
+STRATEGY_DETAILS:
+
+**1. Core Strategy Concept:**
+This is a multi-timeframe swing trading strategy that uses two distinct sets of Triple Exponential Moving Averages (TEMA) for entry and exit signals. The entry logic relies on the precise, short-term alignment of four TEMAs to confirm a strong, established uptrend. The exit logic uses a broader set of twelve TEMAs to detect the earliest sign of a long-term trend reversal from any timeframe. The combination aims to capture sustained trends while being highly sensitive to potential reversals.
+
+**2. Required Indicators & Calculations:**
+   *   **Entry TEMAs:** Calculate four TEMA indicators.
+        *   `TEMA15` = TEMA(15)
+        *   `TEMA30` = TEMA(30)
+        *   `TEMA45` = TEMA(45)
+        *   `TEMA60` = TEMA(60)
+   *   **Exit TEMAs:** Calculate twelve TEMA indicators with a base period of 68.
+        *   `TEMA68` = TEMA(68)
+        *   `TEMA136` = TEMA(136)
+        *   `TEMA204` = TEMA(204)
+        *   `TEMA272` = TEMA(272)
+        *   `TEMA340` = TEMA(340)
+        *   `TEMA408` = TEMA(408)
+        *   `TEMA476` = TEMA(476)
+        *   `TEMA544` = TEMA(544)
+        *   `TEMA612` = TEMA(612)
+        *   `TEMA680` = TEMA(680)
+        *   `TEMA748` = TEMA(748)
+        *   `TEMA816` = TEMA(816)
+
+**3. Entry Conditions (LONG):**
+A buy order is triggered when ALL of the following conditions are met on the same 4-hour candle:
+1.  `TEMA30` < `TEMA15`
+2.  `TEMA45` < `TEMA30`
+3.  `TEMA60` < `TEMA45`
+*   **Interpretation:** This sequence confirms a perfectly aligned, descending order of TEMAs (shortest > next > next > longest), which is the definition of a strong, accelerating uptrend for this indicator.
+
+**4. Exit Conditions (Close LONG):**
+The long position should be closed if ANY of the following occur:
+*   **Primary Signal (Trend Reversal):** For ANY of the 12 exit TEMA pairs, the shorter-period TEMA crosses **above** the longer-period TEMA from the previous candle. This is checked as: `TEMA68[1] > TEMA136[1]` AND `TEMA68 < TEMA136` (cross above). This check must be performed for each consecutive pair (`TEMA136/TEMA204`, `TEMA204/TEMA272`, etc.).
+*   **Stop Loss:** Price reaches `-34.5%` from the entry price.
+*   **Take Profit / ROI Table:** The position closes based on the elapsed number of 4-hour candles since entry, using the provided ROI scale:
+    *   `52.3%` profit target at the moment of entry (effectively a limit order).
+    *   `12.3%` profit target after `1553` candles (~259 days).
+    *   `7.6%` profit target after `2332` candles (~389 days).
+    *   `0%` (breakeven) after `3169` candles (~528 days).
+    *   *Note: The strategy logic must define how to handle the transition between these levels (e.g., trailing stop, multiple limit orders).*
+
+**5. Risk Management:**
+*   **Stop Loss:** Fixed at `-34.5%` from entry price. This is a wide stop, consistent with a swing trading strategy on a 4h timeframe.
+*   **Position Sizing:** Not specified; must be defined by the user based on account risk parameters.
+*   **Time-Based Exit:** The ROI table introduces a time-decaying profit target, which acts as a unique risk management feature, forcing exit on stagnating trades.
+
+**6. Debugging & Monitoring:**
+Every 10 bars (40 hours), print a debug log containing:
+*   Bar Number / Index
+*   Current Price (Close)
+*   Values for: `TEMA15`, `TEMA30`, `TEMA45`, `TEMA60`
+*   Boolean status for each entry condition:
+    *   `Condition1 (T30<T15): [True/False]`
+    *   `Condition2 (T45<T30): [True/False]`
+    *   `Condition3 (T60<T45): [True/False]`
+*This log is crucial for verifying indicator calculation and understanding why entry signals may be absent.*
+
+**7. Strategy Profile:**
+*   **Style:** Swing Trading, Trend-Following (Entry), Reversal-Sensitive (Exit).
+*   **Timeframe:** 4-hour (as specified for calculations and candle counts in ROI/exit).
+*   **Asset Suitability:** Likely best for high-liquidity assets with strong trending characteristics (e.g., major forex pairs, indices, BTC).
+*   **Key Feature:** Uses the sensitivity of TEMA and two separate "families" of periods for dedicated entry (precision) and exit (sensitivity) logic. The ROI table adds a time-based profit-taking mechanism uncommon in standard MA strategies.

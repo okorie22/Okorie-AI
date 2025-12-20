@@ -1,0 +1,71 @@
+STRATEGY_NAME: ExponentialMomentum
+
+STRATEGY_DETAILS:
+
+**CORE CONCEPT:**
+This strategy identifies "Power Tower" patterns - strongly rising price movements where consecutive price ratios exceed exponential growth thresholds. Instead of using raw price values (which fail with large numbers like BTC), it uses percentage-based calculations that work across all price levels.
+
+**KEY COMPONENTS:**
+
+1. **PATTERN DETECTION:** Uses three consecutive price ratio comparisons against exponential growth thresholds
+2. **PERCENTAGE-BASED CALCULATIONS:** Converts absolute price differences to ratios for universal applicability
+3. **EXPONENTIAL THRESHOLDS:** Entry uses 3.849 power, exit uses 3.798 power of 1.01 base
+4. **DYNAMIC ROI SCALING:** Profit targets adjust based on holding period
+5. **AGGRESSIVE STOP LOSS:** -28.8% stop loss to protect capital
+
+**REQUIRED INDICATORS:**
+- Close prices only (no additional indicators needed)
+- Price history for current and previous 4 periods
+
+**ENTRY CONDITIONS (ALL MUST BE TRUE):**
+1. `(current_close / close_2_periods_ago) > (1.01 ** 3.849)`
+2. `(previous_close / close_3_periods_ago) > (1.01 ** 3.849)`
+3. `(close_2_periods_ago / close_4_periods_ago) > (1.01 ** 3.849)`
+
+**EXIT CONDITIONS (ANY ONE TRIGGERS EXIT):**
+1. `(current_close / close_2_periods_ago) < (1.01 ** 3.798)`
+2. `(previous_close / close_3_periods_ago) < (1.01 ** 3.798)`
+3. `(close_2_periods_ago / close_4_periods_ago) < (1.01 ** 3.798)`
+4. Stop loss at -28.8% from entry price
+5. ROI target reached based on holding period
+
+**ROI TARGET TABLE:**
+- Entry: 21.3% target
+- After 39 candles: 4.8% target
+- After 56 candles: 2.9% target
+- After 159 candles: 0% target (exit regardless)
+
+**RISK MANAGEMENT:**
+- Stop Loss: -28.8% fixed
+- Position Sizing: Based on backtest results showing 97% win rate
+- Maximum Holding Period: 159 candles (exit at 0% target)
+
+**DEBUG PRINT REQUIREMENTS:**
+For each calculation period, display:
+- Current close price
+- Previous 4 close prices
+- Calculated ratios for all three comparisons
+- Power calculation results (1.01 ** 3.849 and 1.01 ** 3.798)
+- Boolean results for each condition (True/False)
+
+**CALCULATION NOTES:**
+- `1.01 ** 3.849 ≈ 1.0391` (entry threshold)
+- `1.01 ** 3.798 ≈ 1.0385` (exit threshold)
+- Each ratio must exceed approximately 3.91% growth over 2 periods
+- The pattern requires three consecutive 2-period comparisons showing strong momentum
+
+**STRATEGY LOGIC FLOW:**
+1. Calculate all required price ratios
+2. Compare against exponential thresholds
+3. If all three entry conditions are met → ENTER LONG
+4. Monitor for exit conditions:
+   - Any ratio falls below exit threshold
+   - Stop loss triggered
+   - ROI target reached based on holding period
+5. Implement debug prints for verification
+
+**PERFORMANCE CHARACTERISTICS (FROM BACKTEST):**
+- Total Profit: 81.5%
+- Win Rate: 97%
+- Risk-Reward: Favorable due to high win rate
+- Best Suited For: Strong trending markets with exponential momentum phases

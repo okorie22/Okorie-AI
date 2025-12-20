@@ -275,7 +275,7 @@ def collect_token_data_with_fallback(token, days_back=DAYSBACK_4_DATA, timeframe
                 cprint(f"[SUCCESS] Birdeye success: {len(data)} candles", "white", "on_green")
 
             # Save data if configured
-            save_data_to_file(data, token, "birdeye", is_rbi_data=(token in RBI_DATA_SYMBOLS))
+            save_data_to_file(data, token, "birdeye", is_rbi_data=(token in RBI_DATA_SYMBOLS), timeframe=timeframe)
 
             return {
                 'data': data,
@@ -335,7 +335,7 @@ def collect_token_data_with_fallback(token, days_back=DAYSBACK_4_DATA, timeframe
             data = standardize_hyperliquid_data(data)
 
             # Save data if configured
-            save_data_to_file(data, token, "hyperliquid", is_rbi_data=(token in RBI_DATA_SYMBOLS))
+            save_data_to_file(data, token, "hyperliquid", is_rbi_data=(token in RBI_DATA_SYMBOLS), timeframe=timeframe)
 
             return {
                 'data': data,
@@ -410,7 +410,7 @@ def standardize_hyperliquid_data(data):
 
     return data
 
-def save_data_to_file(data, token, source, is_rbi_data=False):
+def save_data_to_file(data, token, source, is_rbi_data=False, timeframe=None):
     """Save data to file with source indication"""
     if not SAVE_OHLCV_DATA:
         return
@@ -419,7 +419,9 @@ def save_data_to_file(data, token, source, is_rbi_data=False):
     safe_token = token[:8] if len(token) > 8 else token
     if is_rbi_data:
         # For RBI data, save in specific format expected by backtests
-        filename = f"{safe_token}-USD-15m.csv"
+        # Use provided timeframe or default to 15m for backward compatibility
+        tf = timeframe if timeframe else '15m'
+        filename = f"{safe_token}-USD-{tf}.csv"
         save_path = os.path.join("src", "data", "rbi", filename)
     else:
         filename = f"{safe_token}_{source}_latest.csv"
@@ -430,22 +432,30 @@ def save_data_to_file(data, token, source, is_rbi_data=False):
 
     # Save to CSV
     data.to_csv(save_path, index=False)
-    cprint(f"[SAVE] Cached {source} data for {safe_token} at {save_path}", "white", "on_green")
+    cprint(f"[SAVE] Cached {source} data for {safe_token} ({tf if is_rbi_data else 'N/A'}) at {save_path}", "white", "on_green")
 
 def collect_rbi_data():
-    """Collect OHLCV data for RBI backtesting (BTC, ETH, SOL)"""
+    """Collect OHLCV data for RBI backtesting (BTC, ETH, SOL) - Multiple timeframes: 5m, 15m, 4h"""
     rbi_data = {}
+    
+    # Collect multiple timeframes for different strategies
+    timeframes = ['5m', '15m', '4h']
 
-    cprint("\n[DATA] Moon Dev's AI Agent collecting RBI backtest data...", "white", "on_blue")
+    cprint("\n[DATA] Moon Dev's AI Agent collecting RBI backtest data (5m, 15m, 4h)...", "white", "on_blue")
 
     for symbol in RBI_DATA_SYMBOLS:
         cprint(f"\n[TARGET] Collecting {symbol} data for RBI backtesting...", "white", "on_blue")
-        data = collect_token_data(symbol, days_back=30, timeframe='15m')  # 30 days of 15m data for backtesting
-        if data is not None:
-            rbi_data[symbol] = data
-            cprint(f"[SUCCESS] {symbol} data collected: {len(data)} candles", "white", "on_green")
-        else:
-            cprint(f"[ERROR] Failed to collect {symbol} data", "white", "on_red")
+        
+        for timeframe in timeframes:
+            cprint(f"  [TIMEFRAME] Collecting {timeframe} data...", "cyan")
+            data = collect_token_data(symbol, days_back=30, timeframe=timeframe)
+            if data is not None:
+                # Store with timeframe key for reference
+                key = f"{symbol}_{timeframe}"
+                rbi_data[key] = data
+                cprint(f"  [SUCCESS] {symbol} {timeframe} data collected: {len(data)} candles", "white", "on_green")
+            else:
+                cprint(f"  [ERROR] Failed to collect {symbol} {timeframe} data", "white", "on_red")
 
     cprint("\n[COMPLETE] Moon Dev's AI Agent completed RBI data collection!", "white", "on_green")
 

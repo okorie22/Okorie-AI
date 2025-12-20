@@ -179,6 +179,39 @@ FUNDING_SYMBOL_NAMES = {
 }
 
 # =============================================================================
+# 📊 RBI AGENT CONFIGURATION
+# =============================================================================
+
+# RBI Agent Data Symbols - comprehensive list including tokens from OI and Funding agents
+RBI_DATA_SYMBOLS = [
+    # Core 3 (always included)
+    'BTC', 'ETH', 'SOL',
+    # OI Agent tokens (top 10 by market cap)
+    'BNB', 'XRP', 'ADA', 'DOGE', 'AVAX', 'MATIC', 'DOT',
+    # Funding Agent trending tokens
+    'FARTCOIN', 'AI16Z', 'AIXBT', 'TRUMP', 'MELANIA', 'ZEREBRO',
+    'GRIFFAIN', 'PURR', 'GOAT', 'CHILLGUY', 'MOODENG'
+]
+
+# RBI Agent Settings
+RBI_OHLCV_TIMEFRAME = '15m'  # Timeframe for OHLCV data collection
+RBI_ENABLE_AUTO_DISCOVERY = True  # Auto-discover tokens from OI/Funding data
+RBI_DISCOVERY_LOOKBACK_HOURS = 24  # Hours to look back for active tokens
+RBI_MIN_DATA_POINTS = 100  # Minimum OHLCV data points required for analysis
+RBI_DATA_RETENTION_DAYS = 30  # How long to keep OHLCV CSV files
+
+# RBI Agent AI Settings
+RBI_MODEL_OVERRIDE = "deepseek-chat"  # DeepSeek model for strategy generation
+RBI_DEEPSEEK_BASE_URL = "https://api.deepseek.com"  # Base URL for DeepSeek API
+RBI_AI_TEMPERATURE = 0.7  # Temperature for AI strategy generation
+RBI_AI_MAX_TOKENS = 2000  # Max tokens for AI responses
+
+# RBI Agent Optimization Settings
+RBI_MAX_DEBUG_ITERATIONS = 5  # Maximum debug iterations per strategy
+RBI_MAX_OPTIMIZATION_ITERATIONS = 3  # Maximum optimization loops
+RBI_TARGET_RETURN = 5.0  # Target return percentage for optimization
+
+# =============================================================================
 # 🌊 LIQUIDATION AGENT CONFIGURATION
 # =============================================================================
 
@@ -1180,7 +1213,6 @@ DATA_TIMEFRAME = '1H'
 
 # OHLCV Data Collection Settings
 SAVE_OHLCV_DATA = True
-RBI_DATA_SYMBOLS = ['BTC', 'ETH', 'SOL']  # Major crypto symbols for RBI backtesting
 
 # =============================================================================
 # 🛡️ AI PROMPTS (PORTFOLIO-BASED DECISION MAKING)
