@@ -1,0 +1,67 @@
+STRATEGY_NAME: MultiPatternReversal
+
+STRATEGY_DETAILS:
+This is a daily timeframe pattern recognition strategy that combines multiple bullish reversal candlestick patterns for entry signals, with fixed profit/stop exit conditions and comprehensive risk management.
+
+KEY STRATEGY COMPONENTS:
+1. Pattern Recognition: Uses TA-Lib's candlestick pattern detection with three specific bullish reversal patterns:
+   - CDLDOJI == 100 (bullish doji pattern)
+   - CDLENGULFING == 100 (bullish engulfing pattern)
+   - CDLHAMMER == 100 (hammer pattern)
+2. Timeframe: Daily (1d) candles only
+3. Data Requirements: Minimum 30 days of daily data required for proper pattern recognition
+
+INDICATORS REQUIRED:
+1. CDLDOJI - Doji pattern indicator
+2. CDLENGULFING - Engulfing pattern indicator  
+3. CDLHAMMER - Hammer pattern indicator
+All indicators must be calculated using self.I() wrapper with Open, High, Low, Close arrays as inputs.
+
+ENTRY RULES (LONG POSITIONS):
+1. Enter long position when ANY of the following conditions is true:
+   - CDLDOJI indicator returns exactly 100 (bullish doji)
+   - CDLENGULFING indicator returns exactly 100 (bullish engulfing)
+   - CDLHAMMER indicator returns exactly 100 (hammer pattern)
+2. Pattern functions return: -100 (bearish), 0 (no pattern), 100 (bullish)
+3. Only enter on bullish signals (value == 100)
+
+EXIT RULES (PRIMARY - POSITION-BASED):
+1. Take Profit: Exit when position profit reaches 5% (self.position.pl_pct >= 0.05)
+2. Stop Loss: Exit when position loss reaches 3% (self.position.pl_pct <= -0.03)
+3. These exits are checked in populate_exit_trend using self.position.pl_pct
+
+EXIT RULES (SECONDARY - FREQTRADE BUILT-IN):
+1. ROI Table (scaling over time):
+   - 93.6% at entry (candle 0)
+   - 33.2% after 5271 candles
+   - 8.6% after 18147 candles
+   - 0% after 48152 candles
+2. Fixed Stop Loss: -28.8%
+3. Trailing Stop: Enabled with:
+   - Positive threshold: 3.2% (trailing starts after 3.2% profit)
+   - Offset: 8.4% (trails 8.4% below highest price)
+
+RISK MANAGEMENT:
+1. Position Sizing: 2% of equity per trade (fraction = 0.02)
+2. Multiple exit layers provide comprehensive risk protection
+3. The 3% manual stop loss provides tighter risk control than the 28.8% system stop loss
+
+IMPLEMENTATION NOTES:
+1. All pattern indicators must be calculated in populate_indicators() using self.I()
+2. Pattern recognition functions require Open, High, Low, Close arrays in correct order
+3. The multi-pattern approach generates more frequent signals than rare single patterns
+4. Exit conditions are checked in populate_exit_trend() using position profit/loss percentage
+5. The strategy combines pattern-based entries with percentage-based exits for balanced approach
+
+ADVANTAGES:
+1. Multiple pattern recognition increases signal frequency
+2. Tight 3% stop loss protects capital on failed patterns
+3. 5% profit target captures quick gains from successful patterns
+4. Trailing stop and ROI scaling protect profits on extended moves
+5. Daily timeframe reduces noise compared to shorter timeframes
+
+LIMITATIONS:
+1. Requires minimum 30 days of daily data
+2. Candlestick patterns alone may have limited reliability
+3. Fixed percentage exits may not adapt to market volatility changes
+4. Daily timeframe means slower trade frequency

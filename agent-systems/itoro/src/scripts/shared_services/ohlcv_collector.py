@@ -435,26 +435,29 @@ def save_data_to_file(data, token, source, is_rbi_data=False, timeframe=None):
     cprint(f"[SAVE] Cached {source} data for {safe_token} ({tf if is_rbi_data else 'N/A'}) at {save_path}", "white", "on_green")
 
 def collect_rbi_data():
-    """Collect OHLCV data for RBI backtesting (BTC, ETH, SOL) - Multiple timeframes: 5m, 15m, 4h"""
+    """Collect OHLCV data for RBI backtesting (BTC, ETH, SOL) - Multiple timeframes: 5m, 15m, 4h, 1d"""
     rbi_data = {}
-    
-    # Collect multiple timeframes for different strategies
-    timeframes = ['5m', '15m', '4h']
 
-    cprint("\n[DATA] Moon Dev's AI Agent collecting RBI backtest data (5m, 15m, 4h)...", "white", "on_blue")
+    # Collect multiple timeframes for different strategies
+    timeframes = ['5m', '15m', '4h', '1d']
+
+    cprint("\n[DATA] Moon Dev's AI Agent collecting RBI backtest data (5m, 15m, 4h, 1d)...", "white", "on_blue")
 
     for symbol in RBI_DATA_SYMBOLS:
         cprint(f"\n[TARGET] Collecting {symbol} data for RBI backtesting...", "white", "on_blue")
         
         for timeframe in timeframes:
             cprint(f"  [TIMEFRAME] Collecting {timeframe} data...", "cyan")
-            data = collect_token_data(symbol, days_back=30, timeframe=timeframe)
-            if data is not None:
+            # For daily (1d) timeframe, collect minimum 30 days (data source limitation)
+            # For other timeframes, 30 days is sufficient
+            days_back = 30 if timeframe == '1d' else 30
+            data = collect_token_data(symbol, days_back=days_back, timeframe=timeframe)
+        if data is not None:
                 # Store with timeframe key for reference
                 key = f"{symbol}_{timeframe}"
                 rbi_data[key] = data
                 cprint(f"  [SUCCESS] {symbol} {timeframe} data collected: {len(data)} candles", "white", "on_green")
-            else:
+        else:
                 cprint(f"  [ERROR] Failed to collect {symbol} {timeframe} data", "white", "on_red")
 
     cprint("\n[COMPLETE] Moon Dev's AI Agent completed RBI data collection!", "white", "on_green")

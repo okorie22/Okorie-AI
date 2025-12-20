@@ -238,6 +238,11 @@ INDICATOR CALCULATION RULES:
 3. For swing high/lows use talib.MAX/MIN:
    - Instead of: self.data.High.rolling(window=20).max()
    - Use: self.I(talib.MAX, self.data.High, timeperiod=20)
+4. For pattern recognition (CDL* functions), use all four OHLC arrays:
+   - Pattern functions require: Open, High, Low, Close (in that order)
+   - Example: self.cdl_highwave = self.I(talib.CDLHIGHWAVE, self.data.Open, self.data.High, self.data.Low, self.data.Close)
+   - Pattern functions return integers: -100 (strong bearish), 0 (no pattern), 100 (strong bullish)
+   - Compare pattern values using == operator (e.g., if self.cdl_highwave[-1] == -100:)
 
 CRITICAL BACKTESTING.PY DATA ACCESS RULES:
 1. self.data.* columns are _Array objects, NOT pandas Series or DataFrames
@@ -262,24 +267,67 @@ BACKTEST EXECUTION ORDER:
 do not creeate charts to plot this, just print stats. no charts needed.
 
 CRITICAL POSITION SIZING RULES (MUST FOLLOW EXACTLY):
-1. Position sizes MUST be either:
-   - A fraction between 0 and 1 (e.g., 0.1 for 10% of equity)
-   - A positive whole number (integer) for units
+1. Position size TARGET: 1-3% of equity (0.01 to 0.03 as fraction) - IDEAL RANGE
+2. Position size MAXIMUM: 10% of equity (0.10 as fraction) - HARD CAP - NEVER EXCEED
+3. Position sizes MUST be either:
+   - A fraction between 0.01 and 0.10 (preferred method)
+   - A positive whole number (integer) for units (with equity validation)
 
-2. NEVER use floating point numbers for position sizes
-3. Always round and convert to int: position_size = int(round(position_size))
-4. For risk-based sizing: risk_amount = self.equity * risk_percentage
-5. Then: position_size = int(round(risk_amount / stop_distance))
+4. FRACTIONAL SIZING (PREFERRED):
+   - Calculate target: position_size = min(calculated_fraction, 0.10)  # Never exceed 10%
+   - Example: self.buy(size=0.02)  # 2% of equity
+   - Example: self.buy(size=0.015)  # 1.5% of equity
+   - Always validate: position_value = position_size * self.equity <= self.equity * 0.10
 
-VALID: self.buy(size=0.1) or self.buy(size=5)
-INVALID: self.buy(size=3.14159) or self.buy(size=1.5)
+5. UNIT-BASED SIZING (with validation):
+   - First calculate max units: max_units = int(self.equity * 0.10 / current_price)
+   - Then calculate desired size: desired_units = int(round(risk_amount / stop_distance))
+   - Apply cap: position_size = min(desired_units, max_units)
+   - Always validate: position_value = position_size * current_price <= self.equity * 0.10
 
-Fix any calculation that results in non-integer, non-fraction sizes.
+6. NEVER use floating point numbers for position sizes (except fractions 0.01-0.10)
+7. For risk-based sizing: risk_amount = self.equity * risk_percentage (where risk_percentage <= 0.10)
+8. Then: position_size = int(round(risk_amount / stop_distance)) for units, or min(risk_percentage, 0.10) for fractions
+
+VALID: self.buy(size=0.02) or self.buy(size=0.015) or self.buy(size=5) where 5 * price <= equity * 0.10
+INVALID: self.buy(size=3.14159) or self.buy(size=1.5) or position_size that exceeds 10% of equity
+
+Fix any calculation that results in positions exceeding 10% of equity.
 
 RISK MANAGEMENT:
-1. Always calculate position sizes based on risk percentage
+1. Always calculate position sizes based on risk percentage (target 1-3%, max 10%)
 2. Use proper stop loss and take profit calculations
-3. Print entry/exit signals with simple debug messages
+3. Print entry/exit signals with position size as percentage: print(f"Position size: {position_size} ({position_size*100:.2f}% of equity)")
+4. CRITICAL: If calculated position exceeds 10% of equity, cap it at 10% and log a warning
+
+CRITICAL TRADE EXECUTION RULES:
+1. When entry conditions are met, you MUST actually call self.buy() or self.sell() - printing "[TRADE EXECUTED]" is NOT enough
+2. The self.buy() call must be in the same code block as the entry condition check
+3. Example CORRECT pattern:
+   if entry_condition:
+       position_size = min(calculated_size, 0.10)  # Cap at 10%
+       self.buy(size=position_size)  # ACTUALLY CALL self.buy()
+4. Example WRONG pattern (DO NOT DO THIS):
+   if entry_condition:
+       print("[ENTRY SIGNAL]")
+       print("[TRADE EXECUTED]")  # This does NOT execute a trade!
+5. CRITICAL: After calling self.buy(), verify the trade was executed by checking if self.position exists
+6. If self.buy() is not executing, check: (a) size parameter is valid (fraction 0.01-0.10 or positive integer), (b) sufficient equity/cash, (c) no conflicting position logic
+
+VERBOSE LOGGING REDUCTION (MANDATORY):
+1. DO NOT print every single trade execution - this creates thousands of lines of output
+2. Instead, use a counter and only print periodically:
+   - Initialize: self.trade_count = 0 (in __init__)
+   - Only print every 10th trade: if self.trade_count % 10 == 0: print(f"[TRADE {self.trade_count}] Entry at bar {len(self.data)}")
+   - Or print summary every 100 bars: if len(self.data) % 100 == 0: print(f"[SUMMARY] Bar {len(self.data)}, Equity: ${self.equity:.2f}")
+3. Remove or reduce these verbose prints:
+   - DO NOT print [ENTRY SIGNAL] for every bar
+   - DO NOT print [ENTRY], [POSITION], [EQUITY], [TRADE EXECUTED] for every single trade
+   - DO NOT print MACD values, ranges, or debug info on every bar
+4. Keep only essential prints:
+   - Print at strategy initialization: print("[STRATEGY] Initialized")
+   - Print periodic summaries (every 100-200 bars)
+   - Print final trade count at end: print(f"[FINAL] Total trades executed: {self.trade_count}")
 
 If you need indicators use TA lib or pandas TA. 
 
@@ -293,6 +341,9 @@ CRITICAL DATA LOADING INSTRUCTIONS:
      * Test all symbols in the funding data, or iterate through symbols that have extreme funding rates
      * Example: for symbol in funding_data['symbol'].unique(): process_symbol_data(symbol)
    - For OHLCV data: price_data = pd.read_csv('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/rbi/BTC-USD-15m.csv')
+     * IMPORTANT: The file path will be automatically updated based on the strategy's timeframe requirement
+     * If the strategy requires a different timeframe (e.g., '1d', '4h'), the system will replace '15m' with the correct timeframe
+     * Always use the timeframe-specific data file that matches the strategy's requirements
    - For Onchain data: onchain_data = pd.read_json('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/token_onchain_data.json')
      * On-chain data has nested JSON structure - normalize to flat DataFrame
      * Extract: timestamp, symbol, whale_concentration (from holder_distribution.whale_pct), market_cap (estimate from liquidity_usd * 10)
@@ -334,6 +385,18 @@ Fix technical issues in the backtest code WITHOUT changing the strategy logic.
 CRITICAL ERROR TO FIX:
 {error_message}
 
+🔍 DEBUGGING REQUIREMENTS - ADD THESE PRINTS TO UNDERSTAND ENTRY LOGIC:
+1. At the start of next(): print current bar number, equity, position status
+2. For each entry condition check: print the condition values and boolean result
+3. Print MACD values, range bounds, and whether conditions are met
+4. Print position size calculations and why trades might not execute
+5. Add periodic summary prints every 100 bars showing indicator values
+
+Example debug prints to add:
+- print(f"[DEBUG] Bar {{len(self.data)}}, Equity: ${{self.equity:.2f}}, Position: {{self.position.size if self.position else 0}}")
+- print(f"[DEBUG] MACD: {{current_macd:.6f}}, Range: [{{range_min:.6f}}, {{range_max:.6f}}], InRange: {{range_min <= current_macd <= range_max}}")
+- print(f"[DEBUG] Position size calc: equity={{self.equity:.2f}}, risk={{risk_per_trade}}, stop_distance={{stop_distance:.2f}}, size={{position_size_fraction:.6f}}")
+
 CRITICAL DATA LOADING REQUIREMENTS:
 The CSV file has these exact columns after processing:
 - datetime, open, high, low, close, volume (all lowercase after .str.lower())
@@ -370,10 +433,12 @@ CRITICAL BACKTESTING REQUIREMENTS:
 
 5. No Trades Issue (Signals but no execution):
    - If strategy prints "ENTRY SIGNAL" but shows 0 trades, the self.buy() call is not executing
-   - Common causes: invalid size parameter, insufficient cash, missing self.buy() call
-   - Ensure self.buy() is actually called in the entry condition block
-   - Check size parameter: must be fraction (0-1) or positive integer
+   - Common causes: invalid size parameter, insufficient cash, missing self.buy() call, printing instead of calling
+   - CRITICAL: You MUST actually call self.buy(size=position_size) - printing "[TRADE EXECUTED]" does NOT execute a trade
+   - Ensure self.buy() is in the same code block as the entry condition: if condition: self.buy(size=size)
+   - Check size parameter: must be fraction (0.01-0.10) or positive integer
    - Verify cash/equity is sufficient for the trade size
+   - DO NOT just print trade messages - you must call self.buy() or self.sell() to execute trades
 
 Focus on:
 1. KeyError issues with column names
@@ -384,7 +449,7 @@ Focus on:
 
 DO NOT change strategy logic, entry/exit conditions, or risk management rules.
 
-Return the complete fixed code with simple debug prints using plain text only.
+Return the complete fixed code with comprehensive debug prints using plain text only.
 ONLY SEND BACK CODE, NO OTHER TEXT.
 """
 
@@ -420,6 +485,8 @@ Your job is to ensure the backtest code NEVER uses ANY backtesting.lib imports o
      * oi_data = load_oi_data('BTC') → oi_data = pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/oi/oi_20251218.parquet')
      * funding_data = load_funding_data('BTC') → funding_data = pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/funding/funding_20251218.parquet')
      * price_data = load_ohlcv_data('BTC') → price_data = pd.read_csv('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/rbi/BTC-USD-15m.csv')
+       * IMPORTANT: Replace '15m' with the actual timeframe from the strategy (e.g., '1d', '4h', '15m')
+       * The timeframe should match the strategy's requirements - check the strategy idea for the correct timeframe
      * onchain_data = load_onchain_data() → onchain_data = pd.read_json('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/token_onchain_data.json')
      * For liquidation data: try pd.read_parquet('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/liquidations/liquidations_20251218.parquet') and handle if file doesn't exist
    - REMOVE any function definitions for load_oi_data, load_funding_data, load_ohlcv_data, load_onchain_data
@@ -469,35 +536,61 @@ TARGET RETURN: {target_return}%
 
 YOUR MISSION: Optimize this strategy to hit the target return!
 
-OPTIMIZATION TECHNIQUES TO CONSIDER:
-1. **Entry Optimization:**
-   - Tighten entry conditions to catch better setups
-   - Add filters to avoid low-quality signals
-   - Use multiple timeframe confirmation
-   - Add volume/momentum filters
+OPTIMIZATION TECHNIQUES - PRIORITIZE SIMPLICITY:
+1. **KEEP IT SIMPLE**: Remove unnecessary filters that create 0-trade scenarios
+2. **Focus on Core Logic**: Only optimize the MACD entry/exit ranges and parameters
+3. **Avoid Over-filtering**: Don't add RSI, volume, trend, or divergence filters unless they significantly improve returns
+4. **Test Simplified Versions**: Always ensure the strategy can execute trades before adding complexity
 
-2. **Exit Optimization:**
-   - Improve take profit levels
-   - Add trailing stops
-   - Use dynamic position sizing based on volatility
-   - Scale out of positions
+CRITICAL RULE: If an optimization creates 0 trades, REVERT to a simpler version that executes trades.
 
-3. **Risk Management:**
-   - Adjust position sizing
-   - Use volatility-based position sizing (ATR)
-   - Add maximum drawdown limits
-   - Improve stop loss placement
+CRITICAL POSITION SIZING RULES - DO NOT VIOLATE:
+- Position size MUST be a fraction between 0.005 and 0.03 (0.5% to 3% of equity)
+- NEVER modify the position sizing calculation logic
+- Use this EXACT code pattern for position sizing:
+  target_position_pct = 0.015  # 1.5% target
+  position_size_fraction = min(target_position_pct, 0.03)  # 3% max
+  position_size_fraction = max(position_size_fraction, 0.005)  # 0.5% min
+  position_value = self.equity * position_size_fraction
+  position_size = position_value / entry_price
+- DO NOT use risk-based sizing: (equity * risk) / stop_distance
+- DO NOT modify position_size_fraction calculations
+- ALWAYS validate: if not (0.005 <= position_size_fraction <= 0.03): return
 
-4. **Indicator Optimization:**
-   - Fine-tune indicator parameters
-   - Add complementary indicators
-   - Use indicator divergence
-   - Combine multiple timeframes
+OPTIMIZATION SCOPE RESTRICTIONS:
+✅ ALLOWED: Modify MACD periods (fast, slow, signal)
+✅ ALLOWED: Change entry/exit range multipliers (-1.5 to -2.5 for min, -0.5 to -0.2 for max)
+✅ ALLOWED: Adjust ROI scaling percentages
+✅ ALLOWED: Change stop loss percentage (20-40%)
+✅ ALLOWED: Modify minimum holding periods (3-10 candles)
 
-5. **Market Regime Filters:**
-   - Add trend filters
-   - Avoid choppy/ranging markets
-   - Only trade in favorable conditions
+❌ FORBIDDEN: Change position sizing logic
+❌ FORBIDDEN: Modify position_size_fraction formulas
+❌ FORBIDDEN: Use risk-based position sizing
+❌ FORBIDDEN: Add new indicators or filters
+
+POSITION SIZE DEBUGGING REQUIREMENT:
+- Add debug print before self.buy(): print(f"[DEBUG] Position size: {{{{position_size_fraction*100:.2f}}}}% ({{{{position_size:.6f}}}} units)")
+- Validate size before execution: if not (0.005 <= position_size_fraction <= 0.03): print("[ERROR] Invalid size"); return
+
+2. **Entry Optimization (SIMPLE APPROACH):**
+   - Slightly adjust MACD entry range bounds
+   - Only add ONE additional filter at a time
+
+3. **Exit Optimization:**
+   - Adjust ROI scaling percentages
+   - Modify stop loss percentage
+   - Change minimum holding periods
+
+4. **Risk Management (KEEP SIMPLE):**
+   - Modify stop loss percentage
+   - Change maximum position cap (but keep within 0.5-3% range)
+
+CRITICAL TIMEFRAME REQUIREMENT:
+- The strategy uses {timeframe} timeframe data
+- You MUST maintain the same data file: BTC-USD-{timeframe}.csv
+- Do NOT change the data file path unless explicitly optimizing for a different timeframe
+- If you see BTC-USD-15m.csv in the code, replace it with BTC-USD-{timeframe}.csv
 
 IMPORTANT RULES:
 - DO NOT break the code structure
@@ -1327,7 +1420,9 @@ def debug_backtest(backtest_code, error_message, strategy_name="UnknownStrategy"
     FINAL_BACKTEST_DIR.mkdir(parents=True, exist_ok=True)
 
     # Create debug prompt with specific error
-    debug_prompt_with_error = DEBUG_PROMPT.format(error_message=error_message)
+    # Sanitize error message to prevent formatting issues with special characters
+    safe_error_message = str(error_message).replace('{', '{{').replace('}', '}}')
+    debug_prompt_with_error = DEBUG_PROMPT.format(error_message=safe_error_message)
 
     output = run_with_animation(
         chat_with_model,
@@ -1347,7 +1442,7 @@ def debug_backtest(backtest_code, error_message, strategy_name="UnknownStrategy"
         return output
     return None
 
-def optimize_strategy(backtest_code, current_return, target_return, strategy_name="UnknownStrategy", iteration=1):
+def optimize_strategy(backtest_code, current_return, target_return, strategy_name="UnknownStrategy", iteration=1, timeframe="15m"):
     """Optimization AI: Improves strategy to hit target return"""
     cprint(f"\n[TARGET] Starting Optimization AI (iteration {iteration})...", "cyan")
     cprint(f"[CHART] Current Return: {current_return}%", "yellow")
@@ -1357,7 +1452,8 @@ def optimize_strategy(backtest_code, current_return, target_return, strategy_nam
     # Create optimization prompt with current performance
     optimize_prompt_with_stats = OPTIMIZE_PROMPT.format(
         current_return=current_return,
-        target_return=target_return
+        target_return=target_return,
+        timeframe=timeframe
     )
 
     output = run_with_animation(
@@ -1370,6 +1466,10 @@ def optimize_strategy(backtest_code, current_return, target_return, strategy_nam
 
     if output:
         output = clean_model_output(output, "code")
+        
+        # Replace hardcoded timeframe references with correct timeframe
+        if timeframe and timeframe != "15m":
+            output = output.replace("BTC-USD-15m.csv", f"BTC-USD-{timeframe}.csv")
 
         filepath = OPTIMIZATION_DIR / f"{strategy_name}_OPT_v{iteration}.py"
         with open(filepath, 'w', encoding='utf-8') as f:
@@ -1388,6 +1488,11 @@ def process_trading_idea_with_execution(idea: str) -> None:
     print(f"[TARGET] Target Return: {TARGET_RETURN}%")
     print(f"[LIST] Processing idea: {idea[:100]}...")
 
+    # Extract and verify timeframe
+    timeframe = extract_timeframe_from_idea(idea)
+    print(f"[TIMEFRAME] Strategy requires: {timeframe} timeframe")
+    print(f"[TIMEFRAME] Will use data file: BTC-USD-{timeframe}.csv")
+
     # Check if we have the required data for this strategy type
     data_type = determine_data_type_needed(idea)
     print(f"[DEBUG] Data type determined: {data_type}")
@@ -1403,10 +1508,53 @@ def process_trading_idea_with_execution(idea: str) -> None:
     
     result = ensure_rbi_data_exists(idea)
     print(f"[DEBUG] ensure_rbi_data_exists() returned: {result}")
-    
+
     if not result:
         print(f"❌ Required {data_type} data not available for this strategy type. Skipping.")
         return
+
+    # Verify data file exists after collection
+    data_file_path = f"C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/rbi/BTC-USD-{timeframe}.csv"
+    if not os.path.exists(data_file_path):
+        print(f"[ERROR] Data collection failed - required data file not found: {data_file_path}")
+        return
+    else:
+        print(f"[SUCCESS] Data file confirmed: {data_file_path}")
+
+    # Validate minimum backtest period (timeframe-specific minimums)
+    # Daily timeframe: 30 days (limited by data source availability)
+    # Other timeframes: 90 days for statistical significance
+    min_days_required = 30 if timeframe == '1d' else 90
+
+    try:
+        import pandas as pd
+        data_check = pd.read_csv(data_file_path, nrows=5)  # Quick format check
+        if 'timestamp' in data_check.columns or 'datetime' in data_check.columns:
+            # Load full data to check date range
+            full_data = pd.read_csv(data_file_path)
+            # Handle different timestamp column names
+            timestamp_col = 'timestamp' if 'timestamp' in full_data.columns else 'datetime'
+            if timestamp_col in full_data.columns:
+                full_data[timestamp_col] = pd.to_datetime(full_data[timestamp_col])
+                days_available = (full_data[timestamp_col].max() - full_data[timestamp_col].min()).days
+                print(f"[DATA] Data range: {full_data[timestamp_col].min()} to {full_data[timestamp_col].max()}")
+                print(f"[DATA] Days available: {days_available}")
+
+                if days_available < min_days_required:
+                    print(f"[WARN] Only {days_available} days of data available. Minimum {min_days_required} days required for {timeframe} timeframe.")
+                    print(f"[INFO] Need to collect {min_days_required - days_available} more days of data")
+                    print(f"[INFO] Run data collection script to gather more historical data")
+                    print(f"[SKIP] Skipping strategy due to insufficient data period")
+                    return
+                else:
+                    print(f"[SUCCESS] Data period validation passed: {days_available} days >= {min_days_required} days minimum for {timeframe} timeframe")
+            else:
+                print(f"[WARN] Could not find timestamp column in data file. Skipping period validation.")
+        else:
+            print(f"[WARN] Could not determine timestamp column. Skipping period validation.")
+    except Exception as e:
+        print(f"[WARN] Failed to validate data period: {e}")
+        print(f"[INFO] Continuing with backtest (validation skipped)")
 
     # Phase 1: Research
     print("\n🧪 Phase 1: Research")
@@ -1511,6 +1659,8 @@ def process_trading_idea_with_execution(idea: str) -> None:
                 # #endregion
 
                 print("\n⚠️ BACKTEST EXECUTED BUT NO TRADES TAKEN (NaN results)")
+                analysis = analyze_no_trades_issue(execution_result)
+                print(f"📋 DIAGNOSIS: {analysis}")
                 print("🔧 Sending to Debug AI to fix strategy logic...")
                 
                 # Analyze the specific no-trades issue
@@ -1584,6 +1734,8 @@ def process_trading_idea_with_execution(idea: str) -> None:
                     # This is the magic of v3.0!
                     # Agent will keep improving the strategy until TARGET_RETURN is hit
                     # Each iteration: Optimize → Execute → Check Return → Repeat
+                    # Extract timeframe from idea to maintain correct data file
+                    timeframe = extract_timeframe_from_idea(idea) if idea else "15m"
                     optimization_iteration = 0
                     optimization_code = current_code
                     best_return = current_return
@@ -1599,7 +1751,8 @@ def process_trading_idea_with_execution(idea: str) -> None:
                             best_return,
                             TARGET_RETURN,
                             strategy_name,
-                            optimization_iteration
+                            optimization_iteration,
+                            timeframe=timeframe
                         )
 
                         if not optimized_code:
@@ -1615,7 +1768,10 @@ def process_trading_idea_with_execution(idea: str) -> None:
                             continue
 
                         if has_nan_results(opt_result):
-                            print(f"⚠️ Optimized code has no trades, trying again...")
+                            analysis = analyze_no_trades_issue(opt_result)
+                            print(f"⚠️ Optimized code has no trades")
+                            print(f"📋 DIAGNOSIS: {analysis}")
+                            print(f"💡 SUGGESTION: Review entry conditions, position sizing, and ensure self.buy() is being called")
                             continue
 
                         # Parse the new return
@@ -1912,8 +2068,8 @@ def ensure_ohlcv_data_exists():
     # #endregion
 
     RBI_DATA_SYMBOLS = ['BTC', 'ETH', 'SOL']
-    # Collect multiple timeframes: 5m for UniversalMACD/PowerTower, 15m for existing, 4h for MultiMa
-    RBI_TIMEFRAMES = ['5m', '15m', '4h']
+    # Collect multiple timeframes: 5m for UniversalMACD/PowerTower, 15m for existing, 4h for MultiMa, 1d for PatternRecognition
+    RBI_TIMEFRAMES = ['5m', '15m', '4h', '1d']
     data_dir = PROJECT_ROOT / "data" / "rbi"
     
     # #region agent log
@@ -1978,34 +2134,34 @@ def ensure_ohlcv_data_exists():
     for symbol in RBI_DATA_SYMBOLS:
         for timeframe in RBI_TIMEFRAMES:
             data_file = data_dir / f"{symbol}-USD-{timeframe}.csv"
-            
-            # #region agent log
-            log_entry = {
+        
+        # #region agent log
+        log_entry = {
                 "id": f"log_{int(__import__('time').time() * 1000)}_file_check_{symbol}_{timeframe}",
-                "timestamp": int(__import__('time').time() * 1000),
-                "location": "rbi_agent_v3.py:ensure_ohlcv_data_exists",
+            "timestamp": int(__import__('time').time() * 1000),
+            "location": "rbi_agent_v3.py:ensure_ohlcv_data_exists",
                 "message": f"Checking file existence for {symbol} {timeframe}",
-                "data": {
-                    "symbol": symbol,
+            "data": {
+                "symbol": symbol,
                     "timeframe": timeframe,
-                    "data_file": str(data_file),
-                    "data_file_absolute": str(data_file.resolve()),
-                    "file_exists": data_file.exists(),
-                    "file_is_file": data_file.is_file() if data_file.exists() else False
-                },
-                "sessionId": "debug-session",
-                "runId": "run1",
-                "hypothesisId": "B"
-            }
-            try:
-                log_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(log_path, 'a', encoding='utf-8') as f:
-                    f.write(json.dumps(log_entry) + '\n')
-            except:
-                pass
-            # #endregion
-            
-            if not data_file.exists():
+                "data_file": str(data_file),
+                "data_file_absolute": str(data_file.resolve()),
+                "file_exists": data_file.exists(),
+                "file_is_file": data_file.is_file() if data_file.exists() else False
+            },
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "B"
+        }
+        try:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(log_entry) + '\n')
+        except:
+            pass
+        # #endregion
+        
+        if not data_file.exists():
                 missing_data.append(f"{symbol}-{timeframe}")
 
     if missing_data:
@@ -2064,7 +2220,7 @@ def ensure_ohlcv_data_exists():
                 for symbol in RBI_DATA_SYMBOLS:
                     for timeframe in RBI_TIMEFRAMES:
                         data_file = data_dir / f"{symbol}-USD-{timeframe}.csv"
-                        if data_file.exists():
+                    if data_file.exists():
                             collected_files.append(f"{symbol}-{timeframe}")
 
                 if collected_files:
@@ -2834,18 +2990,47 @@ def customize_backtest_prompt_for_data_type(base_prompt, data_type, timeframe="1
         Expected normalized columns: timestamp, symbol, whale_concentration, market_cap, holder_count, transaction_volume, transaction_count, liquidity_usd
         """
     else:  # indicator/ohlcv
+        # Add pattern recognition instructions for 1d timeframe
+        pattern_recognition_instructions = ""
+        if timeframe == "1d":
+            pattern_recognition_instructions = """
+        PATTERN RECOGNITION STRATEGY REQUIREMENTS (for 1d timeframe):
+        1. Use TA-Lib pattern recognition functions (CDL* functions like CDLHIGHWAVE, CDLENGULFING, etc.)
+        2. Pattern functions return integer values: -100 (strong bearish), 0 (no pattern), 100 (strong bullish)
+        3. Calculate patterns in init() using self.I() wrapper with all four OHLC arrays:
+           Example: self.cdl_highwave = self.I(talib.CDLHIGHWAVE, self.data.Open, self.data.High, self.data.Low, self.data.Close)
+        4. Pattern functions require: Open, High, Low, Close arrays (in that order)
+        5. Entry condition: Check if pattern value equals expected signal (e.g., -100 for bearish reversal pattern)
+        6. Pattern recognition works best on daily timeframe - signals are less noisy than intraday
+        7. IMPORTANT: Pattern values are integers, not floats. Compare using == operator, not range checks.
+        """
+        
         data_loading_instruction = f"""
         DATA LOADING FOR INDICATOR STRATEGY:
         Load OHLCV data directly: price_data = pd.read_csv('C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/rbi/BTC-USD-{timeframe}.csv')
+        CRITICAL: Immediately after loading, you MUST print timeframe debug info (this is mandatory, not optional):
+        print(f"[TIMEFRAME] Using {timeframe} timeframe data")
+        print(f"[DATA] Loaded {timeframe} timeframe data from: BTC-USD-{timeframe}.csv")
+        print(f"[DATA] Data shape: {{price_data.shape}}, Columns: {{list(price_data.columns)}}")
+        print(f"[DATA] Date range: {{price_data.index[0]}} to {{price_data.index[-1]}}")
         This script runs standalone and must load data directly.
         Required columns: timestamp, open, high, low, close, volume, open_interest
         IMPORTANT: Use the {timeframe} timeframe data file as specified in the strategy requirements. The file name format is BTC-USD-{timeframe}.csv
+        MANDATORY: The print statements above MUST be included in your code - they are required for debugging and verification.
+        {pattern_recognition_instructions}
         """
 
     # Insert the data loading instruction into the base prompt
     customized_prompt = base_prompt.replace(
         "IMPORTANT DATA HANDLING:",
         f"IMPORTANT DATA HANDLING:\n{data_loading_instruction}\n\nIMPORTANT DATA HANDLING:"
+    )
+    
+    # Replace hardcoded BTC-USD-15m.csv references with dynamic timeframe
+    if data_type in ["indicator", "ohlcv"]:
+        customized_prompt = customized_prompt.replace(
+            "BTC-USD-15m.csv",
+            f"BTC-USD-{timeframe}.csv"
     )
 
     return customized_prompt
@@ -2881,8 +3066,21 @@ def main():
         cprint("[HINT] Add your trading ideas and run again!", "yellow")
         return
         
+    # Parse ideas as blocks preserving comment lines (for timeframe extraction)
+    ideas = []
+    current_block = []
     with open(ideas_file, 'r', encoding='utf-8') as f:
-        ideas = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+        for line in f:
+            stripped = line.strip()
+            if not stripped:  # Blank line - end of current idea block
+                if current_block:
+                    ideas.append('\n'.join(current_block))
+                    current_block = []
+            else:
+                current_block.append(stripped)
+        # Handle last block if file doesn't end with blank line
+        if current_block:
+            ideas.append('\n'.join(current_block))
         
     total_ideas = len(ideas)
     cprint(f"\n[TARGET] Found {total_ideas} trading ideas to process", "cyan")

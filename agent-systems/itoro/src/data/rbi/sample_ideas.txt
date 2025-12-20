@@ -18,6 +18,16 @@ https://www.youtube.com/watch?v=8P2QgXH2Dgc
 
 # === ADDITIONAL TRADING IDEAS ===
 
+# MultiMa Strategy - 73.3% total profit, 4h swing trading
+# Timeframe: 4h, ROI: 52.3% (scales down), Stop Loss: -34.5%
+# FIX: Added debug statements to diagnose why entry conditions never trigger
+Implement a Multi Moving Average strategy using TEMA (Triple Exponential Moving Average) with multiple periods. For entry, calculate 4 TEMA indicators with gap of 15 periods between each (e.g., TEMA(15), TEMA(30), TEMA(45), TEMA(60)). Buy when all TEMA values satisfy: TEMA(30) < TEMA(15) AND TEMA(45) < TEMA(30) AND TEMA(60) < TEMA(45), which means shorter period TEMAs are above longer period TEMAs (descending order indicating uptrend). IMPORTANT: Add debug print statements every 10 bars showing: current bar number, current price, all 4 TEMA values (TEMA15, TEMA30, TEMA45, TEMA60), and whether each condition is satisfied (TEMA30 < TEMA15: True/False, TEMA45 < TEMA30: True/False, TEMA60 < TEMA45: True/False). This will help diagnose why entry conditions may not be triggering. For exit, calculate 12 TEMA indicators with gap of 68 periods (TEMA(68), TEMA(136), TEMA(204), etc.). Sell when ANY TEMA crosses above its previous TEMA (trend reversal signal). Use ROI table: 52.3% at entry, scaling to 12.3% after 1553 candles, 7.6% after 2332 candles, and 0% after 3169 candles. Set stop loss at -34.5%. This is a swing trading strategy designed for 4h timeframe.
+
+# PowerTower Strategy - 81.5% total profit, 97% win rate (32 wins / 34 draws / 1 loss)
+# Timeframe: 5m, ROI: 21.3% (scales down), Stop Loss: -28.8%
+# FIX: Corrected power calculation - original formula doesn't work for large crypto prices like BTC
+Build a Power Tower pattern recognition strategy that detects strongly rising price patterns. IMPORTANT: The original formula (close > close.shift(2) ** 3.849) doesn't work for large prices like BTC. Use percentage-based calculation instead. For entry, check if (current close / close 2 periods ago) > (1.01 ** 2.0) AND (previous close / close 3 periods ago) > (1.01 ** 2.0) AND (close 2 periods ago / close 4 periods ago) > (1.01 ** 2.0). This uses percentage changes (price ratios) raised to power, which works for any price level. Add debug print statements showing: current close, previous closes, calculated ratios, power results, and whether each condition is True/False. For exit, sell when (current close / close 2 periods ago) < (1.01 ** 1.8) OR (previous close / close 3 periods ago) < (1.01 ** 1.8) OR (close 2 periods ago / close 4 periods ago) < (1.01 ** 1.8). Use ROI table: 21.3% at entry, scaling to 4.8% after 39 candles, 2.9% after 56 candles, and 0% after 159 candles. Set stop loss at -28.8%. This strategy achieved 81.5% total profit with 97% win rate in backtesting.
+
 # Sample Text-Based Trading Ideas
 Create a momentum strategy using RSI and MACD divergence with volume confirmation
 Implement a mean reversion strategy that buys oversold conditions and sells overbought conditions
