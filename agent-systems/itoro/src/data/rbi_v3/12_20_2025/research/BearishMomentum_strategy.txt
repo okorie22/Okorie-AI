@@ -1,0 +1,42 @@
+STRATEGY_NAME: BearishMomentum
+
+STRATEGY_DETAILS:
+This is a systematic short-selling strategy designed to capitalize on strong, established downtrends using a combination of trend strength and momentum confirmation. The core philosophy is to enter only when multiple indicators align to confirm a powerful bearish trend, and to exit promptly upon signs of momentum exhaustion or reversal.
+
+**KEY STRATEGY COMPONENTS:**
+1.  **Primary Objective:** Identify and trade strong downtrends.
+2.  **Core Indicators:** ADX (14-period), Plus Directional Indicator (+DI, 25-period), Minus Directional Indicator (-DI, 25-period), and Momentum (14-period).
+3.  **Market Regime Filter:** The strategy is explicitly designed for trending markets and will underperform or generate false signals in ranging/consolidating conditions.
+4.  **Data Requirement:** Minimum of 30 hourly (1H) bars of historical data for reliable indicator calculation.
+
+**ENTRY RULES (SHORT POSITION):**
+All four conditions must be met simultaneously to initiate a short trade:
+1.  **Trend Strength (ADX > 25):** Confirms the presence of a strong trend, not just noise.
+2.  **Bearish Directional Bias (-DI > +DI):** The downtrend's directional force is stronger than the uptrend's force.
+3.  **Strong Downtrend Force (-DI > 25):** The bearish directional movement itself is quantitatively strong.
+4.  **Negative Momentum (Momentum(14) < 0):** Price is accelerating downward, confirming the bearish pressure indicated by the DIs.
+
+**EXIT RULES:**
+The position is closed if ANY of the following conditions are met:
+1.  **Momentum Reversal:** `ADX > 25` AND `Momentum(14) > 0`. The trend is still strong, but momentum has flipped positive, suggesting a potential pause or reversal.
+2.  **Trend Reversal Signal:** `+DI > 25` AND `+DI > -DI`. Signals a potential shift to a strong uptrend.
+3.  **Stop Loss:** Price moves 8% against the position (i.e., price increases 8% from entry).
+4.  **Take Profit:** Price moves 10% in favor of the position (i.e., price decreases 10% from entry).
+5.  **Time-Based Exit:** 96 hourly bars (~4 days) have passed since entry, regardless of P&L.
+6.  **Minimum Holding Period:** A position cannot be exited before 6 hourly bars have passed, preventing premature exits on minor noise.
+
+**RISK & POSITION MANAGEMENT:**
+*   **Position Sizing:** Dynamic sizing targeting 1-2% of account equity per trade, with an average of 1.5%. A randomizing element is applied within this range for trend-following.
+*   **Maximum Risk per Trade:** A hard cap of 3% of equity must not be exceeded.
+*   **Trailing Stop:** Activated once a trade reaches a +2% unrealized profit. The stop loss is then trailed to lock in 80% of the profits gained beyond that 2% threshold.
+*   **Expected Performance:** Designed for 15-25 trades, targeting aggregate returns of 3-8%.
+
+**REQUIRED INDICATORS & SETTINGS:**
+*   **ADX (Average Directional Index):** Period = 14. Used to gauge trend strength.
+*   **DMI (Directional Movement Index):** DI Period = 25. Comprised of +DI and -DI lines to determine trend direction.
+*   **Momentum Oscillator:** Period = 14. Calculates the rate of price change.
+
+**CRITICAL IMPLEMENTATION NOTES:**
+*   This is a **SHORT-ONLY** strategy. It does not define long entries.
+*   Performance is highly dependent on market context. It requires a trending environment with clear bearish phases.
+*   The 6-bar minimum holding period and 96-bar maximum holding period create a defined trade window, balancing the need for the trend to develop against the risk of overstaying.

@@ -1,0 +1,8 @@
+{
+  "success": false,
+  "return_code": 1,
+  "stdout": "",
+  "stderr": "  File \"C:\\Users\\Top Cash Pawn\\ITORO\\agent-systems\\itoro\\src\\data\\rbi_v3\\12_21_2025\\backtests_final\\PatternCatalyst_BTFinal_v2.py\", line 307\n    rename_dict = {column_mapping['open']: 'Open',\n                  ^\nSyntaxError: '{' was never closed\n",
+  "execution_time": 0.287297,
+  "timestamp": "2025-12-21T05:24:05.796866"
+}

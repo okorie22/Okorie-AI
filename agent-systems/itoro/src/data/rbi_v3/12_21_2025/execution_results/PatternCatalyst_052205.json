@@ -1,0 +1,8 @@
+{
+  "success": false,
+  "return_code": 1,
+  "stdout": "",
+  "stderr": "  File \"C:\\Users\\Top Cash Pawn\\ITORO\\agent-systems\\itoro\\src\\data\\rbi_v3\\12_21_2025\\backtests_final\\PatternCatalyst_BTFinal_v1.py\", line 309\n    column_mapping['low']: 'Low\n                           ^\nSyntaxError: unterminated string literal (detected at line 309)\n",
+  "execution_time": 0.248663,
+  "timestamp": "2025-12-21T05:22:05.085563"
+}

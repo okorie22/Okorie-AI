@@ -1,0 +1,8 @@
+{
+  "success": false,
+  "return_code": 1,
+  "stdout": "[INFO] Loading data...\n[INFO] Data loaded: 92 rows, 6 columns\n[DEBUG] Data columns: ['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume']\n[DEBUG] Data range: 2025-09-19 00:00:00 to 2025-12-18 20:00:00\n[INFO] Starting backtest...\n[STRATEGY] PatternCatalyst initialized\n[ENTRY] engulfing pattern detected at bar 68\n[POSITION] Size: 1 units (9.04% of equity)\n[RISK] Stop loss: 64379.04 (28.8%)\n",
+  "stderr": "\nBacktest.run:   0%|          | 0/91 [00:00<?, ?bar/s]\n                                                     \nTraceback (most recent call last):\n  File \"C:\\Users\\Top Cash Pawn\\ITORO\\agent-systems\\itoro\\src\\data\\rbi_v3\\12_21_2025\\backtests_package\\PatternCatalyst_PKG.py\", line 168, in <module>\n    stats = bt.run()\n            ^^^^^^^^\n  File \"C:\\Users\\Top Cash Pawn\\AppData\\Roaming\\Python\\Python311\\site-packages\\backtesting\\backtesting.py\", line 1339, in run\n    strategy.next()\n  File \"C:\\Users\\Top Cash Pawn\\ITORO\\agent-systems\\itoro\\src\\data\\rbi_v3\\12_21_2025\\backtests_package\\PatternCatalyst_PKG.py\", line 38, in next\n    entry_price = self.position.entry_price\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^\nAttributeError: 'Position' object has no attribute 'entry_price'\n",
+  "execution_time": 4.409504,
+  "timestamp": "2025-12-21T05:31:33.908783"
+}

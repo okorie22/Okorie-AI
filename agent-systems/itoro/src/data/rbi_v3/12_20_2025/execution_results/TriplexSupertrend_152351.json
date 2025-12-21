@@ -1,0 +1,8 @@
+{
+  "success": false,
+  "return_code": 1,
+  "stdout": "",
+  "stderr": "  File \"C:\\Users\\Top Cash Pawn\\ITORO\\agent-systems\\itoro\\src\\data\\rbi_v3\\12_20_2025\\backtests_final\\TriplexSupertrend_BTFinal_v4.py\", line 296\n    print(f\"[INFO] Data loaded: {len(price_data)} rows, {len(price_data.columns)} columns\")\nSyntaxError: expected 'except' or 'finally' block\n",
+  "execution_time": 0.314446,
+  "timestamp": "2025-12-20T15:23:51.455197"
+}

@@ -1,0 +1,43 @@
+STRATEGY_NAME: BandReversion
+
+STRATEGY_DETAILS:
+
+**Core Concept:**
+The BandReversion strategy is a mean reversion approach that combines Bollinger Bands and the Relative Strength Index (RSI) to identify and capitalize on extreme oversold conditions in ranging or consolidating markets. It operates on the principle that prices tend to revert to their mean (the middle Bollinger Band) after reaching statistically significant extremes.
+
+**Key Components & Indicators:**
+1.  **Bollinger Bands (BB):**
+    *   **Period:** 20
+    *   **Standard Deviations:** 2
+    *   **Lines:** Upper Band (BB_upper), Middle Band/SMA (BB_middle), Lower Band (BB_lower).
+    *   **Purpose:** Defines dynamic support/resistance and identifies when price is at a statistically extreme low.
+
+2.  **Relative Strength Index (RSI):**
+    *   **Period:** 14
+    *   **Purpose:** Confirms the oversold condition identified by the Bollinger Bands, adding a momentum filter to the entry signal.
+
+**Market Condition & Data Requirements:**
+*   **Optimal Market:** Ranging or sideways markets. Performance may degrade in strong, sustained trends.
+*   **Minimum Data:** **30 days of 1-hour (1h) timeframe data** is mandatory for the indicators (particularly the 20-period BB) to stabilize and provide reliable signals.
+
+**Entry Rules (LONG Only):**
+A buy order is triggered when **BOTH** of the following conditions are met **simultaneously**:
+1.  **Price Condition:** The current closing price is **BELOW** the Lower Bollinger Band (BB_lower). This indicates a statistically significant move to the downside.
+2.  **Momentum Confirmation:** The 14-period RSI value is **LESS THAN 30**. This confirms a strong oversold momentum condition.
+
+**Exit Rules:**
+*   **Take Profit / Exit Condition:** Exit the long position when the 14-period RSI value crosses **ABOVE 70**. This signals that the momentum has shifted from oversold to overbought, suggesting the mean reversion move is likely complete.
+*   **Stop Loss:** A fixed stop loss at **-25%** from the entry price is applied to each trade to limit downside risk in case the mean reversion fails and the trend continues downward.
+
+**Risk & Money Management:**
+*   **Position Sizing:** Allocate **2% of the current total equity** to each trade. (Represented as a fraction: 0.02).
+*   **Stop Loss:** Fixed at **-25%** per trade.
+*   **Trailing Stop:** Disabled.
+*   **This combination (2% equity risk, 25% stop loss) results in a maximum loss of 0.5% of total equity on any single trade.**
+
+**Summary Workflow:**
+1.  **Wait for Setup:** Monitor the 1h chart for a candle to close below the BB_lower band.
+2.  **Confirm Entry:** Check that the RSI(14) value for that same candle is below 30.
+3.  **Enter Trade:** If both conditions are true, enter a LONG position at the next available price, risking 2% of equity.
+4.  **Manage Trade:** Place a stop loss order 25% below the entry price.
+5.  **Exit Trade:** Monitor the RSI. Close the position when the RSI(14) rises above 70.

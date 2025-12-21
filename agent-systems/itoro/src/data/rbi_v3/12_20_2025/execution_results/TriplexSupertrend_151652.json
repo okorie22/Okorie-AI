@@ -1,0 +1,8 @@
+{
+  "success": false,
+  "return_code": 1,
+  "stdout": "[INFO] Loading data...\n[INFO] Data loaded: 5379 rows, 11 columns\n[INFO] Data columns: ['timestamp', 'open', 'high', 'low', 'close', 'volume', 'Open', 'High', 'Low', 'Close', 'Volume']\n[INFO] Date range: 2025-09-05 14:00:00 to 2025-12-20 05:00:00\n[INFO] Starting backtest...\n[STRATEGY] TriplexSupertrend initialized\n",
+  "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\Top Cash Pawn\\ITORO\\agent-systems\\itoro\\src\\data\\rbi_v3\\12_20_2025\\backtests_package\\TriplexSupertrend_PKG.py\", line 254, in <module>\n    stats = bt.run()\n            ^^^^^^^^\n  File \"C:\\Users\\Top Cash Pawn\\AppData\\Local\\anaconda3\\envs\\tflow\\Lib\\site-packages\\backtesting\\backtesting.py\", line 1310, in run\n    strategy.init()\n  File \"C:\\Users\\Top Cash Pawn\\ITORO\\agent-systems\\itoro\\src\\data\\rbi_v3\\12_20_2025\\backtests_package\\TriplexSupertrend_PKG.py\", line 14, in init\n    self.data.df = self.data.df.drop(columns=[col for col in self.data.df.columns if 'unnamed' in col.lower()])\n    ^^^^^^^^^^^^\nAttributeError: property 'df' of '_Data' object has no setter\n",
+  "execution_time": 4.715731,
+  "timestamp": "2025-12-20T15:16:52.229793"
+}

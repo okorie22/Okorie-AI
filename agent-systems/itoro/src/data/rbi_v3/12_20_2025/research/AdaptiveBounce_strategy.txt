@@ -1,0 +1,35 @@
+STRATEGY_NAME: AdaptiveBounce
+
+STRATEGY_DETAILS:
+This is a sophisticated mean reversion strategy that combines Bollinger Bands and RSI oversold signals with a strong trend filter to target high-probability bounce opportunities in ranging or uptrending markets. The strategy's core philosophy is to identify temporary oversold conditions within a non-downtrending market structure and capitalize on the reversion to the mean.
+
+**KEY STRATEGY COMPONENTS:**
+1.  **Primary Indicators:** 20-period Bollinger Bands (2 standard deviations) and a 14-period RSI.
+2.  **Trend Filter:** A 50-period Simple Moving Average (SMA) to ensure trades are only taken in a neutral or bullish broader context.
+3.  **Momentum Guard:** A rule limiting consecutive bars below the lower Bollinger Band to avoid catching a "falling knife" during strong, sustained sell-offs.
+4.  **Multi-Factor Exit Logic:** Uses RSI overbought levels, a return to the Bollinger Band midline, and a fixed profit target for comprehensive trade management.
+
+**ENTRY RULES (ALL CONDITIONS MUST BE MET):**
+1.  **Oversold Momentum:** The 14-period RSI must be below 30, indicating an oversold condition.
+2.  **Extreme Price Deviation:** The current closing price must be **below** the lower Bollinger Band, signifying a statistically significant move to the downside.
+3.  **Positive Trend Context:** The current closing price must be **above** the 50-period SMA. This is the critical trend filter that prevents entries in a clear downtrend.
+4.  **Limited Duration of Extremes:** The price must have been below the lower Bollinger Band for a maximum of 2 consecutive bars (including the current bar). This prevents entry during extended breakdowns.
+
+**EXIT RULES (ANY CONDITION CAN TRIGGER AN EXIT):**
+1.  **Primary Profit-Taking Signal:** The 14-period RSI crosses **above 70**, indicating the momentum has shifted to overbought.
+2.  **Mean Reversion Completion:** The price closes **above** the middle line (20-period SMA) of the Bollinger Bands, suggesting the reversion to the mean is complete.
+3.  **Fixed Take Profit:** A profit target of **+12%** from the entry price is reached.
+
+**RISK MANAGEMENT & POSITION SIZING:**
+-   **Position Size:** Fixed at 2% of the current trading equity per trade (`size=0.02`).
+-   **Stop Loss:** A hard stop loss is set at **-18%** from the entry price. This must be passed as a parameter to the `buy()` method: `sl=entry_price * 0.82`.
+-   **Trailing Stop:** Disabled for this strategy version.
+-   **Data Requirement:** The strategy requires a minimum of **50 bars** of 1-hour (1h) timeframe data to calculate the 50-period SMA accurately.
+
+**REQUIRED INDICATORS & SETTINGS:**
+-   **Bollinger Bands:** Period = 20, Standard Deviations = 2.
+-   **Relative Strength Index (RSI):** Period = 14.
+-   **Simple Moving Average (SMA):** Period = 50 (for trend filter only).
+
+**STRATEGY LOGIC SUMMARY:**
+The "AdaptiveBounce" strategy waits for a sharp, short-lived dip below the lower Bollinger Band (oversold extreme) while the asset's price remains above its 50-period SMA (bullish or neutral trend). This confluence suggests a high-potential buying opportunity for a bounce back towards the mean. The trade is managed with a tight stop loss to limit downside and three distinct exit conditions to lock in profits, prioritizing momentum exhaustion (RSI > 70) as the primary signal.

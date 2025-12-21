@@ -98,30 +98,30 @@ except ImportError as e:
 
 # Model Configurations
 # You can switch between "deepseek", "xai", "openai", "claude", "groq", etc.
-# Now using DeepSeek for all AI operations - excellent reasoning capabilities!
+# Now using DeepSeek Coder for all AI operations - specialized for code generation!
 RESEARCH_CONFIG = {
-    "type": "deepseek",  # Using DeepSeek for research and idea generation
-    "name": "deepseek-chat"
+    "type": "deepseek",  # Using DeepSeek Coder for research and idea generation
+    "name": "deepseek-coder"
 }
 
 BACKTEST_CONFIG = {
-    "type": "deepseek",  # Using DeepSeek for backtest coding
-    "name": "deepseek-chat"
+    "type": "deepseek",  # Using DeepSeek Coder for backtest coding
+    "name": "deepseek-coder"
 }
 
 DEBUG_CONFIG = {
-    "type": "deepseek",  # Using DeepSeek for debugging
-    "name": "deepseek-chat"
+    "type": "deepseek",  # Using DeepSeek Coder for debugging
+    "name": "deepseek-coder"
 }
 
 PACKAGE_CONFIG = {
-    "type": "deepseek",  # Using DeepSeek for package checking
-    "name": "deepseek-chat"
+    "type": "deepseek",  # Using DeepSeek Coder for package checking
+    "name": "deepseek-coder"
 }
 
 OPTIMIZE_CONFIG = {
-    "type": "deepseek",  # Using DeepSeek for strategy optimization
-    "name": "deepseek-chat"
+    "type": "deepseek",  # Using DeepSeek Coder for strategy optimization
+    "name": "deepseek-coder"
 }
 
 # 🎯🎯🎯 PROFIT TARGET CONFIGURATION 🎯🎯🎯
@@ -2068,8 +2068,8 @@ def ensure_ohlcv_data_exists():
     # #endregion
 
     RBI_DATA_SYMBOLS = ['BTC', 'ETH', 'SOL']
-    # Collect multiple timeframes: 5m for UniversalMACD/PowerTower, 15m for existing, 4h for MultiMa, 1d for PatternRecognition
-    RBI_TIMEFRAMES = ['5m', '15m', '4h', '1d']
+    # Collect multiple timeframes: 5m for UniversalMACD/PowerTower, 15m for existing, 1h for BbandRsi, 4h for MultiMa, 1d for PatternRecognition
+    RBI_TIMEFRAMES = ['5m', '15m', '1h', '4h', '1d']
     data_dir = PROJECT_ROOT / "data" / "rbi"
     
     # #region agent log
@@ -2134,34 +2134,34 @@ def ensure_ohlcv_data_exists():
     for symbol in RBI_DATA_SYMBOLS:
         for timeframe in RBI_TIMEFRAMES:
             data_file = data_dir / f"{symbol}-USD-{timeframe}.csv"
-        
-        # #region agent log
-        log_entry = {
+
+            # #region agent log
+            log_entry = {
                 "id": f"log_{int(__import__('time').time() * 1000)}_file_check_{symbol}_{timeframe}",
-            "timestamp": int(__import__('time').time() * 1000),
-            "location": "rbi_agent_v3.py:ensure_ohlcv_data_exists",
+                "timestamp": int(__import__('time').time() * 1000),
+                "location": "rbi_agent_v3.py:ensure_ohlcv_data_exists",
                 "message": f"Checking file existence for {symbol} {timeframe}",
-            "data": {
-                "symbol": symbol,
+                "data": {
+                    "symbol": symbol,
                     "timeframe": timeframe,
-                "data_file": str(data_file),
-                "data_file_absolute": str(data_file.resolve()),
-                "file_exists": data_file.exists(),
-                "file_is_file": data_file.is_file() if data_file.exists() else False
-            },
-            "sessionId": "debug-session",
-            "runId": "run1",
-            "hypothesisId": "B"
-        }
-        try:
-            log_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps(log_entry) + '\n')
-        except:
-            pass
-        # #endregion
-        
-        if not data_file.exists():
+                    "data_file": str(data_file),
+                    "data_file_absolute": str(data_file.resolve()),
+                    "file_exists": data_file.exists(),
+                    "file_is_file": data_file.is_file() if data_file.exists() else False
+                },
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "B"
+            }
+            try:
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(log_entry) + '\n')
+            except:
+                pass
+            # #endregion
+
+            if not data_file.exists():
                 missing_data.append(f"{symbol}-{timeframe}")
 
     if missing_data:
@@ -2275,7 +2275,7 @@ def ensure_ohlcv_data_exists():
                     import numpy as np
 
                     # Define timeframes (same as above)
-                    RBI_TIMEFRAMES = ['5m', '15m', '4h']
+                    RBI_TIMEFRAMES = ['5m', '15m', '1h', '4h', '1d']
 
                     # Create synthetic data for the past 30 days, 15-minute intervals
                     end_date = datetime.now()

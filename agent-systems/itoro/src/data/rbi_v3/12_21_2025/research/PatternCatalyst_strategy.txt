@@ -1,0 +1,40 @@
+STRATEGY_NAME: PatternCatalyst
+
+STRATEGY_DETAILS:
+This strategy, "PatternCatalyst," is a focused candlestick pattern recognition system that leverages five of TA-Lib's most reliable patterns to identify potential market reversals on the daily timeframe. It acts as a catalyst for entry decisions based on well-defined, high-probability chart formations.
+
+**Key Strategy Components:**
+1.  **Core Patterns:** The strategy exclusively uses five TA-Lib candlestick pattern functions:
+    *   `CDLENGULFING` (Bullish/Bearish Engulfing)
+    *   `CDLHAMMER` (Hammer / Inverted Hammer)
+    *   `CDLDOJI` (Doji)
+    *   `CDLMORNINGSTAR` (Morning Star - Bullish Reversal)
+    *   `CDLEVENINGSTAR` (Evening Star - Bearish Reversal)
+2.  **Pattern Logic:** Each function returns an integer value: `+100` for a strong bullish pattern, `-100` for a strong bearish pattern, and `0` when no pattern is detected.
+3.  **Timeframe:** Designed for the daily (1d) timeframe, where candlestick patterns are considered more reliable due to reduced market noise.
+4.  **Trailing Stop:** A dynamic exit mechanism is enabled to protect profits, activating after an 8.4% unrealized gain and trailing at an 8.4% offset, with a minimum profit lock of 3.2%.
+
+**Required Indicators & Data:**
+The strategy must populate the five TA-Lib pattern indicators. Each requires the data arrays in the specific order: `(Open, High, Low, Close)`.
+Example in `populate_indicators`:
+```python
+data['engulfing'] = self.I(talib.CDLENGULFING, data['open'], data['high'], data['low'], data['close'])
+data['hammer'] = self.I(talib.CDLHAMMER, data['open'], data['high'], data['low'], data['close'])
+# ... repeat for doji, morningstar, eveningstar
+```
+
+**Entry Rules (LONG):**
+1.  A categorical parameter allows the trader to select which single pattern will trigger trades (e.g., only Engulfing, only Morning Star).
+2.  A **BUY/LONG** signal is generated **only** when the value of the user-selected pattern indicator equals `+100` (bullish pattern) on the most recent completed candle.
+3.  **Do NOT enter** on a pattern value of `-100` (bearish reversal) or `0` (no pattern).
+
+**Exit & Risk Management Rules:**
+1.  **Position Sizing:** Risk 1-3% of the total trading equity per trade.
+2.  **Initial Stop-Loss:** Set a hard stop-loss at -28.8% from the entry price. This is the maximum capital risk per trade.
+3.  **Trailing Stop:** The primary exit mechanism.
+    *   **Activation:** Becomes active once the trade reaches an **+8.4%** unrealized profit.
+    *   **Behavior:** After activation, the stop-loss trails the highest price since entry, maintaining an **8.4%** offset.
+    *   **Minimum Profit Guarantee:** The trailing stop will never move to a level that would result in less than a **+3.2%** profit on the trade.
+4.  The strategy does not define short (SELL) entries, focusing solely on long-side bullish reversal patterns.
+
+**Summary:** PatternCatalyst is a disciplined, pattern-specific strategy. It waits for a single, high-confidence bullish reversal pattern to form on the daily chart, enters long, and manages the trade with a wide initial stop (accommodating daily volatility) and an aggressive trailing stop to capture trends while protecting substantial gains.

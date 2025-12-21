@@ -1,0 +1,39 @@
+STRATEGY_NAME: TriplexSupertrend
+
+STRATEGY_DETAILS:
+
+**CORE CONCEPT:**
+This is a sophisticated trend-following strategy that employs a triple-confirmation system using six distinct Supertrend indicators (three for buy signals, three for sell signals). It aims to filter out false breakouts and capture strong, sustained trends by requiring unanimous agreement across multiple volatility-adjusted trend perspectives.
+
+**REQUIRED INDICATORS & SETUP:**
+1.  **Six Supertrend Indicators:** All calculated using the ATR (Average True Range) method.
+    *   **Buy Supertrends (Bullish Confirmation Triad):**
+        *   ST_B1: Multiplier = 4, Period = 8
+        *   ST_B2: Multiplier = 7, Period = 9
+        *   ST_B3: Multiplier = 1, Period = 8
+    *   **Sell Supertrends (Bearish Confirmation Triad):**
+        *   ST_S1: Multiplier = 1, Period = 16
+        *   ST_S2 (Middle/Exit Signal): Multiplier = 3, Period = 18
+        *   ST_S3: Multiplier = 6, Period = 18
+2.  **Data Requirements:** Minimum of 30 bars of historical data for indicator warmup. Must filter for `volume > 0` to validate entry signals.
+
+**ENTRY RULES:**
+*   **LONG ENTRY:** Trigger when **ALL THREE** Buy Supertrends (ST_B1, ST_B2, ST_B3) simultaneously show an **'up'** (bullish) signal. This indicates a strong, multi-faceted bullish trend confirmation.
+*   **SHORT ENTRY:** Trigger when **ALL THREE** Sell Supertrends (ST_S1, ST_S2, ST_S3) simultaneously show a **'down'** (bearish) signal. This indicates a strong, multi-faceted bearish trend confirmation.
+
+**EXIT RULES:**
+*   **EXIT LONG:** Trigger when the **middle Sell Supertrend (ST_S2 - Multiplier: 3, Period: 18)** flips from 'up' to **'down'**. This uses a more sensitive bearish indicator to exit the bullish trend.
+*   **EXIT SHORT:** Trigger when the **middle Buy Supertrend (ST_B2 - Multiplier: 7, Period: 9)** flips from 'down' to **'up'**. This uses a more sensitive bullish indicator to exit the bearish trend.
+
+**RISK & POSITION MANAGEMENT:**
+*   **Stop-Loss:** Initial hard stop-loss at **-26.5%** from entry price.
+*   **Trailing Stop:** Activated once a position reaches **+10%** unrealized profit.
+    *   The trailing stop is set at **-10%** from the highest price reached since entry (a +5% buffer from the +10% activation point).
+*   **Position Sizing:** Dynamic, based on market volatility (likely derived from ATR). More volatile conditions should result in a smaller position size to maintain consistent risk.
+*   **Market Regime:** The strategy is designed for **trending markets**. It will underperform or generate whipsaws in ranging or low-volatility conditions. Best performance observed on the **1-hour timeframe**.
+
+**PERFORMANCE EXPECTATIONS & NOTES:**
+*   **Target:** Aims for returns in the **5-15%** range per trade.
+*   **Frequency:** Expects approximately **20-40 trades** for a typical backtest period.
+*   The use of three different multiplier/period combinations for each direction creates a "consensus" model, making entries more robust but potentially less frequent.
+*   The exit logic is asymmetric, using a single, mid-range indicator from the *opposing* signal set, allowing trends to run while providing a timely exit on reversal confirmation.
