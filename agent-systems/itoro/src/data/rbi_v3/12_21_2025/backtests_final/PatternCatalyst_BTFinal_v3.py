@@ -7,11 +7,29 @@ class PatternCatalyst(Strategy):
         print("[STRATEGY] PatternCatalyst initialized")
         
         # Initialize pattern indicators using self.I()
+        # Current patterns
         self.engulfing = self.I(talib.CDLENGULFING, self.data.Open, self.data.High, self.data.Low, self.data.Close)
         self.hammer = self.I(talib.CDLHAMMER, self.data.Open, self.data.High, self.data.Low, self.data.Close)
         self.doji = self.I(talib.CDLDOJI, self.data.Open, self.data.High, self.data.Low, self.data.Close)
         self.morning_star = self.I(talib.CDLMORNINGSTAR, self.data.Open, self.data.High, self.data.Low, self.data.Close)
         self.evening_star = self.I(talib.CDLEVENINGSTAR, self.data.Open, self.data.High, self.data.Low, self.data.Close)
+
+        # Additional bullish patterns
+        self.marubozu = self.I(talib.CDLMARUBOZU, self.data.Open, self.data.High, self.data.Low, self.data.Close)
+        self.hanging_man = self.I(talib.CDLHANGINGMAN, self.data.Open, self.data.High, self.data.Low, self.data.Close)
+        self.shooting_star = self.I(talib.CDLSHOOTINGSTAR, self.data.Open, self.data.High, self.data.Low, self.data.Close)
+        self.inverted_hammer = self.I(talib.CDLINVERTEDHAMMER, self.data.Open, self.data.High, self.data.Low, self.data.Close)
+        self.tasukigap = self.I(talib.CDLTASUKIGAP, self.data.Open, self.data.High, self.data.Low, self.data.Close)
+        self.separating_lines = self.I(talib.CDLSEPARATINGLINES, self.data.Open, self.data.High, self.data.Low, self.data.Close)
+        self.breakaway = self.I(talib.CDLBREAKAWAY, self.data.Open, self.data.High, self.data.Low, self.data.Close)
+
+        # Additional bearish patterns
+        self.three_black_crows = self.I(talib.CDL3BLACKCROWS, self.data.Open, self.data.High, self.data.Low, self.data.Close)
+        self.three_inside = self.I(talib.CDL3INSIDE, self.data.Open, self.data.High, self.data.Low, self.data.Close)
+        self.three_outside = self.I(talib.CDL3OUTSIDE, self.data.Open, self.data.High, self.data.Low, self.data.Close)
+
+        # Continuation patterns
+        self.rising_three = self.I(talib.CDLRISEFALL3METHODS, self.data.Open, self.data.High, self.data.Low, self.data.Close)
 
         # TREND CONFIRMATION INDICATORS
         self.sma_20 = self.I(talib.SMA, self.data.Close, timeperiod=20)
@@ -24,7 +42,17 @@ class PatternCatalyst(Strategy):
         self.volume_sma = self.I(talib.SMA, self.data.Volume, timeperiod=20)
         
         # Strategy parameters - DYNAMIC PATTERN SELECTION
-        self.available_patterns = ['engulfing', 'hammer', 'doji', 'morning_star', 'evening_star']
+        self.available_patterns = [
+            # Current ones
+            'engulfing', 'hammer', 'doji', 'morning_star', 'evening_star',
+            # Add bullish patterns
+            'marubozu', 'hanging_man', 'shooting_star', 'inverted_hammer',
+            'tasukigap', 'separating_lines', 'breakaway',
+            # Add more bearish patterns
+            'three_black_crows', 'three_inside', 'three_outside',
+            # Add continuation patterns
+            'rising_three'
+        ]
         self.risk_percentage = 0.02  # 2% risk per trade (within 1-3% range)
         self.initial_stop_loss_pct = 0.288  # -28.8% initial stop loss
         self.trailing_activation_pct = 0.084  # +8.4% profit to activate trailing stop
