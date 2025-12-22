@@ -156,11 +156,20 @@ def fetch_from_exchange(exchange_name, symbol, timeframe, start_time, end_time):
                 'endAt': int(end_time.timestamp())
             }
         elif exchange_name == 'okx':
+            # OKX requires uppercase timeframe format: 1m, 5m, 15m, 30m, 1H, 2H, 4H, 6H, 12H, 1D, 1W, 1M
+            okx_timeframes = {
+                '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
+                '1h': '1H', '2h': '2H', '4h': '4H', '6h': '6H',
+                '12h': '12H', '1d': '1D', '1w': '1W', '1M': '1M'
+            }
+            okx_tf = okx_timeframes.get(timeframe, '1H')
             params = {
                 'instId': symbol,
-                'bar': timeframe,
+                'bar': okx_tf,
                 'limit': str(min(limit, 300))
             }
+            # Note: OKX doesn't support date range parameters like other exchanges
+            # It returns recent data by default, we'll filter client-side if needed
         elif exchange_name == 'bybit':
             bybit_intervals = {'1m': '1', '5m': '5', '15m': '15', '1h': '60', '4h': '240', '1d': 'D'}
             params = {
@@ -171,16 +180,66 @@ def fetch_from_exchange(exchange_name, symbol, timeframe, start_time, end_time):
                 'start': int(start_time.timestamp() * 1000),
                 'end': int(end_time.timestamp() * 1000)
             }
+        elif exchange_name == 'kraken':
+            # Convert timeframe to minutes for Kraken
+            tf_minutes = {'1m': 1, '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240, '1d': 1440, '1w': 10080}.get(timeframe, 60)
+            params = {
+                'pair': symbol,
+                'interval': tf_minutes
+            }
+            # Note: Kraken's 'since' parameter doesn't filter by start date like other exchanges
+            # It returns recent data and 'since' is used for pagination
+            # We'll filter the results manually after fetching
 
         response = requests.get(base_url, params=params, timeout=10)
 
-        if response.status_code == 200:
-            data = response.json()
+        # Better error handling for HTTP errors
+        if response.status_code != 200:
+            try:
+                error_data = response.json()
+                if exchange_name == 'binance':
+                    error_msg = error_data.get('msg', f'HTTP {response.status_code}')
+                    error_code = error_data.get('code', response.status_code)
+                elif exchange_name == 'kucoin':
+                    error_msg = error_data.get('msg', f'HTTP {response.status_code}')
+                    error_code = error_data.get('code', response.status_code)
+                elif exchange_name == 'okx':
+                    error_msg = error_data.get('msg', f'HTTP {response.status_code}')
+                    error_code = error_data.get('code', response.status_code)
+                elif exchange_name == 'bybit':
+                    error_msg = error_data.get('retMsg', f'HTTP {response.status_code}')
+                    error_code = error_data.get('retCode', response.status_code)
+                else:
+                    error_msg = f'HTTP {response.status_code}'
+                    error_code = response.status_code
+                cprint(f"    [ERROR] {exchange_name} API HTTP {response.status_code}: {error_msg} (code: {error_code})", "red")
+            except:
+                error_text = response.text[:200] if response.text else 'No error message'
+                cprint(f"    [ERROR] {exchange_name} API HTTP {response.status_code}: {error_text}", "red")
+            return None
 
-            # Parse response based on exchange
-            df_data = []
-            if exchange_name == 'binance':
+        data = response.json()
+
+        # Parse response based on exchange with better error handling
+        df_data = []
+        
+        if exchange_name == 'binance':
+            # Check if Binance returned an error in the JSON
+            if isinstance(data, dict) and 'code' in data:
+                error_msg = data.get('msg', 'Unknown error')
+                error_code = data.get('code', 'Unknown')
+                cprint(f"    [ERROR] Binance API error: {error_msg} (code: {error_code})", "red")
+                return None
+            
+            if not isinstance(data, list) or len(data) == 0:
+                cprint(f"    [ERROR] Binance returned empty or invalid data", "red")
+                return None
+                
+            try:
                 for kline in data:
+                    if len(kline) < 6:
+                        cprint(f"    [WARN] Binance kline has insufficient data: {len(kline)} fields (expected 6+)", "yellow")
+                        continue
                     df_data.append({
                         'timestamp': pd.to_datetime(int(kline[0]), unit='ms'),
                         'open': float(kline[1]),
@@ -189,50 +248,185 @@ def fetch_from_exchange(exchange_name, symbol, timeframe, start_time, end_time):
                         'close': float(kline[4]),
                         'volume': float(kline[5])
                     })
-            elif exchange_name == 'kucoin':
-                if data.get('code') == '200000' and data.get('data'):
-                    for candle in data['data']:
+            except (ValueError, IndexError, TypeError) as e:
+                cprint(f"    [ERROR] Binance data parsing error: {str(e)}", "red")
+                cprint(f"    [DEBUG] Sample kline data: {data[0] if data else 'No data'}", "yellow")
+                return None
+                
+        elif exchange_name == 'kucoin':
+            if data.get('code') != '200000':
+                error_msg = data.get('msg', 'Unknown error')
+                error_code = data.get('code', 'Unknown')
+                cprint(f"    [ERROR] KuCoin API error: {error_msg} (code: {error_code})", "red")
+                return None
+                
+            if not data.get('data'):
+                cprint(f"    [ERROR] KuCoin API returned no data", "red")
+                return None
+                
+            try:
+                # KuCoin API format: [Time, Open, Close, High, Low, Volume, Turnover]
+                for candle in data['data']:
+                    if len(candle) < 6:
+                        cprint(f"    [WARN] KuCoin candle has insufficient data: {len(candle)} fields (expected 6+)", "yellow")
+                        continue
+                    df_data.append({
+                        'timestamp': pd.to_datetime(int(candle[0]), unit='s'),
+                        'open': float(candle[1]),      # Open - correct
+                        'close': float(candle[2]),     # Close (was incorrectly mapped as high)
+                        'high': float(candle[3]),      # High (was incorrectly mapped as low)
+                        'low': float(candle[4]),       # Low (was incorrectly mapped as close)
+                        'volume': float(candle[5])     # Volume - correct
+                    })
+            except (ValueError, IndexError, TypeError) as e:
+                cprint(f"    [ERROR] KuCoin data parsing error: {str(e)}", "red")
+                cprint(f"    [DEBUG] Sample candle data: {data['data'][0] if data.get('data') else 'No data'}", "yellow")
+                return None
+                
+        elif exchange_name == 'okx':
+            if data.get('code') != '0':
+                error_msg = data.get('msg', 'Unknown error')
+                error_code = data.get('code', 'Unknown')
+                cprint(f"    [ERROR] OKX API error: {error_msg} (code: {error_code})", "red")
+                return None
+                
+            if not data.get('data'):
+                cprint(f"    [ERROR] OKX API returned no data", "red")
+                return None
+                
+            try:
+                for candle in data['data']:
+                    if len(candle) < 6:
+                        cprint(f"    [WARN] OKX candle has insufficient data: {len(candle)} fields (expected 6+)", "yellow")
+                        continue
+
+                    timestamp = pd.to_datetime(int(candle[0]), unit='ms')
+                    # Filter to our date range (OKX doesn't support date filtering)
+                    if timestamp >= start_time and timestamp <= end_time:
                         df_data.append({
-                            'timestamp': pd.to_datetime(int(candle[0]), unit='s'),
+                            'timestamp': timestamp,
                             'open': float(candle[1]),
                             'high': float(candle[2]),
                             'low': float(candle[3]),
                             'close': float(candle[4]),
                             'volume': float(candle[5])
                         })
-            elif exchange_name == 'okx':
-                if data.get('code') == '0' and data.get('data'):
-                    for candle in data['data']:
-                        df_data.append({
-                            'timestamp': pd.to_datetime(int(candle[0]), unit='ms'),
-                            'open': float(candle[1]),
-                            'high': float(candle[2]),
-                            'low': float(candle[3]),
-                            'close': float(candle[4]),
-                            'volume': float(candle[5])
-                        })
-            elif exchange_name == 'bybit':
-                if data.get('retCode') == 0 and data.get('result', {}).get('list'):
-                    for kline in data['result']['list']:
-                        df_data.append({
-                            'timestamp': pd.to_datetime(int(kline[0]), unit='ms'),
-                            'open': float(kline[1]),
-                            'high': float(kline[2]),
-                            'low': float(kline[3]),
-                            'close': float(kline[4]),
-                            'volume': float(kline[5])
-                        })
+            except (ValueError, IndexError, TypeError) as e:
+                cprint(f"    [ERROR] OKX data parsing error: {str(e)}", "red")
+                cprint(f"    [DEBUG] Sample candle data: {data['data'][0] if data.get('data') else 'No data'}", "yellow")
+                return None
 
-            if df_data:
-                df = pd.DataFrame(df_data)
-                # Ensure timestamp is properly parsed as datetime
-                df['timestamp'] = pd.to_datetime(df['timestamp'])
-                return df
+            if not df_data:
+                cprint(f"    [WARN] OKX returned data but none in our date range ({start_time.date()} to {end_time.date()})", "yellow")
+                if data.get('data'):
+                    first_ts = pd.to_datetime(int(data['data'][0][0]), unit='ms')
+                    last_ts = pd.to_datetime(int(data['data'][-1][0]), unit='ms')
+                    cprint(f"    [DEBUG] OKX data range: {first_ts} to {last_ts}", "yellow")
+                return None
+                
+        elif exchange_name == 'bybit':
+            if data.get('retCode') != 0:
+                error_msg = data.get('retMsg', 'Unknown error')
+                error_code = data.get('retCode', 'Unknown')
+                cprint(f"    [ERROR] Bybit API error: {error_msg} (code: {error_code})", "red")
+                return None
+                
+            if not data.get('result', {}).get('list'):
+                cprint(f"    [ERROR] Bybit API returned no data", "red")
+                return None
+                
+            try:
+                for kline in data['result']['list']:
+                    if len(kline) < 6:
+                        cprint(f"    [WARN] Bybit kline has insufficient data: {len(kline)} fields (expected 6+)", "yellow")
+                        continue
+                    df_data.append({
+                        'timestamp': pd.to_datetime(int(kline[0]), unit='ms'),
+                        'open': float(kline[1]),
+                        'high': float(kline[2]),
+                        'low': float(kline[3]),
+                        'close': float(kline[4]),
+                        'volume': float(kline[5])
+                    })
+            except (ValueError, IndexError, TypeError) as e:
+                cprint(f"    [ERROR] Bybit data parsing error: {str(e)}", "red")
+                cprint(f"    [DEBUG] Sample kline data: {data['result']['list'][0] if data.get('result', {}).get('list') else 'No data'}", "yellow")
+                return None
 
+        elif exchange_name == 'kraken':
+            # Kraken returns error as list, empty list means no error
+            if data.get('error') and len(data.get('error', [])) > 0:
+                error_msg = data.get('error', ['Unknown error'])
+                cprint(f"    [ERROR] Kraken API error: {error_msg}", "red")
+                return None
+
+            if not data.get('result'):
+                cprint(f"    [ERROR] Kraken API returned no result data", "red")
+                cprint(f"    [DEBUG] Kraken response: {data}", "yellow")
+                return None
+
+            pair_data = list(data['result'].values())
+            if not pair_data or len(pair_data) == 0:
+                cprint(f"    [ERROR] Kraken API returned empty pair data", "red")
+                cprint(f"    [DEBUG] Kraken result keys: {list(data['result'].keys())}", "yellow")
+                return None
+
+            # Kraken returns list of OHLC data for each pair
+            ohlc_data = pair_data[0]  # Get data for first (only) pair
+            if not isinstance(ohlc_data, list) or len(ohlc_data) == 0:
+                cprint(f"    [ERROR] Kraken API returned invalid OHLC data format", "red")
+                cprint(f"    [DEBUG] Kraken OHLC data type: {type(ohlc_data)}, length: {len(ohlc_data) if hasattr(ohlc_data, '__len__') else 'N/A'}", "yellow")
+                cprint(f"    [DEBUG] Kraken OHLC sample: {ohlc_data[:2] if isinstance(ohlc_data, list) and len(ohlc_data) > 0 else 'No data'}", "yellow")
+                return None
+
+            try:
+                # Kraken OHLC format: [time, open, high, low, close, vwap, volume, count]
+                for ohlc in ohlc_data[-limit:]:  # Get last 'limit' records
+                    if len(ohlc) < 8:
+                        cprint(f"    [WARN] Kraken OHLC has insufficient data: {len(ohlc)} fields (expected 8+)", "yellow")
+                        continue
+
+                    timestamp = pd.to_datetime(int(ohlc[0]), unit='s')
+                    # Filter to our date range since Kraken doesn't support date filtering in API
+                    if timestamp >= start_time and timestamp <= end_time:
+                        df_data.append({
+                            'timestamp': timestamp,
+                            'open': float(ohlc[1]),
+                            'high': float(ohlc[2]),
+                            'low': float(ohlc[3]),
+                            'close': float(ohlc[4]),
+                            'volume': float(ohlc[6])  # Volume is at index 6
+                        })
+            except (ValueError, IndexError, TypeError) as e:
+                cprint(f"    [ERROR] Kraken data parsing error: {str(e)}", "red")
+                cprint(f"    [DEBUG] Kraken sample OHLC: {ohlc_data[0] if ohlc_data else 'No data'}", "yellow")
+                return None
+
+            if not df_data:
+                cprint(f"    [WARN] Kraken returned data but none in our date range ({start_time.date()} to {end_time.date()})", "yellow")
+                cprint(f"    [DEBUG] Kraken data range: {pd.to_datetime(int(ohlc_data[0][0]), unit='s')} to {pd.to_datetime(int(ohlc_data[-1][0]), unit='s')}", "yellow")
+                return None
+
+        if df_data:
+            df = pd.DataFrame(df_data)
+            # Ensure timestamp is properly parsed as datetime
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            return df
+        else:
+            cprint(f"    [ERROR] {exchange_name} returned no valid data after parsing", "red")
+            return None
+
+    except requests.exceptions.Timeout:
+        cprint(f"    [ERROR] {exchange_name} request timed out after 10 seconds", "red")
+        return None
+    except requests.exceptions.RequestException as e:
+        cprint(f"    [ERROR] {exchange_name} network error: {str(e)}", "red")
+        return None
     except Exception as e:
-        print(f"[ERROR] Failed to fetch from {exchange_name}: {str(e)}")
-
-    return None
+        cprint(f"    [ERROR] Failed to fetch from {exchange_name}: {str(e)}", "red")
+        import traceback
+        cprint(f"    [DEBUG] Traceback: {traceback.format_exc()}", "yellow")
+        return None
 
 def collect_specific_period_data(symbol='BTC', start_date=None, end_date=None, timeframe='1h'):
     """

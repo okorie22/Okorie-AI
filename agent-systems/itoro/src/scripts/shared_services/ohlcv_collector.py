@@ -466,12 +466,37 @@ def fetch_binance_ohlcv(symbol, timeframe='1h', limit=1000, start_time=None, end
 
         response = requests.get(base_url, params=params, timeout=10)
 
-        if response.status_code == 200:
-            data = response.json()
+        # Better error handling
+        if response.status_code != 200:
+            try:
+                error_data = response.json()
+                error_msg = error_data.get('msg', f'HTTP {response.status_code}')
+                error_code = error_data.get('code', response.status_code)
+                print(f"[ERROR] Binance API HTTP error {response.status_code}: {error_msg} (code: {error_code})")
+            except:
+                print(f"[ERROR] Binance API HTTP error {response.status_code}: {response.text[:200] if response.text else 'No error message'}")
+            return None
 
-            # Convert to DataFrame
-            df_data = []
+        data = response.json()
+        
+        # Check if Binance returned an error in the JSON (sometimes they return 200 with error in body)
+        if isinstance(data, dict) and 'code' in data:
+            error_msg = data.get('msg', 'Unknown error')
+            error_code = data.get('code', 'Unknown')
+            print(f"[ERROR] Binance API error: {error_msg} (code: {error_code})")
+            return None
+        
+        if not isinstance(data, list) or len(data) == 0:
+            print(f"[ERROR] Binance API returned empty or invalid data")
+            return None
+
+        # Convert to DataFrame
+        df_data = []
+        try:
             for kline in data:
+                if len(kline) < 6:
+                    print(f"[WARN] Binance kline has insufficient data: {len(kline)} fields (expected 6+)")
+                    continue
                 df_data.append({
                     'timestamp': pd.to_datetime(kline[0], unit='ms'),
                     'open': float(kline[1]),
@@ -480,15 +505,28 @@ def fetch_binance_ohlcv(symbol, timeframe='1h', limit=1000, start_time=None, end
                     'close': float(kline[4]),
                     'volume': float(kline[5])
                 })
-
-            df = pd.DataFrame(df_data)
-            return df
-        else:
-            print(f"[ERROR] Binance API error: {response.status_code}")
+        except (ValueError, IndexError, TypeError) as e:
+            print(f"[ERROR] Binance data parsing error: {str(e)}")
+            print(f"[DEBUG] Sample kline data: {data[0] if data else 'No data'}")
             return None
 
+        if not df_data:
+            print(f"[ERROR] Binance: No valid klines parsed from response")
+            return None
+
+        df = pd.DataFrame(df_data)
+        return df
+
+    except requests.exceptions.Timeout:
+        print(f"[ERROR] Binance request timed out after 10 seconds")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Binance network error: {str(e)}")
+        return None
     except Exception as e:
         print(f"[ERROR] Binance OHLCV fetch failed: {str(e)}")
+        import traceback
+        print(f"[DEBUG] Traceback: {traceback.format_exc()}")
         return None
 
 def fetch_kucoin_ohlcv(symbol, timeframe='1hour', limit=1500, start_time=None, end_time=None):
@@ -526,34 +564,75 @@ def fetch_kucoin_ohlcv(symbol, timeframe='1hour', limit=1500, start_time=None, e
 
         response = requests.get(base_url, params=params, timeout=10)
 
-        if response.status_code == 200:
-            result = response.json()
-            if result.get('code') == '200000' and result.get('data'):
-                data = result['data']
-
-                # Convert to DataFrame
-                df_data = []
-                for candle in data[-limit:]:  # Get last 'limit' records
-                    df_data.append({
-                        'timestamp': pd.to_datetime(int(candle[0]), unit='s'),
-                        'open': float(candle[1]),
-                        'high': float(candle[2]),
-                        'low': float(candle[3]),
-                        'close': float(candle[4]),
-                        'volume': float(candle[5])
-                    })
-
-                df = pd.DataFrame(df_data)
-                return df
-            else:
-                print(f"[ERROR] KuCoin API error: {result.get('msg', 'Unknown error')}")
-                return None
-        else:
-            print(f"[ERROR] KuCoin API error: {response.status_code}")
+        # Better error handling
+        if response.status_code != 200:
+            try:
+                error_data = response.json()
+                error_msg = error_data.get('msg', f'HTTP {response.status_code}')
+                error_code = error_data.get('code', response.status_code)
+                print(f"[ERROR] KuCoin API HTTP error {response.status_code}: {error_msg} (code: {error_code})")
+            except:
+                print(f"[ERROR] KuCoin API HTTP error {response.status_code}: {response.text[:200] if response.text else 'No error message'}")
             return None
 
+        result = response.json()
+        
+        # Check for API-level errors
+        if result.get('code') != '200000':
+            error_msg = result.get('msg', 'Unknown error')
+            error_code = result.get('code', 'Unknown')
+            print(f"[ERROR] KuCoin API error: {error_msg} (code: {error_code})")
+            return None
+        
+        if not result.get('data'):
+            print(f"[ERROR] KuCoin API returned no data")
+            return None
+
+        data = result['data']
+        
+        if not data or len(data) == 0:
+            print(f"[ERROR] KuCoin API returned empty data array")
+            return None
+
+        # Convert to DataFrame
+        # KuCoin API format: [Time, Open, Close, High, Low, Volume, Turnover]
+        df_data = []
+        try:
+            for candle in data[-limit:]:  # Get last 'limit' records
+                if len(candle) < 6:
+                    print(f"[WARN] KuCoin candle has insufficient data: {len(candle)} fields (expected 6+)")
+                    continue
+                    
+                df_data.append({
+                    'timestamp': pd.to_datetime(int(candle[0]), unit='s'),
+                    'open': float(candle[1]),      # Open - correct
+                    'close': float(candle[2]),     # Close (was incorrectly mapped as high)
+                    'high': float(candle[3]),      # High (was incorrectly mapped as low)
+                    'low': float(candle[4]),       # Low (was incorrectly mapped as close)
+                    'volume': float(candle[5])     # Volume - correct
+                })
+        except (ValueError, IndexError, TypeError) as e:
+            print(f"[ERROR] KuCoin data parsing error: {str(e)}")
+            print(f"[DEBUG] Sample candle data: {data[0] if data else 'No data'}")
+            return None
+
+        if not df_data:
+            print(f"[ERROR] KuCoin: No valid candles parsed from response")
+            return None
+
+        df = pd.DataFrame(df_data)
+        return df
+
+    except requests.exceptions.Timeout:
+        print(f"[ERROR] KuCoin request timed out after 10 seconds")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] KuCoin network error: {str(e)}")
+        return None
     except Exception as e:
         print(f"[ERROR] KuCoin OHLCV fetch failed: {str(e)}")
+        import traceback
+        print(f"[DEBUG] Traceback: {traceback.format_exc()}")
         return None
 
 def fetch_kraken_ohlcv(symbol, timeframe=60, limit=720, since=None):
@@ -588,34 +667,70 @@ def fetch_kraken_ohlcv(symbol, timeframe=60, limit=720, since=None):
 
         response = requests.get(base_url, params=params, timeout=10)
 
-        if response.status_code == 200:
-            result = response.json()
-            if result.get('error') == [] and result.get('result'):
-                pair_data = list(result['result'].values())[0]
-
-                # Convert to DataFrame
-                df_data = []
-                for ohlc in pair_data[-limit:]:  # Get last 'limit' records
-                    df_data.append({
-                        'timestamp': pd.to_datetime(int(ohlc[0]), unit='s'),
-                        'open': float(ohlc[1]),
-                        'high': float(ohlc[2]),
-                        'low': float(ohlc[3]),
-                        'close': float(ohlc[4]),
-                        'volume': float(ohlc[6])  # Volume is at index 6
-                    })
-
-                df = pd.DataFrame(df_data)
-                return df
-            else:
-                print(f"[ERROR] Kraken API error: {result.get('error', 'Unknown error')}")
-                return None
-        else:
-            print(f"[ERROR] Kraken API error: {response.status_code}")
+        # Better error handling
+        if response.status_code != 200:
+            try:
+                error_data = response.json()
+                error_msg = error_data.get('error', [f'HTTP {response.status_code}'])
+                print(f"[ERROR] Kraken API HTTP error {response.status_code}: {error_msg}")
+            except:
+                print(f"[ERROR] Kraken API HTTP error {response.status_code}: {response.text[:200] if response.text else 'No error message'}")
             return None
 
+        result = response.json()
+        
+        # Check for API-level errors
+        if result.get('error') != []:
+            error_msg = result.get('error', ['Unknown error'])
+            print(f"[ERROR] Kraken API error: {error_msg}")
+            return None
+        
+        if not result.get('result'):
+            print(f"[ERROR] Kraken API returned no result data")
+            return None
+
+        pair_data = list(result['result'].values())
+        if not pair_data or len(pair_data) == 0:
+            print(f"[ERROR] Kraken API returned empty pair data")
+            return None
+
+        # Convert to DataFrame
+        df_data = []
+        try:
+            for ohlc in pair_data[0][-limit:]:  # Get last 'limit' records
+                if len(ohlc) < 7:
+                    print(f"[WARN] Kraken OHLC has insufficient data: {len(ohlc)} fields (expected 7+)")
+                    continue
+                df_data.append({
+                    'timestamp': pd.to_datetime(int(ohlc[0]), unit='s'),
+                    'open': float(ohlc[1]),
+                    'high': float(ohlc[2]),
+                    'low': float(ohlc[3]),
+                    'close': float(ohlc[4]),
+                    'volume': float(ohlc[6])  # Volume is at index 6
+                })
+        except (ValueError, IndexError, TypeError) as e:
+            print(f"[ERROR] Kraken data parsing error: {str(e)}")
+            print(f"[DEBUG] Sample OHLC data: {pair_data[0][0] if pair_data and pair_data[0] else 'No data'}")
+            return None
+
+        if not df_data:
+            print(f"[ERROR] Kraken: No valid OHLC data parsed from response")
+            return None
+
+        df = pd.DataFrame(df_data)
+        return df
+
+    except requests.exceptions.Timeout:
+        print(f"[ERROR] Kraken request timed out after 10 seconds")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Kraken network error: {str(e)}")
+        return None
     except Exception as e:
         print(f"[ERROR] Kraken OHLCV fetch failed: {str(e)}")
+        import traceback
+        print(f"[DEBUG] Traceback: {traceback.format_exc()}")
         return None
 
 def fetch_okx_ohlcv(symbol, timeframe='1H', limit=300, before=None, after=None):
@@ -654,34 +769,73 @@ def fetch_okx_ohlcv(symbol, timeframe='1H', limit=300, before=None, after=None):
 
         response = requests.get(base_url, params=params, timeout=10)
 
-        if response.status_code == 200:
-            result = response.json()
-            if result.get('code') == '0' and result.get('data'):
-                data = result['data']
-
-                # Convert to DataFrame
-                df_data = []
-                for candle in data:
-                    df_data.append({
-                        'timestamp': pd.to_datetime(int(candle[0]), unit='ms'),
-                        'open': float(candle[1]),
-                        'high': float(candle[2]),
-                        'low': float(candle[3]),
-                        'close': float(candle[4]),
-                        'volume': float(candle[5])
-                    })
-
-                df = pd.DataFrame(df_data)
-                return df
-            else:
-                print(f"[ERROR] OKX API error: {result.get('msg', 'Unknown error')}")
-                return None
-        else:
-            print(f"[ERROR] OKX API error: {response.status_code}")
+        # Better error handling
+        if response.status_code != 200:
+            try:
+                error_data = response.json()
+                error_msg = error_data.get('msg', f'HTTP {response.status_code}')
+                error_code = error_data.get('code', response.status_code)
+                print(f"[ERROR] OKX API HTTP error {response.status_code}: {error_msg} (code: {error_code})")
+            except:
+                print(f"[ERROR] OKX API HTTP error {response.status_code}: {response.text[:200] if response.text else 'No error message'}")
             return None
 
+        result = response.json()
+        
+        # Check for API-level errors
+        if result.get('code') != '0':
+            error_msg = result.get('msg', 'Unknown error')
+            error_code = result.get('code', 'Unknown')
+            print(f"[ERROR] OKX API error: {error_msg} (code: {error_code})")
+            return None
+        
+        if not result.get('data'):
+            print(f"[ERROR] OKX API returned no data")
+            return None
+
+        data = result['data']
+        
+        if not data or len(data) == 0:
+            print(f"[ERROR] OKX API returned empty data array")
+            return None
+
+        # Convert to DataFrame
+        df_data = []
+        try:
+            for candle in data:
+                if len(candle) < 6:
+                    print(f"[WARN] OKX candle has insufficient data: {len(candle)} fields (expected 6+)")
+                    continue
+                df_data.append({
+                    'timestamp': pd.to_datetime(int(candle[0]), unit='ms'),
+                    'open': float(candle[1]),
+                    'high': float(candle[2]),
+                    'low': float(candle[3]),
+                    'close': float(candle[4]),
+                    'volume': float(candle[5])
+                })
+        except (ValueError, IndexError, TypeError) as e:
+            print(f"[ERROR] OKX data parsing error: {str(e)}")
+            print(f"[DEBUG] Sample candle data: {data[0] if data else 'No data'}")
+            return None
+
+        if not df_data:
+            print(f"[ERROR] OKX: No valid candles parsed from response")
+            return None
+
+        df = pd.DataFrame(df_data)
+        return df
+
+    except requests.exceptions.Timeout:
+        print(f"[ERROR] OKX request timed out after 10 seconds")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] OKX network error: {str(e)}")
+        return None
     except Exception as e:
         print(f"[ERROR] OKX OHLCV fetch failed: {str(e)}")
+        import traceback
+        print(f"[DEBUG] Traceback: {traceback.format_exc()}")
         return None
 
 def fetch_bybit_ohlcv(symbol, timeframe='60', limit=200, start_time=None, end_time=None):
@@ -721,34 +875,73 @@ def fetch_bybit_ohlcv(symbol, timeframe='60', limit=200, start_time=None, end_ti
 
         response = requests.get(base_url, params=params, timeout=10)
 
-        if response.status_code == 200:
-            result = response.json()
-            if result.get('retCode') == 0 and result.get('result', {}).get('list'):
-                data = result['result']['list']
-
-                # Convert to DataFrame
-                df_data = []
-                for kline in data:
-                    df_data.append({
-                        'timestamp': pd.to_datetime(int(kline[0]), unit='ms'),
-                        'open': float(kline[1]),
-                        'high': float(kline[2]),
-                        'low': float(kline[3]),
-                        'close': float(kline[4]),
-                        'volume': float(kline[5])
-                    })
-
-                df = pd.DataFrame(df_data)
-                return df
-            else:
-                print(f"[ERROR] Bybit API error: {result.get('retMsg', 'Unknown error')}")
-                return None
-        else:
-            print(f"[ERROR] Bybit API error: {response.status_code}")
+        # Better error handling
+        if response.status_code != 200:
+            try:
+                error_data = response.json()
+                error_msg = error_data.get('retMsg', f'HTTP {response.status_code}')
+                error_code = error_data.get('retCode', response.status_code)
+                print(f"[ERROR] Bybit API HTTP error {response.status_code}: {error_msg} (code: {error_code})")
+            except:
+                print(f"[ERROR] Bybit API HTTP error {response.status_code}: {response.text[:200] if response.text else 'No error message'}")
             return None
 
+        result = response.json()
+        
+        # Check for API-level errors
+        if result.get('retCode') != 0:
+            error_msg = result.get('retMsg', 'Unknown error')
+            error_code = result.get('retCode', 'Unknown')
+            print(f"[ERROR] Bybit API error: {error_msg} (code: {error_code})")
+            return None
+        
+        if not result.get('result', {}).get('list'):
+            print(f"[ERROR] Bybit API returned no data")
+            return None
+
+        data = result['result']['list']
+        
+        if not data or len(data) == 0:
+            print(f"[ERROR] Bybit API returned empty data array")
+            return None
+
+        # Convert to DataFrame
+        df_data = []
+        try:
+            for kline in data:
+                if len(kline) < 6:
+                    print(f"[WARN] Bybit kline has insufficient data: {len(kline)} fields (expected 6+)")
+                    continue
+                df_data.append({
+                    'timestamp': pd.to_datetime(int(kline[0]), unit='ms'),
+                    'open': float(kline[1]),
+                    'high': float(kline[2]),
+                    'low': float(kline[3]),
+                    'close': float(kline[4]),
+                    'volume': float(kline[5])
+                })
+        except (ValueError, IndexError, TypeError) as e:
+            print(f"[ERROR] Bybit data parsing error: {str(e)}")
+            print(f"[DEBUG] Sample kline data: {data[0] if data else 'No data'}")
+            return None
+
+        if not df_data:
+            print(f"[ERROR] Bybit: No valid klines parsed from response")
+            return None
+
+        df = pd.DataFrame(df_data)
+        return df
+
+    except requests.exceptions.Timeout:
+        print(f"[ERROR] Bybit request timed out after 10 seconds")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Bybit network error: {str(e)}")
+        return None
     except Exception as e:
         print(f"[ERROR] Bybit OHLCV fetch failed: {str(e)}")
+        import traceback
+        print(f"[DEBUG] Traceback: {traceback.format_exc()}")
         return None
 
 def save_data_to_file(data, token, source, is_rbi_data=False, timeframe=None):

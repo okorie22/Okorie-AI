@@ -7,29 +7,11 @@ class PatternCatalyst(Strategy):
         print("[STRATEGY] PatternCatalyst initialized")
         
         # Initialize pattern indicators using self.I()
-        # Current patterns
         self.engulfing = self.I(talib.CDLENGULFING, self.data.Open, self.data.High, self.data.Low, self.data.Close)
         self.hammer = self.I(talib.CDLHAMMER, self.data.Open, self.data.High, self.data.Low, self.data.Close)
         self.doji = self.I(talib.CDLDOJI, self.data.Open, self.data.High, self.data.Low, self.data.Close)
         self.morning_star = self.I(talib.CDLMORNINGSTAR, self.data.Open, self.data.High, self.data.Low, self.data.Close)
         self.evening_star = self.I(talib.CDLEVENINGSTAR, self.data.Open, self.data.High, self.data.Low, self.data.Close)
-
-        # Additional bullish patterns
-        self.marubozu = self.I(talib.CDLMARUBOZU, self.data.Open, self.data.High, self.data.Low, self.data.Close)
-        self.hanging_man = self.I(talib.CDLHANGINGMAN, self.data.Open, self.data.High, self.data.Low, self.data.Close)
-        self.shooting_star = self.I(talib.CDLSHOOTINGSTAR, self.data.Open, self.data.High, self.data.Low, self.data.Close)
-        self.inverted_hammer = self.I(talib.CDLINVERTEDHAMMER, self.data.Open, self.data.High, self.data.Low, self.data.Close)
-        self.tasukigap = self.I(talib.CDLTASUKIGAP, self.data.Open, self.data.High, self.data.Low, self.data.Close)
-        self.separating_lines = self.I(talib.CDLSEPARATINGLINES, self.data.Open, self.data.High, self.data.Low, self.data.Close)
-        self.breakaway = self.I(talib.CDLBREAKAWAY, self.data.Open, self.data.High, self.data.Low, self.data.Close)
-
-        # Additional bearish patterns
-        self.three_black_crows = self.I(talib.CDL3BLACKCROWS, self.data.Open, self.data.High, self.data.Low, self.data.Close)
-        self.three_inside = self.I(talib.CDL3INSIDE, self.data.Open, self.data.High, self.data.Low, self.data.Close)
-        self.three_outside = self.I(talib.CDL3OUTSIDE, self.data.Open, self.data.High, self.data.Low, self.data.Close)
-
-        # Continuation patterns
-        self.rising_three = self.I(talib.CDLRISEFALL3METHODS, self.data.Open, self.data.High, self.data.Low, self.data.Close)
 
         # TREND CONFIRMATION INDICATORS
         self.sma_20 = self.I(talib.SMA, self.data.Close, timeperiod=20)
@@ -42,26 +24,14 @@ class PatternCatalyst(Strategy):
         self.volume_sma = self.I(talib.SMA, self.data.Volume, timeperiod=20)
         
         # Strategy parameters - DYNAMIC PATTERN SELECTION
-        self.available_patterns = [
-            # Current ones
-            'engulfing', 'hammer', 'doji', 'morning_star', 'evening_star',
-            # Add bullish patterns
-            'marubozu', 'hanging_man', 'shooting_star', 'inverted_hammer',
-            'tasukigap', 'separating_lines', 'breakaway',
-            # Add more bearish patterns
-            'three_black_crows', 'three_inside', 'three_outside',
-            # Add continuation patterns
-            'rising_three'
-        ]
+        self.available_patterns = ['engulfing', 'hammer', 'doji', 'morning_star', 'evening_star']
         self.risk_percentage = 0.02  # 2% risk per trade (within 1-3% range)
-        self.initial_stop_loss_pct = 0.288  # -28.8% initial stop loss
+        self.initial_stop_loss_pct = 0.30  # -28.8% initial stop loss
         self.trailing_activation_pct = 0.084  # +8.4% profit to activate trailing stop
         self.trailing_offset_pct = 0.084  # 8.4% trailing offset
         self.min_profit_pct = 0.032  # +3.2% minimum profit guarantee
-        self.profit_target_pct = 0.08  # +8% profit target
-        self.max_holding_period = 20  # Maximum 15 bars (15 days) holding period
-
-        # NEW PARAMETERS FOR ENHANCEMENTS
+        self.profit_target_pct = 0.10  # +8% profit target
+        self.max_holding_period = 30  # Maximum 15 bars (15 days) holding period
         self.breakeven_trigger_pct = 0.02  # +2% profit to trigger breakeven stop
         self.min_signal_strength = 0.7  # Minimum signal strength (0.7 = 70% of max strength)
         
@@ -128,13 +98,122 @@ class PatternCatalyst(Strategy):
             return best_pattern, best_signal
         else:
             return None, 0  # No strong enough signal found
+
+    def detect_market_regime(self):
+        """Detect market regime based on trend strength and price position"""
+        if len(self.data) < 50:  # Need enough data for reliable detection
+            return "neutral_sideways"
+
+        current_price = self.data.Close[-1]
+        sma_20 = self.sma_20[-1]
+        sma_50 = self.sma_50[-1]
+
+        # Price position relative to SMAs (normalized)
+        price_vs_fast = (current_price - sma_20) / sma_20
+        price_vs_slow = (current_price - sma_50) / sma_50
+
+        # Trend strength score (-1 to +1)
+        trend_strength = (price_vs_fast + price_vs_slow) / 2
+
+        # Volatility measure (recent price range)
+        recent_high = max(self.data.High[-20:])
+        recent_low = min(self.data.Low[-20:])
+        volatility = (recent_high - recent_low) / current_price
+
+        print(f"[REGIME] Trend strength: {trend_strength:.4f}, Volatility: {volatility:.4f}")
+
+        # Regime classification based on trend strength and volatility
+        if trend_strength > 0.02:  # Strong uptrend
+            regime = "strong_uptrend"
+        elif trend_strength > 0.008:  # Moderate uptrend
+            regime = "moderate_uptrend"
+        elif trend_strength < -0.02:  # Strong downtrend
+            regime = "strong_downtrend"
+        elif trend_strength < -0.008:  # Moderate downtrend
+            regime = "moderate_downtrend"
+        elif abs(trend_strength) > 0.003:  # Sideways with slight bias
+            regime = "sideways_bias"
+        else:  # Neutral sideways
+            regime = "neutral_sideways"
+
+        print(f"[REGIME] Detected: {regime}")
+        return regime
+
+    def set_regime_parameters(self, regime):
+        """Set strategy parameters based on detected market regime"""
+
+        # Base parameters that stay constant
+        self.risk_percentage = 0.02
+        self.breakeven_trigger_pct = 0.02
+        self.min_signal_strength = 0.7
+
+        # Regime-specific parameters based on backtest results
+        if regime == "strong_uptrend":
+            # Set A: Works best for uptrends - wider stops, longer hold
+            self.initial_stop_loss_pct = 0.25    # 25% stop loss
+            self.profit_target_pct = 0.12        # 12% profit target
+            self.max_holding_period = 48         # 48 bars (8 days)
+            self.trailing_activation_pct = 0.10  # 10% to activate trailing
+            self.trailing_offset_pct = 0.08      # 8% trailing offset
+            self.min_profit_pct = 0.04           # 4% minimum profit
+
+        elif regime == "strong_downtrend":
+            # Set C: Works best for downtrends - tighter stops/targets, longer hold
+            self.initial_stop_loss_pct = 0.15    # 15% stop loss
+            self.profit_target_pct = 0.15        # 15% profit target
+            self.max_holding_period = 60         # 60 bars (10 days)
+            self.trailing_activation_pct = 0.08  # 8% to activate trailing
+            self.trailing_offset_pct = 0.06      # 6% trailing offset
+            self.min_profit_pct = 0.03           # 3% minimum profit
+
+        elif regime == "moderate_uptrend":
+            # Blend of strong uptrend and sideways - moderate parameters
+            self.initial_stop_loss_pct = 0.20    # 20% stop loss
+            self.profit_target_pct = 0.13        # 13% profit target
+            self.max_holding_period = 42         # 42 bars (7 days)
+            self.trailing_activation_pct = 0.09  # 9% to activate trailing
+            self.trailing_offset_pct = 0.07      # 7% trailing offset
+            self.min_profit_pct = 0.035          # 3.5% minimum profit
+
+        elif regime == "moderate_downtrend":
+            # Blend of strong downtrend and sideways - moderate parameters
+            self.initial_stop_loss_pct = 0.18    # 18% stop loss
+            self.profit_target_pct = 0.14        # 14% profit target
+            self.max_holding_period = 54         # 54 bars (9 days)
+            self.trailing_activation_pct = 0.085 # 8.5% to activate trailing
+            self.trailing_offset_pct = 0.065     # 6.5% trailing offset
+            self.min_profit_pct = 0.0325         # 3.25% minimum profit
+
+        elif regime == "sideways_bias":
+            # Sideways with slight directional bias - use Set C as base
+            self.initial_stop_loss_pct = 0.15    # 15% stop loss
+            self.profit_target_pct = 0.15        # 15% profit target
+            self.max_holding_period = 60         # 60 bars (10 days)
+            self.trailing_activation_pct = 0.08  # 8% to activate trailing
+            self.trailing_offset_pct = 0.06      # 6% trailing offset
+            self.min_profit_pct = 0.03           # 3% minimum profit
+
+        else:  # neutral_sideways - default conservative settings
+            # Conservative settings for neutral sideways markets
+            self.initial_stop_loss_pct = 0.12    # 12% stop loss (tightest)
+            self.profit_target_pct = 0.08        # 8% profit target (smallest)
+            self.max_holding_period = 36         # 36 bars (6 days)
+            self.trailing_activation_pct = 0.06  # 6% to activate trailing
+            self.trailing_offset_pct = 0.05      # 5% trailing offset
+            self.min_profit_pct = 0.025          # 2.5% minimum profit
+
+        print(f"[PARAMETERS] Set for {regime}: SL={self.initial_stop_loss_pct*100:.1f}%, PT={self.profit_target_pct*100:.1f}%, Hold={self.max_holding_period} bars")
         
     def next(self):
         self.bar_count += 1
-        
+
+        # DYNAMIC REGIME DETECTION - Update parameters based on current market conditions
+        current_regime = self.detect_market_regime()
+        self.set_regime_parameters(current_regime)
+
         # DEBUG: Print current bar status
         print(f"[DEBUG] Bar {self.bar_count}, Equity: ${self.equity:.2f}, Position: {self.position.size if self.position else 0}")
-        
+
         # Print summary every 100 bars
         if self.bar_count % 100 == 0:
             print(f"[SUMMARY] Bar {self.bar_count}, Equity: ${self.equity:.2f}, Trades: {self.trade_count}")
@@ -441,7 +520,7 @@ class PatternCatalyst(Strategy):
 print("[INFO] Loading data...")
 
 # CHANGE TIMEFRAME HERE: '1d', '4h', '1h', '15m', '5m', etc.
-data_timeframe = '1d'  # Change this to test different timeframes
+data_timeframe = '4h'  # Change this to test different timeframes
 data_filename = f'BTC-USD-{data_timeframe}.csv'
 
 price_data = pd.read_csv(f'C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/rbi/{data_filename}')
