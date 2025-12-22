@@ -131,10 +131,14 @@ class PatternCatalyst(Strategy):
             regime = "strong_downtrend"
         elif trend_strength < -0.008:  # Moderate downtrend
             regime = "moderate_downtrend"
-        elif abs(trend_strength) > 0.003:  # Sideways with slight bias
-            regime = "sideways_bias"
-        else:  # Neutral sideways
+        elif abs(trend_strength) <= 0.005:  # Truly neutral sideways
             regime = "neutral_sideways"
+        elif trend_strength > 0.001 and trend_strength <= 0.005:  # Slightly bullish sideways
+            regime = "sideways_bullish_bias"
+        elif trend_strength < -0.001 and trend_strength >= -0.005:  # Slightly bearish sideways
+            regime = "sideways_bearish_bias"
+        else:  # Moderate directional bias in sideways
+            regime = "sideways_moderate_bias"
 
         print(f"[REGIME] Detected: {regime}")
         return regime
@@ -184,14 +188,32 @@ class PatternCatalyst(Strategy):
             self.trailing_offset_pct = 0.065     # 6.5% trailing offset
             self.min_profit_pct = 0.0325         # 3.25% minimum profit
 
-        elif regime == "sideways_bias":
-            # Sideways with slight directional bias - use Set C as base
-            self.initial_stop_loss_pct = 0.15    # 15% stop loss
-            self.profit_target_pct = 0.15        # 15% profit target
-            self.max_holding_period = 60         # 60 bars (10 days)
+        elif regime == "sideways_bullish_bias":
+            # Slightly bullish sideways - needs tighter risk management
+            self.initial_stop_loss_pct = 0.15    # 15% stop loss (tighter)
+            self.profit_target_pct = 0.10        # 10% profit target (smaller)
+            self.max_holding_period = 36         # 36 bars (6 days, shorter exposure)
             self.trailing_activation_pct = 0.08  # 8% to activate trailing
             self.trailing_offset_pct = 0.06      # 6% trailing offset
             self.min_profit_pct = 0.03           # 3% minimum profit
+
+        elif regime == "sideways_bearish_bias":
+            # Slightly bearish sideways - needs wider stops
+            self.initial_stop_loss_pct = 0.22    # 22% stop loss (wider)
+            self.profit_target_pct = 0.14        # 14% profit target (higher)
+            self.max_holding_period = 48         # 48 bars (8 days, longer exposure)
+            self.trailing_activation_pct = 0.09  # 9% to activate trailing
+            self.trailing_offset_pct = 0.07      # 7% trailing offset
+            self.min_profit_pct = 0.035          # 3.5% minimum profit
+
+        elif regime == "sideways_moderate_bias":
+            # Moderate directional bias in sideways - balanced approach
+            self.initial_stop_loss_pct = 0.18    # 18% stop loss
+            self.profit_target_pct = 0.12        # 12% profit target
+            self.max_holding_period = 42         # 42 bars (7 days)
+            self.trailing_activation_pct = 0.085 # 8.5% to activate trailing
+            self.trailing_offset_pct = 0.065     # 6.5% trailing offset
+            self.min_profit_pct = 0.0325         # 3.25% minimum profit
 
         else:  # neutral_sideways - default conservative settings
             # Conservative settings for neutral sideways markets
