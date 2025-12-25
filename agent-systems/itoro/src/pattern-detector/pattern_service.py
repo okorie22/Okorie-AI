@@ -189,12 +189,12 @@ class PatternService:
                         alert_result = self.alert_system.send_alert(pattern_data, symbol, include_ai_analysis=True)
                         print(f"[ALERT] Sent alert for {symbol} {pattern_type}")
                     else:
-                        # Skip alert but still generate basic analysis for storage
-                        alert_result = self.alert_system.send_alert(pattern_data, symbol, include_ai_analysis=False)
+                        # Skip alert - only generate AI analysis for storage (NO notifications)
+                        ai_analysis = self.alert_system.generate_ai_analysis(pattern_data, symbol) if self.alert_system.ai_enabled else f"{pattern_type.upper()} pattern detected ({pattern_data['confidence']:.1%} confidence) - Alert already sent recently"
                         alert_result = {
                             'symbol': symbol,
                             'pattern_data': pattern_data,
-                            'ai_analysis': f"{pattern_type.upper()} pattern detected ({pattern_data['confidence']:.1%} confidence) - Alert already sent recently",
+                            'ai_analysis': ai_analysis,
                             'alert_timestamp': datetime.now().isoformat()
                         }
                         print(f"[SKIP] Alert skipped for {symbol} {pattern_type} (recently alerted)")
