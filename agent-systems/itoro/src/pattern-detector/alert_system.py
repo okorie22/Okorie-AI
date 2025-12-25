@@ -1,11 +1,14 @@
 """
 Alert System - Pattern Alerts with AI Analysis
-Sends desktop notifications and generates AI-powered analysis using DeepSeek
+Sends desktop notifications, email alerts, and generates AI-powered analysis
 """
 
 import os
 import json
+import smtplib
 from datetime import datetime
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from typing import Dict, Optional
 try:
     from plyer import notification
@@ -20,34 +23,51 @@ from openai import OpenAI
 class AlertSystem:
     """
     Alert system with AI-powered pattern analysis.
-    Uses DeepSeek API for analysis and plyer for desktop notifications.
+    Uses DeepSeek/OpenAI for analysis, plyer for desktop notifications, and SMTP for emails.
     """
-    
-    def __init__(self, deepseek_api_key: Optional[str] = None, enable_desktop_notifications: bool = True):
+
+    def __init__(self, ai_config: Optional[Dict] = None, email_config: Optional[Dict] = None,
+                 enable_desktop_notifications: bool = True):
         """
         Initialize alert system.
-        
+
         Args:
-            deepseek_api_key: DeepSeek API key (or set DEEPSEEK_KEY env variable)
+            ai_config: AI provider configuration (from config.py)
+            email_config: Email configuration (from config.py)
             enable_desktop_notifications: Enable/disable desktop notifications
         """
-        # Get API key from parameter or environment
-        self.api_key = deepseek_api_key or os.getenv('DEEPSEEK_KEY')
-        
-        if not self.api_key:
-            print("[ALERT SYSTEM] Warning: No DeepSeek API key provided")
-            print("[ALERT SYSTEM] Set DEEPSEEK_KEY environment variable or pass api_key parameter")
-            self.ai_enabled = False
+        # AI Configuration
+        self.ai_config = ai_config or {}
+        self.ai_enabled = bool(self.ai_config.get('api_key'))
+
+        if self.ai_enabled:
+            try:
+                self.client = OpenAI(
+                    api_key=self.ai_config['api_key'],
+                    base_url=self.ai_config.get('base_url')
+                )
+                print(f"[ALERT SYSTEM] AI analysis enabled ({self.ai_config.get('provider', 'unknown')})")
+            except Exception as e:
+                print(f"[ALERT SYSTEM] Error initializing AI client: {e}")
+                self.ai_enabled = False
+                self.client = None
         else:
-            self.ai_enabled = True
-            # Initialize DeepSeek client (OpenAI compatible)
-            self.client = OpenAI(
-                api_key=self.api_key,
-                base_url="https://api.deepseek.com"
-            )
-            print("[ALERT SYSTEM] AI analysis enabled (DeepSeek)")
-        
+            self.client = None
+            print("[ALERT SYSTEM] Warning: AI analysis disabled - no API key configured")
+
+        # Email Configuration
+        self.email_config = email_config
+        self.email_enabled = bool(self.email_config and self.email_config.get('username'))
+
+        if self.email_enabled:
+            print("[ALERT SYSTEM] Email alerts enabled")
+        else:
+            print("[ALERT SYSTEM] Email alerts disabled")
+
+        # Desktop Notifications
         self.enable_desktop_notifications = enable_desktop_notifications and PLYER_AVAILABLE
+        if not PLYER_AVAILABLE:
+            print("[ALERT SYSTEM] Warning: plyer not available, desktop notifications disabled")
         
         if self.enable_desktop_notifications:
             print("[ALERT SYSTEM] Desktop notifications enabled")
@@ -145,7 +165,68 @@ Provide a concise 2-3 sentence trading analysis focusing on:
         )
         
         return analysis
-    
+
+    def send_email_alert(self, pattern_data: Dict, symbol: str, analysis: str):
+        """
+        Send email alert for pattern detection.
+
+        Args:
+            pattern_data: Pattern detection data
+            symbol: Trading symbol
+            analysis: AI analysis text
+        """
+        if not self.email_enabled or not self.email_config:
+            return
+
+        try:
+            # Create message
+            msg = MIMEMultipart()
+            msg['From'] = self.email_config['from_email']
+            msg['To'] = ', '.join(self.email_config['to_emails'])
+            msg['Subject'] = f'ALERT: SolPattern - {symbol} {pattern_data["pattern"]}'
+
+            # Email body
+            body = f"""
+PATTERN DETECTED: {symbol}
+
+Pattern: {pattern_data['pattern'].upper()}
+Direction: {pattern_data['direction'].upper()}
+Signal: {pattern_data['signal']}
+Confidence: {pattern_data['confidence']:.1%}
+Price: ${pattern_data.get('price', 'N/A')}
+
+Confirmations:
+  Trend: {pattern_data.get('confirmations', {}).get('trend', 'N/A')}
+  Momentum: {pattern_data.get('confirmations', {}).get('momentum', 'N/A')}
+  Volume: {pattern_data.get('confirmations', {}).get('volume', 'N/A')}
+
+Parameters:
+  Stop Loss: {pattern_data.get('parameters', {}).get('stop_loss', 'N/A')}
+  Profit Target: {pattern_data.get('parameters', {}).get('profit_target', 'N/A')}
+  Max Hold: {pattern_data.get('parameters', {}).get('max_hold', 'N/A')} bars
+
+AI ANALYSIS:
+{analysis}
+
+---
+SolPattern Detector | Real-time Pattern Analysis
+Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+
+            msg.attach(MIMEText(body, 'plain'))
+
+            # Send email
+            server = smtplib.SMTP(self.email_config['smtp_server'], self.email_config['smtp_port'])
+            server.starttls()
+            server.login(self.email_config['username'], self.email_config['password'])
+            server.sendmail(self.email_config['from_email'], self.email_config['to_emails'], msg.as_string())
+            server.quit()
+
+            print(f"[EMAIL ALERT] Sent to {len(self.email_config['to_emails'])} recipients")
+
+        except Exception as e:
+            print(f"[EMAIL ALERT] Failed to send email: {e}")
+
     def send_desktop_notification(self, pattern_data: Dict, symbol: str, analysis: str):
         """
         Send desktop notification for detected pattern.
@@ -201,7 +282,11 @@ Provide a concise 2-3 sentence trading analysis focusing on:
         
         # Send desktop notification
         self.send_desktop_notification(pattern_data, symbol, ai_analysis)
-        
+
+        # Send email alert
+        if self.email_enabled and self.email_config:
+            self.send_email_alert(pattern_data, symbol, ai_analysis)
+
         # Return combined data
         return {
             'symbol': symbol,

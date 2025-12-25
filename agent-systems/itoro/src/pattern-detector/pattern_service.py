@@ -18,6 +18,7 @@ from pattern_detector import PatternDetector
 from data_fetcher import BinanceDataFetcher
 from alert_system import AlertSystem
 from pattern_storage import PatternStorage
+from config import config
 
 # Load environment variables from .env file
 load_dotenv()
@@ -49,10 +50,16 @@ class PatternService:
             enable_desktop_notifications: Enable desktop notifications
             db_path: SQLite database path
         """
-        # Configuration
-        self.symbols = symbols or ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT']
-        self.scan_interval = scan_interval
-        self.data_timeframe = data_timeframe
+        # Load configuration
+        trading_config = config.get_trading_config()
+        system_config = config.get_system_config()
+        notification_config = config.get_notification_config()
+
+        # Configuration with fallbacks
+        self.symbols = symbols or trading_config['symbols']
+        self.scan_interval = scan_interval or trading_config['scan_interval']
+        self.data_timeframe = data_timeframe or trading_config['data_timeframe']
+        self.alert_cooldown_hours = system_config['alert_cooldown_hours']
         
         # Initialize components
         print("\n" + "="*80)
@@ -66,10 +73,11 @@ class PatternService:
         self.pattern_detector = PatternDetector(ohlcv_history_length=100)
         self.data_fetcher = BinanceDataFetcher()
         self.alert_system = AlertSystem(
-            deepseek_api_key=deepseek_api_key,
-            enable_desktop_notifications=enable_desktop_notifications
+            ai_config=config.get_ai_config(),
+            email_config=config.get_email_config(),
+            enable_desktop_notifications=notification_config['desktop']
         )
-        self.storage = PatternStorage(db_path=db_path)
+        self.storage = PatternStorage(db_path=db_path or system_config['db_path'])
         
         # State tracking
         self.running = False
@@ -376,23 +384,11 @@ def main():
     ============================================================================
     """)
     
-    # Configuration (can be moved to config file)
-    symbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT']
-    scan_interval = 300  # 5 minutes
-    data_timeframe = '1d'  # Daily candles (as backtested)
-    
-    # Get DeepSeek API key from environment
-    deepseek_api_key = os.getenv('DEEPSEEK_KEY')
-    
-    # Initialize and run service
-    service = PatternService(
-        symbols=symbols,
-        scan_interval=scan_interval,
-        data_timeframe=data_timeframe,
-        deepseek_api_key=deepseek_api_key,
-        enable_desktop_notifications=True,
-        db_path='patterns.db'
-    )
+    # Print configuration summary
+    config.print_config_summary()
+
+    # Initialize and run service using config
+    service = PatternService()
     
     # Run continuously
     service.run()
