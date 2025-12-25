@@ -39,6 +39,27 @@ class PatternCatalyst(Strategy):
         self.trade_count = 0
         self.bar_count = 0
 
+        # Regime confidence scoring (smooth parameter blending)
+        self.regime_confidence = {
+            "strong_uptrend": 0.0,
+            "moderate_uptrend": 0.0,
+            "strong_downtrend": 0.0,
+            "moderate_downtrend": 0.0,
+            "neutral_sideways": 1.0,  # Start with neutral sideways
+            "sideways_bullish_bias": 0.0,
+            "sideways_bearish_bias": 0.0,
+            "sideways_moderate_bias": 0.0
+        }
+
+        # Confidence decay/smoothing factor
+        self.confidence_decay = 0.95  # How quickly confidence fades
+        self.confidence_boost = 0.2   # How much confidence increases per detection
+
+        # Doji breakout tracking (for next-bar confirmation)
+        self.pending_doji_high = None
+        self.pending_doji_low = None
+        self.pending_doji_bar = None
+
     def check_trend_confirmation(self, direction):
         """Check if trend supports the trade direction"""
         current_price = self.data.Close[-1]
@@ -76,16 +97,58 @@ class PatternCatalyst(Strategy):
         # Require above-average volume (at least 80% of 20-day average)
         return current_volume >= (avg_volume * 0.8)
 
-    def select_best_pattern(self):
-        """Dynamically select the pattern with the strongest signal above minimum threshold"""
+    def _get_allowed_patterns_for_regime(self, dominant_regime):
+        """Get list of patterns allowed for the given regime direction"""
+        allowed_patterns = []
+        
+        # Determine allowed directions based on regime
+        if dominant_regime in ["strong_uptrend", "moderate_uptrend"]:
+            # Uptrend: only bullish patterns allowed
+            allowed_directions = [100]  # Only +100 (bullish)
+        elif dominant_regime in ["strong_downtrend", "moderate_downtrend"]:
+            # Downtrend: only bearish patterns allowed
+            allowed_directions = [-100]  # Only -100 (bearish)
+        else:
+            # Sideways regimes: both directions allowed
+            allowed_directions = [100, -100]  # Both bullish and bearish
+        
+        # Check each pattern and add if direction matches
+        for pattern_name in self.available_patterns:
+            pattern_value = getattr(self, pattern_name)[-1]
+            if pattern_value != 0:  # Pattern detected
+                # For doji, we'll handle it separately (it can be either direction after breakout)
+                if pattern_name == 'doji':
+                    # Doji is allowed in all regimes, but requires breakout confirmation
+                    allowed_patterns.append(pattern_name)
+                elif pattern_value in allowed_directions:
+                    allowed_patterns.append(pattern_name)
+        
+        return allowed_patterns
+
+    def select_best_pattern(self, dominant_regime=None):
+        """Dynamically select the pattern with the strongest signal above minimum threshold
+        Now filters by regime direction FIRST, then selects best from allowed patterns"""
+        # If regime provided, filter patterns by regime direction first
+        if dominant_regime:
+            allowed_patterns = self._get_allowed_patterns_for_regime(dominant_regime)
+            if not allowed_patterns:
+                return None, 0  # No patterns allowed for this regime
+        else:
+            # Fallback: use all patterns (backward compatibility)
+            allowed_patterns = self.available_patterns
+        
         pattern_scores = {}
 
-        for pattern_name in self.available_patterns:
+        # Only score patterns that are allowed for the regime
+        for pattern_name in allowed_patterns:
             pattern_value = getattr(self, pattern_name)[-1]
             # Use absolute value to find strongest signal regardless of direction
             pattern_scores[pattern_name] = abs(pattern_value)
 
-        # Find the strongest pattern
+        if not pattern_scores:
+            return None, 0  # No patterns found
+
+        # Find the strongest pattern from allowed patterns
         best_pattern = max(pattern_scores, key=pattern_scores.get)
         best_signal = getattr(self, best_pattern)[-1]
         max_possible_strength = 100.0  # Maximum possible pattern signal
@@ -100,7 +163,7 @@ class PatternCatalyst(Strategy):
             return None, 0  # No strong enough signal found
 
     def detect_market_regime(self):
-        """Detect market regime based on trend strength and price position"""
+        """Update regime confidence scores based on trend strength (no hard switches)"""
         if len(self.data) < 50:  # Need enough data for reliable detection
             return "neutral_sideways"
 
@@ -122,110 +185,167 @@ class PatternCatalyst(Strategy):
 
         print(f"[REGIME] Trend strength: {trend_strength:.4f}, Volatility: {volatility:.4f}")
 
-        # Regime classification based on trend strength and volatility
+        # Decay all confidence scores
+        for regime in self.regime_confidence:
+            self.regime_confidence[regime] *= self.confidence_decay
+
+        # Boost confidence for detected regime
+        detected_regime = None
         if trend_strength > 0.02:  # Strong uptrend
-            regime = "strong_uptrend"
+            detected_regime = "strong_uptrend"
         elif trend_strength > 0.008:  # Moderate uptrend
-            regime = "moderate_uptrend"
+            detected_regime = "moderate_uptrend"
         elif trend_strength < -0.02:  # Strong downtrend
-            regime = "strong_downtrend"
+            detected_regime = "strong_downtrend"
         elif trend_strength < -0.008:  # Moderate downtrend
-            regime = "moderate_downtrend"
-        elif abs(trend_strength) <= 0.005:  # Truly neutral sideways
-            regime = "neutral_sideways"
-        elif trend_strength > 0.001 and trend_strength <= 0.005:  # Slightly bullish sideways
-            regime = "sideways_bullish_bias"
-        elif trend_strength < -0.001 and trend_strength >= -0.005:  # Slightly bearish sideways
-            regime = "sideways_bearish_bias"
+            detected_regime = "moderate_downtrend"
+        elif abs(trend_strength) <= 0.002:  # Much stricter sideways definition
+            detected_regime = "neutral_sideways"
+        elif trend_strength > 0.001 and trend_strength <= 0.002:  # Slightly bullish sideways
+            detected_regime = "sideways_bullish_bias"
+        elif trend_strength < -0.001 and trend_strength >= -0.002:  # Slightly bearish sideways
+            detected_regime = "sideways_bearish_bias"
         else:  # Moderate directional bias in sideways
-            regime = "sideways_moderate_bias"
+            detected_regime = "sideways_moderate_bias"
 
-        print(f"[REGIME] Detected: {regime}")
-        return regime
+        # Boost confidence for detected regime
+        if detected_regime:
+            self.regime_confidence[detected_regime] += self.confidence_boost
+            # Ensure confidence doesn't exceed 1.0
+            self.regime_confidence[detected_regime] = min(1.0, self.regime_confidence[detected_regime])
 
-    def set_regime_parameters(self, regime):
-        """Set strategy parameters based on detected market regime"""
+        print(f"[REGIME] Detected: {detected_regime}, Confidence: {self.regime_confidence[detected_regime]:.3f}")
+        return detected_regime or "neutral_sideways"
+
+    def set_regime_parameters(self, detected_regime):
+        """Blend strategy parameters based on regime confidence scores (smooth transitions)"""
 
         # Base parameters that stay constant
         self.risk_percentage = 0.02
         self.breakeven_trigger_pct = 0.02
         self.min_signal_strength = 0.7
 
-        # Regime-specific parameters based on backtest results
-        if regime == "strong_uptrend":
-            # Set A: Works best for uptrends - wider stops, longer hold
-            self.initial_stop_loss_pct = 0.25    # 25% stop loss
-            self.profit_target_pct = 0.12        # 12% profit target
-            self.max_holding_period = 48         # 48 bars (8 days)
-            self.trailing_activation_pct = 0.10  # 10% to activate trailing
-            self.trailing_offset_pct = 0.08      # 8% trailing offset
-            self.min_profit_pct = 0.04           # 4% minimum profit
+        # Define parameter sets for each regime
+        regime_params = {
+            "strong_uptrend": {
+                "stop_loss": 0.25, "profit_target": 0.12, "hold_period": 48,
+                "trailing_activation": 0.10, "trailing_offset": 0.08, "min_profit": 0.04
+            },
+            "moderate_uptrend": {
+                "stop_loss": 0.20, "profit_target": 0.13, "hold_period": 42,
+                "trailing_activation": 0.09, "trailing_offset": 0.07, "min_profit": 0.035
+            },
+            "strong_downtrend": {
+                "stop_loss": 0.15, "profit_target": 0.15, "hold_period": 60,
+                "trailing_activation": 0.08, "trailing_offset": 0.06, "min_profit": 0.03
+            },
+            "moderate_downtrend": {
+                "stop_loss": 0.18, "profit_target": 0.14, "hold_period": 54,
+                "trailing_activation": 0.085, "trailing_offset": 0.065, "min_profit": 0.0325
+            },
+            "neutral_sideways": {
+                "stop_loss": 0.12, "profit_target": 0.08, "hold_period": 36,
+                "trailing_activation": 0.06, "trailing_offset": 0.05, "min_profit": 0.025
+            },
+            "sideways_bullish_bias": {
+                "stop_loss": 0.15, "profit_target": 0.10, "hold_period": 36,
+                "trailing_activation": 0.08, "trailing_offset": 0.06, "min_profit": 0.03
+            },
+            "sideways_bearish_bias": {
+                "stop_loss": 0.22, "profit_target": 0.14, "hold_period": 48,
+                "trailing_activation": 0.09, "trailing_offset": 0.07, "min_profit": 0.035
+            },
+            "sideways_moderate_bias": {
+                "stop_loss": 0.18, "profit_target": 0.12, "hold_period": 42,
+                "trailing_activation": 0.085, "trailing_offset": 0.065, "min_profit": 0.0325
+            }
+        }
 
-        elif regime == "strong_downtrend":
-            # Set C: Works best for downtrends - tighter stops/targets, longer hold
-            self.initial_stop_loss_pct = 0.15    # 15% stop loss
-            self.profit_target_pct = 0.15        # 15% profit target
-            self.max_holding_period = 60         # 60 bars (10 days)
-            self.trailing_activation_pct = 0.08  # 8% to activate trailing
-            self.trailing_offset_pct = 0.06      # 6% trailing offset
-            self.min_profit_pct = 0.03           # 3% minimum profit
+        # Calculate blended parameters based on confidence scores
+        total_confidence = sum(self.regime_confidence.values())
 
-        elif regime == "moderate_uptrend":
-            # Blend of strong uptrend and sideways - moderate parameters
-            self.initial_stop_loss_pct = 0.20    # 20% stop loss
-            self.profit_target_pct = 0.13        # 13% profit target
-            self.max_holding_period = 42         # 42 bars (7 days)
-            self.trailing_activation_pct = 0.09  # 9% to activate trailing
-            self.trailing_offset_pct = 0.07      # 7% trailing offset
-            self.min_profit_pct = 0.035          # 3.5% minimum profit
+        if total_confidence > 0:
+            # Weighted average of all parameters
+            self.initial_stop_loss_pct = sum(
+                self.regime_confidence[regime] * regime_params[regime]["stop_loss"]
+                for regime in self.regime_confidence
+            ) / total_confidence
 
-        elif regime == "moderate_downtrend":
-            # Blend of strong downtrend and sideways - moderate parameters
-            self.initial_stop_loss_pct = 0.18    # 18% stop loss
-            self.profit_target_pct = 0.14        # 14% profit target
-            self.max_holding_period = 54         # 54 bars (9 days)
-            self.trailing_activation_pct = 0.085 # 8.5% to activate trailing
-            self.trailing_offset_pct = 0.065     # 6.5% trailing offset
-            self.min_profit_pct = 0.0325         # 3.25% minimum profit
+            self.profit_target_pct = sum(
+                self.regime_confidence[regime] * regime_params[regime]["profit_target"]
+                for regime in self.regime_confidence
+            ) / total_confidence
 
-        elif regime == "sideways_bullish_bias":
-            # Slightly bullish sideways - needs tighter risk management
-            self.initial_stop_loss_pct = 0.15    # 15% stop loss (tighter)
-            self.profit_target_pct = 0.10        # 10% profit target (smaller)
-            self.max_holding_period = 36         # 36 bars (6 days, shorter exposure)
-            self.trailing_activation_pct = 0.08  # 8% to activate trailing
-            self.trailing_offset_pct = 0.06      # 6% trailing offset
-            self.min_profit_pct = 0.03           # 3% minimum profit
+            self.max_holding_period = int(sum(
+                self.regime_confidence[regime] * regime_params[regime]["hold_period"]
+                for regime in self.regime_confidence
+            ) / total_confidence)
 
-        elif regime == "sideways_bearish_bias":
-            # Slightly bearish sideways - needs wider stops
-            self.initial_stop_loss_pct = 0.22    # 22% stop loss (wider)
-            self.profit_target_pct = 0.14        # 14% profit target (higher)
-            self.max_holding_period = 48         # 48 bars (8 days, longer exposure)
-            self.trailing_activation_pct = 0.09  # 9% to activate trailing
-            self.trailing_offset_pct = 0.07      # 7% trailing offset
-            self.min_profit_pct = 0.035          # 3.5% minimum profit
+            self.trailing_activation_pct = sum(
+                self.regime_confidence[regime] * regime_params[regime]["trailing_activation"]
+                for regime in self.regime_confidence
+            ) / total_confidence
 
-        elif regime == "sideways_moderate_bias":
-            # Moderate directional bias in sideways - balanced approach
-            self.initial_stop_loss_pct = 0.18    # 18% stop loss
-            self.profit_target_pct = 0.12        # 12% profit target
-            self.max_holding_period = 42         # 42 bars (7 days)
-            self.trailing_activation_pct = 0.085 # 8.5% to activate trailing
-            self.trailing_offset_pct = 0.065     # 6.5% trailing offset
-            self.min_profit_pct = 0.0325         # 3.25% minimum profit
+            self.trailing_offset_pct = sum(
+                self.regime_confidence[regime] * regime_params[regime]["trailing_offset"]
+                for regime in self.regime_confidence
+            ) / total_confidence
 
-        else:  # neutral_sideways - default conservative settings
-            # Conservative settings for neutral sideways markets
-            self.initial_stop_loss_pct = 0.12    # 12% stop loss (tightest)
-            self.profit_target_pct = 0.08        # 8% profit target (smallest)
-            self.max_holding_period = 36         # 36 bars (6 days)
-            self.trailing_activation_pct = 0.06  # 6% to activate trailing
-            self.trailing_offset_pct = 0.05      # 5% trailing offset
-            self.min_profit_pct = 0.025          # 2.5% minimum profit
+            self.min_profit_pct = sum(
+                self.regime_confidence[regime] * regime_params[regime]["min_profit"]
+                for regime in self.regime_confidence
+            ) / total_confidence
 
-        print(f"[PARAMETERS] Set for {regime}: SL={self.initial_stop_loss_pct*100:.1f}%, PT={self.profit_target_pct*100:.1f}%, Hold={self.max_holding_period} bars")
-        
+        else:
+            # Fallback to neutral sideways
+            params = regime_params["neutral_sideways"]
+            self.initial_stop_loss_pct = params["stop_loss"]
+            self.profit_target_pct = params["profit_target"]
+            self.max_holding_period = params["hold_period"]
+            self.trailing_activation_pct = params["trailing_activation"]
+            self.trailing_offset_pct = params["trailing_offset"]
+            self.min_profit_pct = params["min_profit"]
+
+        print(f"[PARAMETERS] Blended - SL={self.initial_stop_loss_pct*100:.1f}%, PT={self.profit_target_pct*100:.1f}%, Hold={self.max_holding_period} bars")
+        print(f"[CONFIDENCE] Top regimes: {sorted(self.regime_confidence.items(), key=lambda x: x[1], reverse=True)[:3]}")
+
+    def _get_dominant_regime(self):
+        """Get the regime with the highest confidence score"""
+        if not self.regime_confidence:
+            return "neutral_sideways"
+
+        dominant_regime = max(self.regime_confidence, key=self.regime_confidence.get)
+        dominant_confidence = self.regime_confidence[dominant_regime]
+
+        return dominant_regime, dominant_confidence
+
+
+    def _is_pattern_allowed_for_regime(self, pattern_signal, current_regime):
+        """Check if pattern direction is allowed for current regime"""
+        # Bullish patterns (+100) only allowed in uptrend/sideways regimes
+        # Bearish patterns (-100) only allowed in downtrend/sideways regimes
+        # Sideways regimes allow both directions
+
+        if pattern_signal == 100:  # Bullish pattern
+            # Allow in uptrend regimes and sideways regimes
+            allowed_regimes = [
+                "strong_uptrend", "moderate_uptrend",
+                "neutral_sideways", "sideways_bullish_bias",
+                "sideways_bearish_bias", "sideways_moderate_bias"
+            ]
+            return current_regime in allowed_regimes
+
+        elif pattern_signal == -100:  # Bearish pattern
+            # Allow in downtrend regimes and sideways regimes
+            allowed_regimes = [
+                "strong_downtrend", "moderate_downtrend",
+                "neutral_sideways", "sideways_bullish_bias",
+                "sideways_bearish_bias", "sideways_moderate_bias"
+            ]
+            return current_regime in allowed_regimes
+
+        return False  # Unknown pattern signal
+
     def next(self):
         self.bar_count += 1
 
@@ -233,8 +353,11 @@ class PatternCatalyst(Strategy):
         current_regime = self.detect_market_regime()
         self.set_regime_parameters(current_regime)
 
+        # Get dominant regime (highest confidence) for filtering decisions
+        dominant_regime, dominant_confidence = self._get_dominant_regime()
+
         # DEBUG: Print current bar status
-        print(f"[DEBUG] Bar {self.bar_count}, Equity: ${self.equity:.2f}, Position: {self.position.size if self.position else 0}")
+        print(f"[DEBUG] Bar {self.bar_count}, Equity: ${self.equity:.2f}, Position: {self.position.size if self.position else 0}, Detected: {current_regime}, Dominant: {dominant_regime} ({dominant_confidence:.3f})")
 
         # Print summary every 100 bars
         if self.bar_count % 100 == 0:
@@ -243,7 +366,7 @@ class PatternCatalyst(Strategy):
             if len(self.data) > 1:
                 print(f"[SUMMARY] Current prices - Open: {self.data.Open[-1]:.2f}, High: {self.data.High[-1]:.2f}, Low: {self.data.Low[-1]:.2f}, Close: {self.data.Close[-1]:.2f}")
                 print(f"[SUMMARY] Pattern values - Engulfing: {self.engulfing[-1]}, Hammer: {self.hammer[-1]}, Doji: {self.doji[-1]}")
-        
+
         # Exit logic - check for trailing stop and stop loss (handles both long and short positions)
         if self.position:
             current_price = self.data.Close[-1]
@@ -271,13 +394,13 @@ class PatternCatalyst(Strategy):
 
             # PARTIAL PROFIT TAKING - Multiple levels
             if current_profit_pct >= 0.03:  # 3% profit - take 50%
-                if not hasattr(self, 'partial_exit_3pct'):
+                if not getattr(self, 'partial_exit_3pct', False):
                     print(f"[PARTIAL EXIT 3%] Taking 50% profit at bar {self.bar_count}, Price: {current_price:.2f}, Profit: {current_profit_pct*100:.2f}%")
                     self.position.close(portion=0.5)
                     self.partial_exit_3pct = True
 
             if current_profit_pct >= 0.06:  # 6% profit - take remaining 50%
-                if not hasattr(self, 'partial_exit_6pct'):
+                if not getattr(self, 'partial_exit_6pct', False):
                     print(f"[PARTIAL EXIT 6%] Taking remaining 50% profit at bar {self.bar_count}, Price: {current_price:.2f}, Profit: {current_profit_pct*100:.2f}%")
                     self.position.close(portion=0.5)
                     self.partial_exit_6pct = True
@@ -409,8 +532,53 @@ class PatternCatalyst(Strategy):
         
         # Entry logic - only if no position is open
         if not self.position:
-            # DYNAMIC PATTERN SELECTION - choose strongest signal above minimum strength
-            selected_pattern, pattern_signal = self.select_best_pattern()
+            # Get dominant regime first (for pattern filtering)
+            dominant_regime, dominant_confidence = self._get_dominant_regime()
+
+            # Check for pending doji breakout confirmation first
+            doji_breakout_confirmed = False
+            if self.pending_doji_high is not None and self.pending_doji_low is not None:
+                current_price = self.data.Close[-1]
+                current_high = self.data.High[-1]
+                current_low = self.data.Low[-1]
+                
+                # Check for breakout above doji high (long) or below doji low (short)
+                breakout_long = current_high > self.pending_doji_high
+                breakout_short = current_low < self.pending_doji_low
+                
+                if breakout_long or breakout_short:
+                    # Doji breakout confirmed - determine direction
+                    if breakout_long and breakout_short:
+                        # Both breakouts - use stronger one
+                        high_break = current_high - self.pending_doji_high
+                        low_break = self.pending_doji_low - current_low
+                        pattern_signal = 100 if high_break >= low_break else -100
+                    else:
+                        pattern_signal = 100 if breakout_long else -100
+                    
+                    selected_pattern = 'doji'
+                    doji_breakout_confirmed = True
+                    print(f"[DOJI BREAKOUT] Confirmed at bar {self.bar_count} - Breakout {'above high' if breakout_long else 'below low'}, Direction: {'LONG' if pattern_signal == 100 else 'SHORT'}")
+                    
+                    # Clear pending doji
+                    self.pending_doji_high = None
+                    self.pending_doji_low = None
+                    self.pending_doji_bar = None
+                else:
+                    # No breakout yet - check if doji is too old (expire after 2 bars)
+                    if self.bar_count - self.pending_doji_bar > 2:
+                        print(f"[DOJI EXPIRED] Pending doji from bar {self.pending_doji_bar} expired (no breakout after 2 bars)")
+                        self.pending_doji_high = None
+                        self.pending_doji_low = None
+                        self.pending_doji_bar = None
+                    else:
+                        # Still waiting for breakout
+                        return
+            
+            # DYNAMIC PATTERN SELECTION - filter by regime FIRST, then choose strongest signal
+            # Skip if doji breakout was just confirmed (already have pattern and signal)
+            if not doji_breakout_confirmed:
+                selected_pattern, pattern_signal = self.select_best_pattern(dominant_regime)
 
             # Check if we have a valid pattern signal
             if selected_pattern is None:
@@ -420,6 +588,23 @@ class PatternCatalyst(Strategy):
             # DEBUG: Print pattern analysis
             signal_strength = abs(pattern_signal) / 100.0
             print(f"[DEBUG] Pattern scan: {selected_pattern}={pattern_signal} (strength: {signal_strength:.1f})")
+
+            # Special handling for doji: require next-bar breakout confirmation
+            # Skip this if doji breakout was just confirmed (already passed breakout check)
+            if selected_pattern == 'doji' and not doji_breakout_confirmed:
+                # Store doji high/low for next-bar breakout check
+                self.pending_doji_high = self.data.High[-1]
+                self.pending_doji_low = self.data.Low[-1]
+                self.pending_doji_bar = self.bar_count
+                print(f"[DOJI SETUP] Doji detected at bar {self.bar_count}, waiting for next-bar breakout (High: {self.pending_doji_high:.2f}, Low: {self.pending_doji_low:.2f})")
+                return  # Wait for next bar to confirm breakout
+
+            # REGIME-AWARE PATTERN FILTERING (for non-doji patterns and confirmed doji breakouts)
+            # Use dominant regime (highest confidence) instead of detected regime for filtering
+            pattern_allowed = self._is_pattern_allowed_for_regime(pattern_signal, dominant_regime)
+            if not pattern_allowed:
+                print(f"[REGIME FILTER] Pattern {selected_pattern} ({pattern_signal}) rejected - Detected: {current_regime}, Dominant: {dominant_regime} (confidence: {dominant_confidence:.3f})")
+                return
 
             # TREND, MOMENTUM, AND VOLUME CONFIRMATION
             trade_direction = 'long' if pattern_signal == 100 else 'short'
@@ -436,9 +621,11 @@ class PatternCatalyst(Strategy):
             volume_confirmed = self.check_volume_confirmation()
             print(f"[DEBUG] Volume confirmation: {volume_confirmed}")
 
-            # REQUIRE 2 OUT OF 3 CONFIRMATIONS
-            confirmations_count = sum([trend_confirmed, momentum_confirmed, volume_confirmed])
-            all_confirmed = confirmations_count >= 2
+            # REQUIRE TREND CONFIRMATION + 1 OUT OF 2 (MOMENTUM OR VOLUME)
+            trend_mandatory = trend_confirmed
+            flexible_confirmations = sum([momentum_confirmed, volume_confirmed])
+            all_confirmed = trend_mandatory and (flexible_confirmations >= 1)
+            confirmations_count = sum([trend_confirmed, momentum_confirmed, volume_confirmed])  # For display
 
             if not all_confirmed:
                 print(f"[DEBUG] Entry rejected - missing confirmations")
@@ -448,7 +635,10 @@ class PatternCatalyst(Strategy):
             if pattern_signal == 100:
                 # BULLISH PATTERN - Go LONG (with all confirmations)
                 print(f"[LONG ENTRY] {selected_pattern} bullish pattern (+100) at bar {self.bar_count}")
-                print(f"[CONFIRMATIONS] Trend: YES, Momentum: YES, Volume: YES")
+                print(f"[CONFIRMATIONS] Trend: {'YES' if trend_confirmed else 'NO'} (MANDATORY), "
+                      f"Momentum: {'YES' if momentum_confirmed else 'NO'}, "
+                      f"Volume: {'YES' if volume_confirmed else 'NO'} "
+                      f"({flexible_confirmations}/2 flexible, {confirmations_count}/3 total)")
 
                 # Calculate position size based on risk percentage
                 current_price = self.data.Close[-1]
@@ -492,7 +682,10 @@ class PatternCatalyst(Strategy):
             elif pattern_signal == -100:
                 # BEARISH PATTERN - Go SHORT (with all confirmations)
                 print(f"[SHORT ENTRY] {selected_pattern} bearish pattern (-100) at bar {self.bar_count}")
-                print(f"[CONFIRMATIONS] Trend: YES, Momentum: YES, Volume: YES")
+                print(f"[CONFIRMATIONS] Trend: {'YES' if trend_confirmed else 'NO'} (MANDATORY), "
+                      f"Momentum: {'YES' if momentum_confirmed else 'NO'}, "
+                      f"Volume: {'YES' if volume_confirmed else 'NO'} "
+                      f"({flexible_confirmations}/2 flexible, {confirmations_count}/3 total)")
 
                 # Calculate position size based on risk percentage
                 current_price = self.data.Close[-1]
@@ -538,90 +731,197 @@ class PatternCatalyst(Strategy):
         else:
             print(f"[DEBUG] Skipping entry - position already open")
 
-# Load and prepare data
-print("[INFO] Loading data...")
+# Load and prepare data for multiple symbols
+print("[INFO] Loading data for multiple symbols...")
 
 # CHANGE TIMEFRAME HERE: '1d', '4h', '1h', '15m', '5m', etc.
-data_timeframe = '4h'  # Change this to test different timeframes
-data_filename = f'BTC-USD-{data_timeframe}.csv'
+data_timeframe = '1d'  # Change this to test different timeframes
 
-price_data = pd.read_csv(f'C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/rbi/{data_filename}')
-print(f"[INFO] Using {data_timeframe} timeframe data from {data_filename}")
-print(f"[INFO] Available timeframes: 1d, 4h, 1h, 15m, 5m (collect with --timeframe parameter)")
+# Symbols to test
+symbols = ['BTC','ETH', 'SOL', 'BNB']
+print(f"[INFO] Testing symbols: {symbols}")
+print(f"[INFO] Using {data_timeframe} timeframe")
+print(f"[INFO] Available timeframes: 1d, 4h, 1h, 15m, 5m")
+print(f"[INFO] Current timeframe: {data_timeframe} (change data_timeframe variable above)")
 
-# Clean column names
-price_data.columns = price_data.columns.str.strip().str.lower()
+def load_symbol_data(symbol, timeframe):
+    """Load and prepare data for a specific symbol"""
+    data_filename = f'{symbol}-USD-{timeframe}.csv'
 
-# Drop any unnamed columns
-price_data = price_data.drop(columns=[col for col in price_data.columns if 'unnamed' in col.lower()])
+    try:
+        price_data = pd.read_csv(f'C:/Users/Top Cash Pawn/ITORO/agent-systems/itoro/src/data/rbi/{data_filename}')
+        print(f"[INFO] Loaded {symbol} data: {len(price_data)} rows")
 
-# Ensure proper column mapping
-required_columns = ['open', 'high', 'low', 'close', 'volume']
-for col in required_columns:
-    if col not in price_data.columns:
-        print(f"[ERROR] Missing required column: {col}")
-        print(f"[DEBUG] Available columns: {list(price_data.columns)}")
-        raise ValueError(f"Missing required column: {col}")
+        # Clean column names
+        price_data.columns = price_data.columns.str.strip().str.lower()
 
-# Rename columns to proper case for backtesting.py
-price_data = price_data.rename(columns={
-    'open': 'Open',
-    'high': 'High', 
-    'low': 'Low',
-    'close': 'Close',
-    'volume': 'Volume'
-})
+        # Drop any unnamed columns
+        price_data = price_data.drop(columns=[col for col in price_data.columns if 'unnamed' in col.lower()])
 
-# Set datetime index - FIXED: Check for datetime column
-if 'datetime' in price_data.columns:
-    price_data.index = pd.to_datetime(price_data['datetime'])
-    print(f"[DEBUG] Using 'datetime' column for index")
-elif 'timestamp' in price_data.columns:
-    price_data.index = pd.to_datetime(price_data['timestamp'])
-    print(f"[DEBUG] Using 'timestamp' column for index")
-elif 'date' in price_data.columns:
-    price_data.index = pd.to_datetime(price_data['date'])
-    print(f"[DEBUG] Using 'date' column for index")
-elif 'time' in price_data.columns:
-    price_data.index = pd.to_datetime(price_data['time'])
-    print(f"[DEBUG] Using 'time' column for index")
+        # Ensure proper column mapping
+        required_columns = ['open', 'high', 'low', 'close', 'volume']
+        for col in required_columns:
+            if col not in price_data.columns:
+                print(f"[ERROR] Missing required column: {col} for {symbol}")
+                print(f"[DEBUG] Available columns: {list(price_data.columns)}")
+                return None
+
+        # Rename columns to proper case for backtesting.py
+        price_data = price_data.rename(columns={
+            'open': 'Open',
+            'high': 'High',
+            'low': 'Low',
+            'close': 'Close',
+            'volume': 'Volume'
+        })
+
+        # Set datetime index - FIXED: Check for datetime column
+        if 'datetime' in price_data.columns:
+            price_data.index = pd.to_datetime(price_data['datetime'])
+        elif 'timestamp' in price_data.columns:
+            price_data.index = pd.to_datetime(price_data['timestamp'])
+        elif 'date' in price_data.columns:
+            price_data.index = pd.to_datetime(price_data['date'])
+        elif 'time' in price_data.columns:
+            price_data.index = pd.to_datetime(price_data['time'])
+        else:
+            print(f"[WARNING] No timestamp column found for {symbol}, using index as time")
+            price_data.index = pd.to_datetime(price_data.index)
+
+        return price_data
+
+    except FileNotFoundError:
+        print(f"[WARNING] Data file not found for {symbol}: {data_filename}")
+        return None
+    except Exception as e:
+        print(f"[ERROR] Failed to load data for {symbol}: {e}")
+        return None
+
+def run_symbol_backtest(symbol, price_data):
+    """Run backtest for a specific symbol and return results"""
+    print(f"\n{'='*60}")
+    print(f"BACKTESTING {symbol}")
+    print('='*60)
+
+    try:
+        # Run backtest with margin buffer
+        print(f"[INFO] Starting {symbol} backtest...")
+        bt = Backtest(price_data, PatternCatalyst, cash=1000000, commission=.002, margin=0.1)
+        stats = bt.run()
+
+        # Run again with finalize_trades=True
+        print(f"[INFO] Finalizing {symbol} trades...")
+        bt_final = Backtest(price_data, PatternCatalyst, cash=1000000, commission=.002, margin=0.1, finalize_trades=True)
+        stats_final = bt_final.run()
+
+        return stats_final
+
+    except Exception as e:
+        print(f"[ERROR] Backtest failed for {symbol}: {e}")
+        return None
+
+# Run backtests for all symbols
+all_results = {}
+successful_symbols = []
+
+for symbol in symbols:
+    price_data = load_symbol_data(symbol, data_timeframe)
+    if price_data is not None:
+        stats = run_symbol_backtest(symbol, price_data)
+        if stats is not None:
+            all_results[symbol] = stats
+            successful_symbols.append(symbol)
+
+# Display aggregated results
+if successful_symbols:
+    print(f"\n{'='*80}")
+    print("MULTI-SYMBOL AGGREGATED RESULTS")
+    print('='*80)
+
+    total_return = 0
+    total_trades = 0
+    total_wins = 0
+    total_win_rate = 0
+    max_dd = 0
+    min_dd = 0
+
+    for symbol in successful_symbols:
+            stats = all_results[symbol]
+            symbol_return = stats['Return [%]']
+            symbol_trades = len(stats._trades)
+            symbol_win_rate = stats.get('Win Rate [%]', 0)
+            symbol_max_dd = stats.get('Max. Drawdown [%]', 0)
+
+            total_return += symbol_return
+            total_trades += symbol_trades
+            if symbol_trades > 0:
+                total_wins += int(symbol_trades * symbol_win_rate / 100)
+            max_dd = max(max_dd, abs(symbol_max_dd))
+
+            print(f"\n{symbol}:")
+            print(f"  Return [%]: {symbol_return:.2f}")
+            print(f"  Buy & Hold Return [%]: {stats.get('Buy & Hold Return [%]', 0):.2f}")
+            print(f"  Max. Drawdown [%]: {symbol_max_dd:.2f}")
+            print(f"  Avg. Drawdown [%]: {stats.get('Avg. Drawdown [%]', 0):.2f}")
+            print(f"  # Trades: {symbol_trades}")
+            print(f"  Win Rate [%]: {symbol_win_rate:.1f}")
+            print(f"  Best Trade [%]: {stats.get('Best Trade [%]', 0):.2f}")
+            print(f"  Worst Trade [%]: {stats.get('Worst Trade [%]', 0):.2f}")
+            print(f"  Avg. Trade [%]: {stats.get('Avg. Trade [%]', 0):.2f}")
+            print(f"  Profit Factor: {stats.get('Profit Factor', 0):.2f}")
+            print(f"  Expectancy [%]: {stats.get('Expectancy [%]', 0):.2f}")
+            print(f"  Sharpe Ratio: {stats.get('Sharpe Ratio', 0):.2f}")
+            print(f"  Sortino Ratio: {stats.get('Sortino Ratio', 0):.2f}")
+            print(f"  Calmar Ratio: {stats.get('Calmar Ratio', 0):.2f}")
+            print(f"  Max. Trade Duration: {stats.get('Max. Trade Duration', 'N/A')}")
+            print(f"  Avg. Trade Duration: {stats.get('Avg. Trade Duration', 'N/A')}")
+            print(f"  Exposure Time [%]: {stats.get('Exposure Time [%]', 0):.2f}")
+            print(f"  SQN: {stats.get('SQN', 0):.2f}")
+            print(f"  Kelly Criterion: {stats.get('Kelly Criterion', 0):.2f}")
+
+    avg_return = total_return / len(successful_symbols)
+    overall_win_rate = (total_wins / total_trades * 100) if total_trades > 0 else 0
+
+    print(f"\n{'='*40}")
+    print("AGGREGATED SUMMARY:")
+    print(f"  Symbols tested: {len(successful_symbols)}")
+    print(f"  Average return: {avg_return:.2f}%")
+    print(f"  Total trades: {total_trades}")
+    print(f"  Overall win rate: {overall_win_rate:.1f}%")
+    print(f"  Max drawdown (worst symbol): {max_dd:.2f}%")
+
+    # Calculate additional aggregated stats
+    total_pf = 0
+    total_expectancy = 0
+    total_sharpe = 0
+    total_sortino = 0
+    total_calmar = 0
+    total_sqn = 0
+
+    for symbol in successful_symbols:
+        stats = all_results[symbol]
+        total_pf += stats.get('Profit Factor', 0)
+        total_expectancy += stats.get('Expectancy [%]', 0)
+        total_sharpe += stats.get('Sharpe Ratio', 0)
+        total_sortino += stats.get('Sortino Ratio', 0)
+        total_calmar += stats.get('Calmar Ratio', 0)
+        total_sqn += stats.get('SQN', 0)
+
+    avg_pf = total_pf / len(successful_symbols)
+    avg_expectancy = total_expectancy / len(successful_symbols)
+    avg_sharpe = total_sharpe / len(successful_symbols)
+    avg_sortino = total_sortino / len(successful_symbols)
+    avg_calmar = total_calmar / len(successful_symbols)
+    avg_sqn = total_sqn / len(successful_symbols)
+
+    print(f"  Average Profit Factor: {avg_pf:.2f}")
+    print(f"  Average Expectancy [%]: {avg_expectancy:.2f}")
+    print(f"  Average Sharpe Ratio: {avg_sharpe:.2f}")
+    print(f"  Average Sortino Ratio: {avg_sortino:.2f}")
+    print(f"  Average Calmar Ratio: {avg_calmar:.2f}")
+    print(f"  Average SQN: {avg_sqn:.2f}")
+    print(f"  Prop firm target: 12% return, 9% max DD")
+    print(f"  Status: {'PASS' if avg_return >= 12 and max_dd <= 9 else 'FAIL'}")
+
 else:
-    print("[WARNING] No timestamp column found, using index as time")
-    price_data.index = pd.to_datetime(price_data.index)
-
-print(f"[INFO] Data loaded: {len(price_data)} rows, {len(price_data.columns)} columns")
-print(f"[DEBUG] Data columns: {list(price_data.columns)}")
-print(f"[DEBUG] Data range: {price_data.index[0]} to {price_data.index[-1]}")
-print(f"[DEBUG] Sample data (first 3 rows):")
-print(price_data.head(3))
-
-# Verify data structure for backtesting.py
-print(f"[DEBUG] Checking data structure...")
-print(f"[DEBUG] Index type: {type(price_data.index)}")
-print(f"[DEBUG] Required columns present: {'Open' in price_data.columns}, {'High' in price_data.columns}, {'Low' in price_data.columns}, {'Close' in price_data.columns}, {'Volume' in price_data.columns}")
-
-# Run backtest with margin buffer
-print("[INFO] Starting backtest with margin buffer...")
-bt = Backtest(price_data, PatternCatalyst, cash=1000000, commission=.002, margin=0.1)
-stats = bt.run()
-print(stats)
-print(stats._strategy)
-
-# Check if there are open trades and close them
-if hasattr(stats._strategy, 'position') and stats._strategy.position.size != 0:
-    print(f"[INFO] Closing open position at end of backtest: {stats._strategy.position.size} units")
-    # This would normally be handled by finalize_trades=True, but let's add it manually
-    print("[INFO] Adding finalize_trades=True to get complete stats...")
-
-# Run again with finalize_trades=True and margin buffer
-print("[INFO] Re-running with finalize_trades=True and margin buffer...")
-bt_final = Backtest(price_data, PatternCatalyst, cash=1000000, commission=.002, margin=0.1, finalize_trades=True)
-stats_final = bt_final.run()
-print("\n" + "="*50)
-print("FINAL STATS WITH CLOSED TRADES")
-print("="*50)
-print(stats_final)
-print(f"\nTotal trades executed: {len(stats_final._trades)}")
-if len(stats_final._trades) > 0:
-    print(f"Win rate: {stats_final['Win Rate [%]']:.1f}%")
-    print(f"Average trade: {stats_final['Avg. Trade [%]']:.2f}%")
+    print("[ERROR] No successful backtests completed")

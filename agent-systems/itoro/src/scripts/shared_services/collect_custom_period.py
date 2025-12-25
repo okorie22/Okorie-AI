@@ -46,18 +46,48 @@ def collect_multi_source_ohlcv_for_period(token, start_date, end_date, timeframe
                 'kraken': 'XXBTZUSD',
                 'okx': 'BTC-USDT',
                 'bybit': 'BTCUSDT'
-            }
+            },
+            'ETH': {
+                'binance': 'ETHUSDT',
+                'kucoin': 'ETH-USDT',
+                'kraken': 'XETHZUSD',
+                'okx': 'ETH-USDT',
+                'bybit': 'ETHUSDT'
+            },
+            'SOL': {
+                'binance': 'SOLUSDT',
+                'kucoin': 'SOL-USDT',
+                'kraken': 'SOLUSD',
+                'okx': 'SOL-USDT',
+                'bybit': 'SOLUSDT'
+            },
+            'BNB': {
+                'binance': 'BNBUSDT',
+                'kucoin': 'BNB-USDT',
+                'kraken': 'BNBUSD',
+                'okx': 'BNB-USDT',
+                'bybit': 'BNBUSDT'
+            },
+            'XRP': {
+                'binance': 'XRPUSDT',
+                'kucoin': 'XRP-USDT',
+                'kraken': 'XXRPZUSD',
+                'okx': 'XRP-USDT',
+                'bybit': 'XRPUSDT'
+            },
         }
 
     # Get exchange symbols for this token
     exchange_symbols = symbol_mapping.get(token, {})
 
-    # Try multiple sources in order
-    sources_to_try = ['binance', 'kucoin', 'okx', 'bybit', 'kraken']
+    # Try multiple sources in order (first source is primary, later sources are fallbacks)
+    # Note: Some exchanges (e.g. OKX) use non-00:00 daily cutoffs, so for timeframe='1d'
+    # we deduplicate by calendar day using this priority order.
+    sources_to_try = ['binance', 'kucoin', 'kraken', 'bybit', 'okx']
 
     all_data = []
 
-    for source_name in sources_to_try:
+    for priority, source_name in enumerate(sources_to_try):
         cprint(f"  [SOURCE] Trying {source_name} with symbol {exchange_symbols.get(source_name, token)}...", "cyan")
 
         try:
@@ -69,6 +99,8 @@ def collect_multi_source_ohlcv_for_period(token, start_date, end_date, timeframe
             if data is not None and not data.empty:
                 # Ensure timestamp is datetime
                 data['timestamp'] = pd.to_datetime(data['timestamp'])
+                data['_source'] = source_name
+                data['_priority'] = priority
 
                 # Debug: Check what data this exchange returned
                 cprint(f"    [DEBUG] {source_name} raw data range: {data['timestamp'].min()} to {data['timestamp'].max()}", "cyan")
@@ -102,14 +134,33 @@ def collect_multi_source_ohlcv_for_period(token, start_date, end_date, timeframe
         cprint(f"[DEBUG] Min timestamp: {combined_data['timestamp'].min()}", "yellow")
         cprint(f"[DEBUG] Max timestamp: {combined_data['timestamp'].max()}", "yellow")
 
-        # Sort by timestamp and remove duplicates (keep first occurrence)
-        combined_data = combined_data.sort_values('timestamp').drop_duplicates(subset=['timestamp'], keep='first')
+        # Dedup strategy:
+        # - For 1d: dedup by calendar day (day boundary differences across exchanges can create 2 "daily" candles/day).
+        #          Keep the first occurrence based on source priority order.
+        # - For other timeframes: dedup by exact timestamp.
+        if timeframe == '1d':
+            combined_data['day'] = combined_data['timestamp'].dt.floor('D')
+            # Prefer primary source, then fallbacks. Keep one candle per day.
+            combined_data = combined_data.sort_values(['day', '_priority', 'timestamp']).drop_duplicates(subset=['day'], keep='first')
+            # Normalize timestamp to day (00:00) to ensure consistent 1d indexing.
+            combined_data['timestamp'] = combined_data['day']
+            combined_data = combined_data.drop(columns=['day'])
+        else:
+            combined_data = combined_data.sort_values('timestamp').drop_duplicates(subset=['timestamp'], keep='first')
 
         # Reset index
         combined_data = combined_data.reset_index(drop=True)
 
         total_days = (combined_data['timestamp'].max() - combined_data['timestamp'].min()).days if len(combined_data) > 1 else 0
+        sources_used = combined_data['_source'].value_counts().to_dict() if '_source' in combined_data.columns else {}
         cprint(f"\n[MULTI-SOURCE] Combined {len(combined_data)} candles ({total_days} days)", "white", "on_green")
+        if sources_used:
+            cprint(f"[MULTI-SOURCE] Candles kept by source: {sources_used}", "cyan")
+
+        # Drop helper columns
+        for col in ['_source', '_priority']:
+            if col in combined_data.columns:
+                combined_data = combined_data.drop(columns=[col])
 
         return combined_data
     else:
@@ -467,10 +518,10 @@ def collect_specific_period_data(symbol='BTC', start_date=None, end_date=None, t
 
     cprint(f"[SUCCESS] Collected {len(data)} candles from {data['timestamp'].min()} to {data['timestamp'].max()}", "white", "on_green")
 
-    # Output directory and filename (BTC-USD-{timeframe}.csv)
+    # Output directory and filename ({SYMBOL}-USD-{timeframe}.csv)
     output_dir = "src/data/rbi"
     os.makedirs(output_dir, exist_ok=True)
-    output_filename = f"BTC-USD-{timeframe}.csv"
+    output_filename = f"{symbol}-USD-{timeframe}.csv"
     output_path = os.path.join(output_dir, output_filename)
 
     # Save to CSV in the format expected by backtests (overwrites existing file)
@@ -492,8 +543,8 @@ def collect_specific_period_data(symbol='BTC', start_date=None, end_date=None, t
     return data
 
 def main():
-    parser = argparse.ArgumentParser(description='Collect OHLCV data for specific time periods and save as BTC-USD-{timeframe}.csv')
-    parser.add_argument('--symbol', default='BTC', help='Trading symbol (default: BTC)')
+    parser = argparse.ArgumentParser(description='Collect OHLCV data for specific time periods and save as {SYMBOL}-USD-{timeframe}.csv')
+    parser.add_argument('--symbols', default='BTC', help='Comma-separated symbols (default: BTC). Example: BTC,ETH,SOL,BNB,XRP')
     parser.add_argument('--start-date', required=True, help='Start date (YYYY-MM-DD)')
     parser.add_argument('--end-date', required=True, help='End date (YYYY-MM-DD)')
     parser.add_argument('--timeframe', default='1h', help='Timeframe (1m, 5m, 15m, 1h, 4h, 1d)')
@@ -501,20 +552,29 @@ def main():
     args = parser.parse_args()
 
     try:
-        data = collect_specific_period_data(
-            symbol=args.symbol,
-            start_date=args.start_date,
-            end_date=args.end_date,
-            timeframe=args.timeframe
-        )
-
-        if data is not None:
-            cprint(f"\n[COMPLETE] Successfully collected data and saved as BTC-USD-{args.timeframe}.csv!", "white", "on_green")
-            cprint(f"Your TriplexSupertrend strategy is now ready to test in this new market condition.", "green")
-            cprint(f"Run your backtest script to see how the strategy performs in this time period.", "cyan")
-        else:
-            cprint(f"\n[FAILED] Could not collect data for the specified period.", "white", "on_red")
+        symbols = [s.strip().upper() for s in args.symbols.split(',') if s.strip()]
+        if not symbols:
+            cprint("[ERROR] No symbols provided.", "white", "on_red")
             sys.exit(1)
+
+        failures = []
+        for symbol in symbols:
+            data = collect_specific_period_data(
+                symbol=symbol,
+                start_date=args.start_date,
+                end_date=args.end_date,
+                timeframe=args.timeframe
+            )
+            if data is not None:
+                cprint(f"\n[COMPLETE] Successfully collected data and saved as {symbol}-USD-{args.timeframe}.csv!", "white", "on_green")
+            else:
+                failures.append(symbol)
+
+        if failures:
+            cprint(f"\n[FAILED] Could not collect data for: {failures}", "white", "on_red")
+            sys.exit(1)
+        else:
+            cprint(f"\n[COMPLETE] Successfully collected all symbols for timeframe {args.timeframe}.", "white", "on_green")
 
     except KeyboardInterrupt:
         cprint(f"\n[EXIT] Collection interrupted by user", "yellow")
