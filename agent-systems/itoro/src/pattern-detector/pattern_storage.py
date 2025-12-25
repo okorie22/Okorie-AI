@@ -8,6 +8,7 @@ import json
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import os
+import numpy as np
 
 
 class PatternStorage:
@@ -59,37 +60,55 @@ class PatternStorage:
             conn.commit()
             print("[PATTERN STORAGE] Database schema initialized")
     
+    def _convert_booleans_for_json(self, data):
+        """
+        Recursively convert boolean values to integers and handle other non-serializable types for JSON.
+        """
+        if isinstance(data, dict):
+            return {key: self._convert_booleans_for_json(value) for key, value in data.items()}
+        elif isinstance(data, list):
+            return [self._convert_booleans_for_json(item) for item in data]
+        elif isinstance(data, (bool, np.bool_)):  # Handle both Python bool and numpy.bool_
+            return 1 if data else 0
+        elif hasattr(data, 'isoformat'):  # Handle Timestamp and datetime objects
+            return data.isoformat()
+        else:
+            return data
+
     def save_pattern(self, symbol: str, pattern_data: Dict, ai_analysis: str) -> int:
         """
         Save detected pattern to database.
-        
+
         Args:
             symbol: Trading symbol
             pattern_data: Pattern detection data
             ai_analysis: AI-generated analysis
-            
+
         Returns:
             Pattern ID (database row ID)
         """
         try:
+            # Convert all boolean values to integers for JSON serialization
+            pattern_data_json = self._convert_booleans_for_json(pattern_data)
+
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.execute('''
-                    INSERT OR REPLACE INTO patterns 
+                    INSERT OR REPLACE INTO patterns
                     (symbol, pattern, signal, confidence, direction, regime, regime_confidence,
                      timestamp, ohlcv, confirmations, parameters, ai_analysis, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     symbol,
-                    pattern_data['pattern'],
-                    pattern_data['signal'],
-                    pattern_data['confidence'],
-                    pattern_data['direction'],
-                    pattern_data['regime'],
-                    pattern_data['regime_confidence'],
-                    pattern_data['timestamp'].isoformat() if hasattr(pattern_data['timestamp'], 'isoformat') else str(pattern_data['timestamp']),
-                    json.dumps(pattern_data['ohlcv']),
-                    json.dumps(pattern_data['confirmations']),
-                    json.dumps(pattern_data['parameters']),
+                    pattern_data_json['pattern'],
+                    pattern_data_json['signal'],
+                    pattern_data_json['confidence'],
+                    pattern_data_json['direction'],
+                    pattern_data_json['regime'],
+                    pattern_data_json['regime_confidence'],
+                    pattern_data_json['timestamp'].isoformat() if hasattr(pattern_data_json['timestamp'], 'isoformat') else str(pattern_data_json['timestamp']),
+                    json.dumps(pattern_data_json['ohlcv']),
+                    json.dumps(pattern_data_json['confirmations']),
+                    json.dumps(pattern_data_json['parameters']),
                     ai_analysis,
                     datetime.now().isoformat()
                 ))

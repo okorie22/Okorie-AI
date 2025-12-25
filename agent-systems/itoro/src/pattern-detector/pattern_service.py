@@ -9,11 +9,18 @@ import signal
 import sys
 from datetime import datetime
 from typing import List, Dict
+from dotenv import load_dotenv
+
+# Add current directory to Python path for imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pattern_detector import PatternDetector
 from data_fetcher import BinanceDataFetcher
 from alert_system import AlertSystem
 from pattern_storage import PatternStorage
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 class PatternService:
@@ -69,6 +76,10 @@ class PatternService:
         self.scan_count = 0
         self.patterns_detected = 0
         self.last_scan_time = None
+
+        # Pattern alert tracking to prevent duplicate alerts
+        self.alerted_patterns = {}  # {symbol: {pattern_type: timestamp}}
+        self.alert_cooldown_hours = 24  # Don't alert for same pattern within 24 hours
         
         # Signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self.stop)
@@ -76,6 +87,60 @@ class PatternService:
         
         print("\n[PATTERN SERVICE] All components initialized successfully")
         print("="*80 + "\n")
+
+    def _should_alert_for_pattern(self, symbol: str, pattern_type: str) -> bool:
+        """
+        Check if we should send an alert for this pattern.
+        Prevents duplicate alerts for the same pattern within cooldown period.
+
+        Args:
+            symbol: Trading symbol
+            pattern_type: Pattern type (hammer, doji, engulfing, etc.)
+
+        Returns:
+            True if we should send alert, False if already alerted recently
+        """
+        from datetime import datetime, timedelta
+
+        current_time = datetime.now()
+
+        # Initialize symbol tracking if not exists
+        if symbol not in self.alerted_patterns:
+            self.alerted_patterns[symbol] = {}
+
+        # Check if we've alerted for this pattern recently
+        if pattern_type in self.alerted_patterns[symbol]:
+            last_alert_time = self.alerted_patterns[symbol][pattern_type]
+            cooldown_end = last_alert_time + timedelta(hours=self.alert_cooldown_hours)
+
+            if current_time < cooldown_end:
+                # Still in cooldown period, don't alert
+                return False
+
+        # Update alert time and allow alert
+        self.alerted_patterns[symbol][pattern_type] = current_time
+        return True
+
+    def _cleanup_old_alerts(self):
+        """
+        Clean up old alert tracking to prevent memory buildup.
+        Remove alerts older than the cooldown period.
+        """
+        from datetime import datetime, timedelta
+
+        current_time = datetime.now()
+        cutoff_time = current_time - timedelta(hours=self.alert_cooldown_hours)
+
+        for symbol in list(self.alerted_patterns.keys()):
+            symbol_patterns = self.alerted_patterns[symbol]
+            # Remove old patterns
+            self.alerted_patterns[symbol] = {
+                pattern: timestamp for pattern, timestamp in symbol_patterns.items()
+                if timestamp > cutoff_time
+            }
+            # Remove symbol if no patterns left
+            if not self.alerted_patterns[symbol]:
+                del self.alerted_patterns[symbol]
     
     def scan_symbol(self, symbol: str) -> List[Dict]:
         """
@@ -105,19 +170,34 @@ class PatternService:
             
             if detected_patterns:
                 print(f"[SCAN] {symbol} - {len(detected_patterns)} pattern(s) detected")
-                
+
                 # Process each detected pattern
                 for pattern_data in detected_patterns:
-                    # Generate AI analysis and send alerts
-                    alert_result = self.alert_system.send_alert(pattern_data, symbol, include_ai_analysis=True)
-                    
-                    # Store pattern in database
+                    pattern_type = pattern_data['pattern']
+
+                    # Check if we should alert for this pattern (prevent duplicates)
+                    if self._should_alert_for_pattern(symbol, pattern_type):
+                        # Generate AI analysis and send alerts
+                        alert_result = self.alert_system.send_alert(pattern_data, symbol, include_ai_analysis=True)
+                        print(f"[ALERT] Sent alert for {symbol} {pattern_type}")
+                    else:
+                        # Skip alert but still generate basic analysis for storage
+                        alert_result = self.alert_system.send_alert(pattern_data, symbol, include_ai_analysis=False)
+                        alert_result = {
+                            'symbol': symbol,
+                            'pattern_data': pattern_data,
+                            'ai_analysis': f"{pattern_type.upper()} pattern detected ({pattern_data['confidence']:.1%} confidence) - Alert already sent recently",
+                            'alert_timestamp': datetime.now().isoformat()
+                        }
+                        print(f"[SKIP] Alert skipped for {symbol} {pattern_type} (recently alerted)")
+
+                    # Store pattern in database regardless of alert status
                     pattern_id = self.storage.save_pattern(
                         symbol,
                         pattern_data,
                         alert_result['ai_analysis']
                     )
-                    
+
                     if pattern_id > 0:
                         self.patterns_detected += 1
                 
@@ -191,7 +271,10 @@ class PatternService:
                             print(f"  {symbol}: {p['pattern']} ({p['direction']}) - {p['confidence']:.1%}")
                 
                 print(f"{'='*80}")
-                
+
+                # Clean up old alert tracking
+                self._cleanup_old_alerts()
+
                 # Wait for next scan
                 self.last_scan_time = datetime.now()
                 wait_time = max(0, self.scan_interval - scan_duration)
@@ -246,6 +329,14 @@ class PatternService:
             print(f"  Patterns in database: {stats['total_patterns']}")
             print(f"  Average confidence: {stats['average_confidence']:.1%}")
             print(f"  Pattern distribution: {stats['pattern_counts']}")
+
+        # Show alert tracking summary
+        total_tracked_alerts = sum(len(patterns) for patterns in self.alerted_patterns.values())
+        print(f"\n[ALERT TRACKING]")
+        print(f"  Patterns in cooldown: {total_tracked_alerts}")
+        print(f"  Alert cooldown: {self.alert_cooldown_hours} hours")
+        if self.alerted_patterns:
+            print(f"  Tracked symbols: {list(self.alerted_patterns.keys())}")
         
         print("\n[SERVICE] Stopped successfully")
         print("="*80 + "\n")
@@ -269,6 +360,8 @@ class PatternService:
             'symbols': self.symbols,
             'scan_interval': self.scan_interval,
             'data_timeframe': self.data_timeframe,
+            'alerted_patterns': self.alerted_patterns,
+            'alert_cooldown_hours': self.alert_cooldown_hours,
             'database_stats': stats
         }
 
@@ -276,11 +369,11 @@ class PatternService:
 def main():
     """Main entry point for pattern service"""
     print("""
-    ╔══════════════════════════════════════════════════════════════════════╗
-    ║                  SolPattern Detector Service                         ║
-    ║              Real-time Pattern Detection with AI Analysis            ║
-    ║                      86% Historical Win Rate                         ║
-    ╚══════════════════════════════════════════════════════════════════════╝
+    ============================================================================
+                  SolPattern Detector Service
+              Real-time Pattern Detection with AI Analysis
+                      86% Historical Win Rate
+    ============================================================================
     """)
     
     # Configuration (can be moved to config file)
