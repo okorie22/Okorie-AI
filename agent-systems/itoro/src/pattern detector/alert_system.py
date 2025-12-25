@@ -1,0 +1,303 @@
+"""
+Alert System - Pattern Alerts with AI Analysis
+Sends desktop notifications and generates AI-powered analysis using DeepSeek
+"""
+
+import os
+import json
+from datetime import datetime
+from typing import Dict, Optional
+try:
+    from plyer import notification
+    PLYER_AVAILABLE = True
+except ImportError:
+    PLYER_AVAILABLE = False
+    print("[ALERT SYSTEM] Warning: plyer not available, desktop notifications disabled")
+
+from openai import OpenAI
+
+
+class AlertSystem:
+    """
+    Alert system with AI-powered pattern analysis.
+    Uses DeepSeek API for analysis and plyer for desktop notifications.
+    """
+    
+    def __init__(self, deepseek_api_key: Optional[str] = None, enable_desktop_notifications: bool = True):
+        """
+        Initialize alert system.
+        
+        Args:
+            deepseek_api_key: DeepSeek API key (or set DEEPSEEK_KEY env variable)
+            enable_desktop_notifications: Enable/disable desktop notifications
+        """
+        # Get API key from parameter or environment
+        self.api_key = deepseek_api_key or os.getenv('DEEPSEEK_KEY')
+        
+        if not self.api_key:
+            print("[ALERT SYSTEM] Warning: No DeepSeek API key provided")
+            print("[ALERT SYSTEM] Set DEEPSEEK_KEY environment variable or pass api_key parameter")
+            self.ai_enabled = False
+        else:
+            self.ai_enabled = True
+            # Initialize DeepSeek client (OpenAI compatible)
+            self.client = OpenAI(
+                api_key=self.api_key,
+                base_url="https://api.deepseek.com"
+            )
+            print("[ALERT SYSTEM] AI analysis enabled (DeepSeek)")
+        
+        self.enable_desktop_notifications = enable_desktop_notifications and PLYER_AVAILABLE
+        
+        if self.enable_desktop_notifications:
+            print("[ALERT SYSTEM] Desktop notifications enabled")
+        else:
+            print("[ALERT SYSTEM] Desktop notifications disabled")
+        
+        print("[ALERT SYSTEM] Initialized successfully")
+    
+    def generate_ai_analysis(self, pattern_data: Dict, symbol: str) -> str:
+        """
+        Generate AI-powered analysis of the detected pattern.
+        
+        Args:
+            pattern_data: Pattern detection data
+            symbol: Trading symbol
+            
+        Returns:
+            AI-generated analysis (2-3 sentences)
+        """
+        if not self.ai_enabled:
+            return self._generate_fallback_analysis(pattern_data, symbol)
+        
+        try:
+            # Construct analysis prompt
+            prompt = f"""Analyze this {pattern_data['pattern']} pattern detected in {symbol}:
+
+Pattern: {pattern_data['pattern']}
+Direction: {pattern_data['direction'].upper()}
+Confidence: {pattern_data['confidence']:.1%}
+Market Regime: {pattern_data['regime']} (confidence: {pattern_data['regime_confidence']:.1%})
+
+Price Data:
+- Open: ${pattern_data['ohlcv']['open']:.2f}
+- High: ${pattern_data['ohlcv']['high']:.2f}
+- Low: ${pattern_data['ohlcv']['low']:.2f}
+- Close: ${pattern_data['ohlcv']['close']:.2f}
+- Volume: {pattern_data['ohlcv']['volume']:.2f}
+
+Confirmations:
+- Trend: {'Confirmed' if pattern_data['confirmations']['trend'] else 'Not Confirmed'}
+- Momentum: {'Confirmed' if pattern_data['confirmations']['momentum'] else 'Not Confirmed'}
+- Volume: {'Confirmed' if pattern_data['confirmations']['volume'] else 'Not Confirmed'}
+
+Parameters:
+- Stop Loss: {pattern_data['parameters']['stop_loss_pct']*100:.1f}%
+- Profit Target: {pattern_data['parameters']['profit_target_pct']*100:.1f}%
+- Max Holding Period: {pattern_data['parameters']['max_holding_period']} bars
+
+Provide a concise 2-3 sentence trading analysis focusing on:
+1. Pattern strength and reliability
+2. Expected price movement
+3. Key risk/reward considerations"""
+            
+            # Call DeepSeek API
+            response = self.client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[
+                    {"role": "system", "content": "You are an expert trading analyst specializing in technical analysis and candlestick patterns. Provide concise, actionable insights."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=200,
+                temperature=0.7
+            )
+            
+            analysis = response.choices[0].message.content.strip()
+            print(f"[AI ANALYSIS] Generated for {symbol} {pattern_data['pattern']}")
+            return analysis
+            
+        except Exception as e:
+            print(f"[AI ANALYSIS] Error: {e}")
+            return self._generate_fallback_analysis(pattern_data, symbol)
+    
+    def _generate_fallback_analysis(self, pattern_data: Dict, symbol: str) -> str:
+        """
+        Generate basic analysis when AI is not available.
+        
+        Args:
+            pattern_data: Pattern detection data
+            symbol: Trading symbol
+            
+        Returns:
+            Basic pattern analysis
+        """
+        direction = pattern_data['direction'].upper()
+        confidence = pattern_data['confidence']
+        pattern = pattern_data['pattern']
+        regime = pattern_data['regime'].replace('_', ' ').title()
+        
+        analysis = (
+            f"{pattern.upper()} pattern detected in {symbol} with {confidence:.0%} confidence, "
+            f"signaling a {direction} opportunity. Market regime is {regime}. "
+            f"Consider {direction.lower()} entry with stop loss at "
+            f"{pattern_data['parameters']['stop_loss_pct']*100:.1f}% and profit target at "
+            f"{pattern_data['parameters']['profit_target_pct']*100:.1f}%."
+        )
+        
+        return analysis
+    
+    def send_desktop_notification(self, pattern_data: Dict, symbol: str, analysis: str):
+        """
+        Send desktop notification for detected pattern.
+        
+        Args:
+            pattern_data: Pattern detection data
+            symbol: Trading symbol
+            analysis: AI-generated analysis
+        """
+        if not self.enable_desktop_notifications:
+            return
+        
+        try:
+            title = f"Pattern Detected: {symbol}"
+            message = (
+                f"{pattern_data['pattern'].upper()} ({pattern_data['direction'].upper()})\n"
+                f"Confidence: {pattern_data['confidence']:.0%}\n"
+                f"Price: ${pattern_data['ohlcv']['close']:.2f}"
+            )
+            
+            notification.notify(
+                title=title,
+                message=message,
+                app_name="SolPattern Detector",
+                timeout=10
+            )
+            
+            print(f"[DESKTOP NOTIFICATION] Sent for {symbol}")
+            
+        except Exception as e:
+            print(f"[DESKTOP NOTIFICATION] Error: {e}")
+    
+    def send_alert(self, pattern_data: Dict, symbol: str, include_ai_analysis: bool = True) -> Dict:
+        """
+        Send complete alert with AI analysis and notifications.
+        
+        Args:
+            pattern_data: Pattern detection data
+            symbol: Trading symbol
+            include_ai_analysis: Whether to generate AI analysis (default: True)
+            
+        Returns:
+            Dictionary with pattern_data and ai_analysis
+        """
+        # Generate AI analysis
+        if include_ai_analysis:
+            ai_analysis = self.generate_ai_analysis(pattern_data, symbol)
+        else:
+            ai_analysis = self._generate_fallback_analysis(pattern_data, symbol)
+        
+        # Print console alert
+        self._print_console_alert(pattern_data, symbol, ai_analysis)
+        
+        # Send desktop notification
+        self.send_desktop_notification(pattern_data, symbol, ai_analysis)
+        
+        # Return combined data
+        return {
+            'symbol': symbol,
+            'pattern_data': pattern_data,
+            'ai_analysis': ai_analysis,
+            'alert_timestamp': datetime.now().isoformat()
+        }
+    
+    def _print_console_alert(self, pattern_data: Dict, symbol: str, analysis: str):
+        """
+        Print formatted alert to console.
+        
+        Args:
+            pattern_data: Pattern detection data
+            symbol: Trading symbol
+            analysis: AI-generated analysis
+        """
+        print("\n" + "="*80)
+        print(f"PATTERN ALERT: {symbol}")
+        print("="*80)
+        print(f"Pattern: {pattern_data['pattern'].upper()}")
+        print(f"Direction: {pattern_data['direction'].upper()}")
+        print(f"Signal: {pattern_data['signal']}")
+        print(f"Confidence: {pattern_data['confidence']:.1%}")
+        print(f"Regime: {pattern_data['regime']} ({pattern_data['regime_confidence']:.1%})")
+        print(f"\nPrice: ${pattern_data['ohlcv']['close']:.2f}")
+        print(f"Time: {pattern_data['timestamp']}")
+        print(f"\nConfirmations:")
+        print(f"  Trend: {pattern_data['confirmations']['trend']}")
+        print(f"  Momentum: {pattern_data['confirmations']['momentum']}")
+        print(f"  Volume: {pattern_data['confirmations']['volume']}")
+        print(f"\nParameters:")
+        print(f"  Stop Loss: {pattern_data['parameters']['stop_loss_pct']*100:.1f}%")
+        print(f"  Profit Target: {pattern_data['parameters']['profit_target_pct']*100:.1f}%")
+        print(f"  Trailing Activation: {pattern_data['parameters']['trailing_activation_pct']*100:.1f}%")
+        print(f"  Max Hold: {pattern_data['parameters']['max_holding_period']} bars")
+        print(f"\n[AI ANALYSIS]")
+        print(f"{analysis}")
+        print("="*80 + "\n")
+    
+    def send_email_alert(self, pattern_data: Dict, symbol: str, analysis: str, email_address: str):
+        """
+        Send email alert (placeholder for future implementation).
+        
+        Args:
+            pattern_data: Pattern detection data
+            symbol: Trading symbol
+            analysis: AI-generated analysis
+            email_address: Recipient email address
+        """
+        # Placeholder for email functionality
+        print(f"[EMAIL ALERT] Email alerts not yet implemented (would send to {email_address})")
+
+
+if __name__ == "__main__":
+    print("="*80)
+    print("ALERT SYSTEM - Manual Test")
+    print("="*80)
+    
+    # Test alert system
+    alert_system = AlertSystem()
+    
+    # Create sample pattern data
+    sample_pattern = {
+        'pattern': 'hammer',
+        'signal': 100,
+        'confidence': 0.85,
+        'direction': 'long',
+        'regime': 'strong_uptrend',
+        'regime_confidence': 0.92,
+        'timestamp': datetime.now(),
+        'ohlcv': {
+            'open': 87500.00,
+            'high': 88000.00,
+            'low': 87200.00,
+            'close': 87800.00,
+            'volume': 1500.50
+        },
+        'confirmations': {
+            'trend': True,
+            'momentum': True,
+            'volume': True
+        },
+        'parameters': {
+            'stop_loss_pct': 0.25,
+            'profit_target_pct': 0.12,
+            'trailing_activation_pct': 0.10,
+            'trailing_offset_pct': 0.08,
+            'min_profit_pct': 0.04,
+            'max_holding_period': 48
+        }
+    }
+    
+    print("\n[TEST] Sending test alert...")
+    result = alert_system.send_alert(sample_pattern, 'BTCUSDT', include_ai_analysis=True)
+    
+    print(f"\n[TEST] Alert sent successfully!")
+    print(f"[TEST] Timestamp: {result['alert_timestamp']}")
+
