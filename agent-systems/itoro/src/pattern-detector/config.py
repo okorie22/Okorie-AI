@@ -26,8 +26,14 @@ class SolPatternConfig:
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
         self.ai_model = os.getenv('AI_MODEL', 'deepseek-chat')
 
-        # Email Settings
-        self.email_enabled = os.getenv('EMAIL_ENABLED', 'true').lower() == 'true'
+        # Discord Settings (Primary notification method)
+        self.discord_enabled = os.getenv('DISCORD_NOTIFICATIONS_ENABLED', 'true').lower() == 'true'
+        self.discord_bot_token = os.getenv('DISCORD_BOT_TOKEN')
+        self.discord_client_id = os.getenv('DISCORD_CLIENT_ID')
+        self.discord_client_secret = os.getenv('DISCORD_CLIENT_SECRET')
+
+        # Email Settings (Fallback only)
+        self.email_enabled = os.getenv('EMAIL_ENABLED', 'false').lower() == 'true'
         self.smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
         self.smtp_port = int(os.getenv('SMTP_PORT', '587'))
         self.email_username = os.getenv('EMAIL_USER')
@@ -37,7 +43,7 @@ class SolPatternConfig:
 
         # Notification Settings
         self.desktop_notifications = os.getenv('DESKTOP_NOTIFICATIONS', 'true').lower() == 'true'
-        self.email_notifications = os.getenv('EMAIL_NOTIFICATIONS', 'true').lower() == 'true'
+        self.discord_notifications = os.getenv('DISCORD_NOTIFICATIONS', 'true').lower() == 'true'
 
         # Trading Settings
         self.symbols = os.getenv('TRADING_SYMBOLS', 'BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT').split(',')
@@ -47,6 +53,23 @@ class SolPatternConfig:
         # System Settings
         self.db_path = os.getenv('DB_PATH', 'patterns.db')
         self.log_level = os.getenv('LOG_LEVEL', 'INFO')
+
+    def get_discord_config(self) -> Dict[str, str]:
+        """Get Discord configuration for bot initialization"""
+        return {
+            'bot_token': self.discord_bot_token,
+            'client_id': self.discord_client_id,
+            'client_secret': self.discord_client_secret,
+            'enabled': self.discord_enabled
+        }
+
+    def get_notification_config(self) -> Dict[str, bool]:
+        """Get notification preferences"""
+        return {
+            'desktop': self.desktop_notifications,
+            'discord': self.discord_notifications,
+            'email': self.email_enabled  # Fallback only
+        }
 
         # Alert Settings
         self.alert_cooldown_hours = int(os.getenv('ALERT_COOLDOWN_HOURS', '24'))

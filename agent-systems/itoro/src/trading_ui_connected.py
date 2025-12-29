@@ -7,11 +7,11 @@ from datetime import datetime, timedelta
 import json
 import random
 
-from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QLabel, QPushButton, QSlider, QComboBox, 
+from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout,
+                             QHBoxLayout, QLabel, QPushButton, QSlider, QComboBox,
                              QLineEdit, QTextEdit, QProgressBar, QFrame, QGridLayout,
                              QSplitter, QGroupBox, QCheckBox, QSpacerItem, QSizePolicy,
-                             QFileDialog, QMessageBox, QDialog, QDialogButtonBox)
+                             QFileDialog, QMessageBox, QDialog, QDialogButtonBox, QScrollArea)
 from PySide6.QtCore import Qt, QTimer, Signal, Slot, QSize, QThread, QObject
 from PySide6.QtGui import QColor, QFont, QPalette, QLinearGradient, QGradient, QPainter, QPen, QBrush
 

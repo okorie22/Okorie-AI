@@ -18,6 +18,7 @@ except ImportError:
     print("[ALERT SYSTEM] Warning: plyer not available, desktop notifications disabled")
 
 from openai import OpenAI
+from discord_bot import get_discord_bot
 
 
 class AlertSystem:
@@ -25,21 +26,22 @@ class AlertSystem:
     Alert system with AI-powered pattern analysis.
     Uses DeepSeek/OpenAI for analysis, plyer for desktop notifications, and SMTP for emails.
     """
-
+    
     def __init__(self, ai_config: Optional[Dict] = None, email_config: Optional[Dict] = None,
-                 enable_desktop_notifications: bool = True):
+                 discord_config: Optional[Dict] = None, enable_desktop_notifications: bool = True):
         """
         Initialize alert system.
-
+        
         Args:
             ai_config: AI provider configuration (from config.py)
             email_config: Email configuration (from config.py)
+            discord_config: Discord configuration (from config.py)
             enable_desktop_notifications: Enable/disable desktop notifications
         """
         # AI Configuration
         self.ai_config = ai_config or {}
         self.ai_enabled = bool(self.ai_config.get('api_key'))
-
+        
         if self.ai_enabled:
             try:
                 self.client = OpenAI(
@@ -49,21 +51,37 @@ class AlertSystem:
                 print(f"[ALERT SYSTEM] AI analysis enabled ({self.ai_config.get('provider', 'unknown')})")
             except Exception as e:
                 print(f"[ALERT SYSTEM] Error initializing AI client: {e}")
-                self.ai_enabled = False
+            self.ai_enabled = False
                 self.client = None
         else:
             self.client = None
             print("[ALERT SYSTEM] Warning: AI analysis disabled - no API key configured")
 
-        # Email Configuration
+        # Discord Configuration (Replacing Email)
+        self.discord_config = discord_config
+        self.discord_enabled = bool(self.discord_config and self.discord_config.get('bot_token'))
+        self.discord_bot = None
+
+        if self.discord_enabled:
+            try:
+                self.discord_bot = get_discord_bot()
+                print("[ALERT SYSTEM] Discord notifications enabled")
+            except Exception as e:
+                print(f"[ALERT SYSTEM] Error initializing Discord bot: {e}")
+                self.discord_enabled = False
+                self.discord_bot = None
+        else:
+            print("[ALERT SYSTEM] Discord notifications disabled - no bot token configured")
+
+        # Email Configuration (Kept for backward compatibility)
         self.email_config = email_config
         self.email_enabled = bool(self.email_config and self.email_config.get('username'))
 
         if self.email_enabled:
-            print("[ALERT SYSTEM] Email alerts enabled")
+            print("[ALERT SYSTEM] Email alerts enabled (fallback)")
         else:
             print("[ALERT SYSTEM] Email alerts disabled")
-
+        
         # Desktop Notifications
         self.enable_desktop_notifications = enable_desktop_notifications and PLYER_AVAILABLE
         if not PLYER_AVAILABLE:
@@ -165,7 +183,7 @@ Provide a concise 2-3 sentence trading analysis focusing on:
         )
         
         return analysis
-
+    
     def send_email_alert(self, pattern_data: Dict, symbol: str, analysis: str):
         """
         Send email alert for pattern detection.
@@ -259,7 +277,8 @@ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         except Exception as e:
             print(f"[DESKTOP NOTIFICATION] Error: {e}")
     
-    def send_alert(self, pattern_data: Dict, symbol: str, include_ai_analysis: bool = True) -> Dict:
+    def send_alert(self, pattern_data: Dict, symbol: str, include_ai_analysis: bool = True,
+                  discord_user_id: Optional[str] = None) -> Dict:
         """
         Send complete alert with AI analysis and notifications.
         
@@ -267,6 +286,7 @@ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             pattern_data: Pattern detection data
             symbol: Trading symbol
             include_ai_analysis: Whether to generate AI analysis (default: True)
+            discord_user_id: Discord user ID for private DM notifications
             
         Returns:
             Dictionary with pattern_data and ai_analysis
@@ -282,17 +302,44 @@ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         
         # Send desktop notification
         self.send_desktop_notification(pattern_data, symbol, ai_analysis)
+        
+        # Send Discord DM (Primary notification method)
+        discord_sent = False
+        if self.discord_enabled and self.discord_bot and discord_user_id:
+            # Add AI analysis to pattern data for Discord embed
+            discord_pattern_data = {**pattern_data, 'ai_analysis': ai_analysis}
 
-        # Send email alert
-        if self.email_enabled and self.email_config:
+            try:
+                # Get event loop for async call
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                discord_sent = loop.run_until_complete(
+                    self.discord_bot.send_pattern_alert(discord_user_id, discord_pattern_data)
+                )
+                loop.close()
+
+                if discord_sent:
+                    print(f"[ALERT] Discord notification sent to user {discord_user_id}")
+                else:
+                    print(f"[ALERT] Discord notification failed for user {discord_user_id}")
+
+            except Exception as e:
+                print(f"[ALERT] Error sending Discord notification: {e}")
+
+        # Send email alert (Fallback only)
+        if self.email_enabled and self.email_config and not discord_sent:
             self.send_email_alert(pattern_data, symbol, ai_analysis)
+            print("[ALERT] Fallback to email notification")
 
         # Return combined data
         return {
             'symbol': symbol,
             'pattern_data': pattern_data,
             'ai_analysis': ai_analysis,
-            'alert_timestamp': datetime.now().isoformat()
+            'alert_timestamp': datetime.now().isoformat(),
+            'discord_sent': discord_sent,
+            'discord_user_id': discord_user_id
         }
     
     def _print_console_alert(self, pattern_data: Dict, symbol: str, analysis: str):

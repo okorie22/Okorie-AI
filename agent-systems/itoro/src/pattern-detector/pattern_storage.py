@@ -50,13 +50,28 @@ class PatternStorage:
                     UNIQUE(symbol, timestamp, pattern)
                 )
             ''')
-            
+
+            # Alert tracking table to remember when patterns were last alerted
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS alert_tracking (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT NOT NULL,
+                    pattern_type TEXT NOT NULL,
+                    last_alert_timestamp TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(symbol, pattern_type)
+                )
+            ''')
+
             # Create indices for faster queries
             conn.execute('CREATE INDEX IF NOT EXISTS idx_symbol ON patterns(symbol)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON patterns(timestamp)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_created_at ON patterns(created_at)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_pattern ON patterns(pattern)')
-            
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_alert_symbol ON alert_tracking(symbol)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_alert_pattern ON alert_tracking(pattern_type)')
+
             conn.commit()
             print("[PATTERN STORAGE] Database schema initialized")
     
@@ -385,6 +400,66 @@ class PatternStorage:
             
         except Exception as e:
             print(f"[PATTERN STORAGE] Error exporting to CSV: {e}")
+
+    def save_alert_timestamp(self, symbol: str, pattern_type: str, timestamp: datetime) -> bool:
+        """
+        Save the timestamp of when a pattern alert was sent.
+
+        Args:
+            symbol: Trading symbol
+            pattern_type: Pattern name (e.g., 'doji', 'hammer')
+            timestamp: When the alert was sent
+
+        Returns:
+            Success status
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                # Use INSERT OR REPLACE to update existing entries
+                conn.execute('''
+                    INSERT OR REPLACE INTO alert_tracking
+                    (symbol, pattern_type, last_alert_timestamp, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (
+                    symbol,
+                    pattern_type,
+                    timestamp.isoformat(),
+                    datetime.now().isoformat(),
+                    datetime.now().isoformat()
+                ))
+                return True
+        except Exception as e:
+            print(f"[PATTERN STORAGE] Error saving alert timestamp: {e}")
+            return False
+
+    def load_alert_tracking(self) -> Dict[str, Dict[str, datetime]]:
+        """
+        Load all alert tracking data from database.
+
+        Returns:
+            Dictionary mapping symbols to pattern_type -> last_alert_timestamp
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute('''
+                    SELECT symbol, pattern_type, last_alert_timestamp
+                    FROM alert_tracking
+                ''')
+
+                alert_tracking = {}
+                for row in cursor:
+                    symbol, pattern_type, timestamp_str = row
+                    if symbol not in alert_tracking:
+                        alert_tracking[symbol] = {}
+
+                    # Convert ISO string back to datetime
+                    alert_tracking[symbol][pattern_type] = datetime.fromisoformat(timestamp_str)
+
+                return alert_tracking
+
+        except Exception as e:
+            print(f"[PATTERN STORAGE] Error loading alert tracking: {e}")
+            return {}
 
 
 if __name__ == "__main__":

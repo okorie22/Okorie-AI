@@ -75,6 +75,7 @@ class PatternService:
         self.alert_system = AlertSystem(
             ai_config=config.get_ai_config(),
             email_config=config.get_email_config(),
+            discord_config=config.get_discord_config(),
             enable_desktop_notifications=notification_config['desktop']
         )
         self.storage = PatternStorage(db_path=db_path or system_config['db_path'])
@@ -86,15 +87,53 @@ class PatternService:
         self.last_scan_time = None
 
         # Pattern alert tracking to prevent duplicate alerts
-        self.alerted_patterns = {}  # {symbol: {pattern_type: timestamp}}
+        self.alerted_patterns = {}  # Will be loaded from database
         self.alert_cooldown_hours = 24  # Don't alert for same pattern within 24 hours
-        
+
+        # LOAD ALERT STATE FROM DATABASE
+        self._load_alert_state()
+
         # Signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self.stop)
         signal.signal(signal.SIGTERM, self.stop)
         
         print("\n[PATTERN SERVICE] All components initialized successfully")
         print("="*80 + "\n")
+
+    def _get_current_user_discord_id(self) -> Optional[str]:
+        """
+        Get the current user's Discord ID for notifications.
+        This is a placeholder - you'll need to implement proper user session management.
+
+        Returns:
+            Discord user ID string or None
+        """
+        # TODO: Implement proper user session management
+        # For now, check if there's a stored Discord ID in a config file
+        try:
+            # Check for user-specific Discord ID storage
+            import sqlite3
+            with sqlite3.connect('discord_users.db') as conn:
+                # This assumes a single user for now
+                cursor = conn.execute(
+                    'SELECT discord_user_id FROM discord_users WHERE enabled = 1 LIMIT 1'
+                )
+                result = cursor.fetchone()
+                return result[0] if result else None
+        except Exception as e:
+            print(f"[DISCORD] Error getting user Discord ID: {e}")
+            return None
+
+    def _load_alert_state(self):
+        """Load previous alert tracking from database to prevent duplicate alerts across restarts"""
+        try:
+            alert_tracking = self.storage.load_alert_tracking()
+            self.alerted_patterns = alert_tracking
+            alert_count = sum(len(patterns) for patterns in alert_tracking.values())
+            print(f"[ALERT TRACKING] Loaded {alert_count} alert timestamps from database")
+        except Exception as e:
+            print(f"[ALERT TRACKING] Error loading alert state: {e}")
+            self.alerted_patterns = {}
 
     def _should_alert_for_pattern(self, symbol: str, pattern_type: str) -> bool:
         """
@@ -185,9 +224,20 @@ class PatternService:
 
                     # Check if we should alert for this pattern (prevent duplicates)
                     if self._should_alert_for_pattern(symbol, pattern_type):
+                        # Get Discord user ID for notifications (you'll need to implement user session management)
+                        discord_user_id = self._get_current_user_discord_id()
+
                         # Generate AI analysis and send alerts
-                        alert_result = self.alert_system.send_alert(pattern_data, symbol, include_ai_analysis=True)
+                        alert_result = self.alert_system.send_alert(
+                            pattern_data,
+                            symbol,
+                            include_ai_analysis=True,
+                            discord_user_id=discord_user_id
+                        )
                         print(f"[ALERT] Sent alert for {symbol} {pattern_type}")
+
+                        # SAVE ALERT TIMESTAMP TO DATABASE
+                        self.storage.save_alert_timestamp(symbol, pattern_type, datetime.now())
                     else:
                         # Skip alert - only generate AI analysis for storage (NO notifications)
                         ai_analysis = self.alert_system.generate_ai_analysis(pattern_data, symbol) if self.alert_system.ai_enabled else f"{pattern_type.upper()} pattern detected ({pattern_data['confidence']:.1%} confidence) - Alert already sent recently"
