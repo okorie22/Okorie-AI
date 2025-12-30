@@ -51,7 +51,7 @@ class AlertSystem:
                 print(f"[ALERT SYSTEM] AI analysis enabled ({self.ai_config.get('provider', 'unknown')})")
             except Exception as e:
                 print(f"[ALERT SYSTEM] Error initializing AI client: {e}")
-            self.ai_enabled = False
+                self.ai_enabled = False
                 self.client = None
         else:
             self.client = None

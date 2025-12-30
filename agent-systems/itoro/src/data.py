@@ -176,16 +176,12 @@ load_dotenv(env_path)
 # Import configuration
 from src.config import (
     CHART_ANALYSIS_INTERVAL_MINUTES,
-    WHALE_UPDATE_INTERVAL_HOURS,
-    TOKEN_ONCHAIN_UPDATE_INTERVAL_MINUTES,
-    TOKEN_ONCHAIN_ENABLED,
     OI_CHECK_INTERVAL_HOURS,
     FUNDING_CHECK_INTERVAL_MINUTES
 )
 
 # Import agents
 from src.agents.chartanalysis_agent import ChartAnalysisAgent
-from src.agents.whale_agent import WhaleAgent
 from src.agents.oi_agent import OIAgent
 from src.agents.funding_agent import FundingAgent
 
@@ -195,7 +191,7 @@ logger = logging.getLogger(__name__)
 class MultiAgentScheduler:
     """
     Robust multi-agent scheduler with sequential execution.
-    Agents run in order: OnChain → Chart Analysis → Whale, ensuring organized execution.
+    Agents run in order: OI → Funding → Chart Analysis, ensuring organized execution.
     """
     
     def __init__(self, silent_init=False):
@@ -219,30 +215,10 @@ class MultiAgentScheduler:
     def _initialize_agents(self):
         """Initialize all agents with their execution methods and intervals"""
         try:
-            # Define agent execution order: OI -> Funding -> OnChain -> Chart Analysis -> Whale
-            if TOKEN_ONCHAIN_ENABLED:
-                self.agent_execution_order = ['oi', 'funding', 'onchain', 'chartanalysis', 'whale']
-            else:
-                self.agent_execution_order = ['oi', 'funding', 'chartanalysis', 'whale']
+            # Define agent execution order: OI -> Funding -> Chart Analysis
+            self.agent_execution_order = ['oi', 'funding', 'chartanalysis']
             
-            # OnChain Agent - runs every hour (THIRD)
-            if TOKEN_ONCHAIN_ENABLED:
-                from src.agents.onchain_agent import OnChainAgent
-                onchain_agent = OnChainAgent()
-                self.agents['onchain'] = {
-                    'instance': onchain_agent,
-                    'interval_minutes': TOKEN_ONCHAIN_UPDATE_INTERVAL_MINUTES,
-                    'last_run': None,
-                    'next_run': datetime.now() + timedelta(minutes=30),  # Start 30 minutes after launch
-                    'execution_method': self._execute_onchain_analysis,
-                    'status': 'idle',
-                    'error_count': 0,
-                    'max_retries': 3,
-                    'max_runtime_minutes': 10,
-                    'order': 3
-                }
-            
-            # Chart Analysis Agent - runs every hour (FOURTH)
+            # Chart Analysis Agent - runs every hour (THIRD)
             chart_agent = ChartAnalysisAgent()
             self.agents['chartanalysis'] = {
                 'instance': chart_agent,
@@ -254,22 +230,7 @@ class MultiAgentScheduler:
                 'error_count': 0,
                 'max_retries': 3,
                 'max_runtime_minutes': 5,  # 5 minutes timeout
-                'order': 4
-            }
-            
-            # Whale Agent - runs every 48 hours (FIFTH)
-            whale_agent = WhaleAgent()
-            self.agents['whale'] = {
-                'instance': whale_agent,
-                'interval_minutes': WHALE_UPDATE_INTERVAL_HOURS * 60,  # Convert hours to minutes
-                'last_run': None,
-                'next_run': datetime.now() + timedelta(minutes=60),  # Start 60 minutes after launch
-                'execution_method': self._execute_whale_analysis,
-                'status': 'idle',
-                'error_count': 0,
-                'max_retries': 3,
-                'max_runtime_minutes': 15,  # 15 minutes timeout
-                'order': 5
+                'order': 3
             }
             
             # OI Agent - runs every 4 hours (FIRST)
@@ -337,34 +298,6 @@ class MultiAgentScheduler:
             logger.error(traceback.format_exc())
             return False
     
-    def _execute_whale_analysis(self, agent_info: Dict) -> bool:
-        """Execute whale analysis agent with proper error handling"""
-        try:
-            logger.info("🐋 Starting Whale Analysis Agent execution...")
-            start_time = time.time()
-            
-            # Execute the agent (whale agent has async run method)
-            import asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                # Use execute_now() for single execution instead of run() which loops indefinitely
-                success = loop.run_until_complete(agent_info['instance'].execute_now())
-            finally:
-                loop.close()
-            
-            execution_time = time.time() - start_time
-            if success:
-                logger.info(f"✅ Whale Analysis Agent completed successfully in {execution_time:.2f} seconds")
-            else:
-                logger.error(f"❌ Whale Analysis Agent failed in {execution_time:.2f} seconds")
-            return success
-            
-        except Exception as e:
-            logger.error(f"❌ Whale Analysis Agent execution failed: {str(e)}")
-            logger.error(traceback.format_exc())
-            return False
-    
     def _execute_oi_analysis(self, agent_info: Dict) -> bool:
         """Execute OI agent with proper error handling"""
         try:
@@ -398,23 +331,6 @@ class MultiAgentScheduler:
             
         except Exception as e:
             logger.error(f"❌ Funding Agent execution failed: {str(e)}")
-            logger.error(traceback.format_exc())
-            return False
-    
-    def _execute_onchain_analysis(self, agent_info: Dict) -> bool:
-        """Execute on-chain data agent"""
-        try:
-            logger.info("\033[0;34m🔗 Starting OnChain Agent execution...\033[0m")
-            start_time = time.time()
-            
-            agent_info['instance'].run_single_cycle()
-            
-            execution_time = time.time() - start_time
-            logger.info(f"\033[0;34m✅ OnChain Agent completed in {execution_time:.2f}s\033[0m")
-            return True
-            
-        except Exception as e:
-            logger.error(f"\033[0;34m❌ OnChain Agent failed: {str(e)}\033[0m")
             logger.error(traceback.format_exc())
             return False
     

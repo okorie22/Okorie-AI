@@ -8,8 +8,21 @@ import time
 import signal
 import sys
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Optional
 from dotenv import load_dotenv
+
+# Qt imports for signal support
+try:
+    from PySide6.QtCore import QObject, Signal
+    QT_AVAILABLE = True
+except ImportError:
+    QT_AVAILABLE = False
+    # Create dummy classes for when Qt is not available
+    class QObject:
+        pass
+    class Signal:
+        def __init__(self, *args):
+            pass
 
 # Add current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -18,17 +31,21 @@ from pattern_detector import PatternDetector
 from data_fetcher import BinanceDataFetcher
 from alert_system import AlertSystem
 from pattern_storage import PatternStorage
+from data_reader import DataReader
 from config import config
 
 # Load environment variables from .env file
 load_dotenv()
 
 
-class PatternService:
+class PatternService(QObject):
     """
     Main service orchestrator for pattern detection.
     Coordinates data fetching, pattern detection, alerts, and storage.
     """
+    
+    # Qt Signal for pattern detection events
+    pattern_detected = Signal(dict) if QT_AVAILABLE else None
     
     def __init__(
         self,
@@ -50,6 +67,10 @@ class PatternService:
             enable_desktop_notifications: Enable desktop notifications
             db_path: SQLite database path
         """
+        # Initialize QObject parent if Qt is available
+        if QT_AVAILABLE:
+            super().__init__()
+        
         # Load configuration
         trading_config = config.get_trading_config()
         system_config = config.get_system_config()
@@ -72,6 +93,8 @@ class PatternService:
         
         self.pattern_detector = PatternDetector(ohlcv_history_length=100)
         self.data_fetcher = BinanceDataFetcher()
+        self.data_reader = DataReader()
+        print("[INIT] Data Reader initialized - connected to market data stream")
         self.alert_system = AlertSystem(
             ai_config=config.get_ai_config(),
             email_config=config.get_email_config(),
@@ -135,6 +158,40 @@ class PatternService:
             print(f"[ALERT TRACKING] Error loading alert state: {e}")
             self.alerted_patterns = {}
 
+    def _generate_recommendation(self, pattern_data: Dict, market_context: Dict) -> str:
+        """
+        Generate trading recommendation based on pattern and market context.
+        
+        Args:
+            pattern_data: Detected pattern data
+            market_context: Market data (OI, funding, chart)
+            
+        Returns:
+            Recommendation string
+        """
+        pattern_type = pattern_data.get('pattern', 'Unknown')
+        confidence = pattern_data.get('confidence', 0)
+        
+        # Base recommendation on pattern
+        if pattern_type in ['hammer', 'inverted_hammer', 'bullish_engulfing']:
+            base_rec = "Bullish signal - Consider long positions"
+        elif pattern_type in ['shooting_star', 'hanging_man', 'bearish_engulfing']:
+            base_rec = "Bearish signal - Consider short positions or taking profits"
+        elif pattern_type == 'doji':
+            base_rec = "Indecision signal - Wait for confirmation"
+        else:
+            base_rec = "Pattern detected - Review for trading opportunity"
+        
+        # Add confidence level
+        if confidence > 0.8:
+            conf_str = "High confidence"
+        elif confidence > 0.6:
+            conf_str = "Moderate confidence"
+        else:
+            conf_str = "Low confidence"
+        
+        return f"{base_rec} ({conf_str}: {confidence:.1%})"
+    
     def _should_alert_for_pattern(self, symbol: str, pattern_type: str) -> bool:
         """
         Check if we should send an alert for this pattern.
@@ -209,6 +266,22 @@ class PatternService:
                 print(f"[SCAN] {symbol} - No data available")
                 return []
             
+            # Get market data context from data collection service
+            market_context = self.data_reader.get_all_market_context(symbol)
+            
+            # Log market context availability
+            context_status = []
+            if market_context.get('oi'):
+                context_status.append("OI")
+            if market_context.get('funding'):
+                context_status.append("Funding")
+            if market_context.get('chart'):
+                context_status.append("Chart")
+            if context_status:
+                print(f"[MARKET DATA] {symbol} - Available: {', '.join(context_status)}")
+            else:
+                print(f"[MARKET DATA] {symbol} - No market context available (data collection may not be running)")
+            
             # Update pattern detector with new data
             self.pattern_detector.update_data(ohlcv_data)
             
@@ -221,23 +294,38 @@ class PatternService:
                 # Process each detected pattern
                 for pattern_data in detected_patterns:
                     pattern_type = pattern_data['pattern']
+                    
+                    # Enhance pattern data with market context
+                    pattern_data['market_context'] = market_context
 
                     # Check if we should alert for this pattern (prevent duplicates)
                     if self._should_alert_for_pattern(symbol, pattern_type):
                         # Get Discord user ID for notifications (you'll need to implement user session management)
                         discord_user_id = self._get_current_user_discord_id()
 
-                        # Generate AI analysis and send alerts
+                        # Generate AI analysis with market context and send alerts
                         alert_result = self.alert_system.send_alert(
                             pattern_data,
                             symbol,
                             include_ai_analysis=True,
                             discord_user_id=discord_user_id
                         )
-                        print(f"[ALERT] Sent alert for {symbol} {pattern_type}")
+                        print(f"[ALERT] Sent alert for {symbol} {pattern_type} (with market context)")
 
                         # SAVE ALERT TIMESTAMP TO DATABASE
                         self.storage.save_alert_timestamp(symbol, pattern_type, datetime.now())
+                        
+                        # Emit signal for UI (if Qt available)
+                        if QT_AVAILABLE and self.pattern_detected:
+                            pattern_ui_data = {
+                                'symbol': symbol,
+                                'pattern_type': pattern_type,
+                                'timeframe': self.data_timeframe,
+                                'ai_analysis': alert_result.get('ai_analysis', 'AI analysis not available'),
+                                'recommendation': self._generate_recommendation(pattern_data, market_context),
+                                'timestamp': datetime.now()
+                            }
+                            self.pattern_detected.emit(pattern_ui_data)
                     else:
                         # Skip alert - only generate AI analysis for storage (NO notifications)
                         ai_analysis = self.alert_system.generate_ai_analysis(pattern_data, symbol) if self.alert_system.ai_enabled else f"{pattern_type.upper()} pattern detected ({pattern_data['confidence']:.1%} confidence) - Alert already sent recently"

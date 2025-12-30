@@ -6,14 +6,25 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import json
 import random
+import time
 
-from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout,
-                             QHBoxLayout, QLabel, QPushButton, QSlider, QComboBox,
+from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, 
+                             QHBoxLayout, QLabel, QPushButton, QSlider, QComboBox, 
                              QLineEdit, QTextEdit, QProgressBar, QFrame, QGridLayout,
                              QSplitter, QGroupBox, QCheckBox, QSpacerItem, QSizePolicy,
                              QFileDialog, QMessageBox, QDialog, QDialogButtonBox, QScrollArea)
 from PySide6.QtCore import Qt, QTimer, Signal, Slot, QSize, QThread, QObject
 from PySide6.QtGui import QColor, QFont, QPalette, QLinearGradient, QGradient, QPainter, QPen, QBrush
+
+# Redis import (optional - graceful degradation if not available)
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+
+# Import strategy runner
+from strategy_runner import StrategyRunner
 
 # Define cyberpunk color scheme
 class CyberpunkColors:
@@ -97,156 +108,193 @@ class ConsoleOutput(QTextEdit):
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.append(f'<span style="color:{color};">[{timestamp}] {message}</span>')
 
-class PortfolioVisualization(QWidget):
+class AIAnalysisConsole(QTextEdit):
+    """Console for displaying AI pattern analysis and recommendations"""
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setReadOnly(True)
         self.setMinimumHeight(300)
-        self.tokens = []
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update)
-        self.timer.start(50)  # Update every 50ms for animation
-        self.animation_offset = 0
+        self.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: #0A0A0A;
+                color: {CyberpunkColors.TEXT_LIGHT};
+                border: 2px solid {CyberpunkColors.TERTIARY};
+                font-family: 'Share Tech Mono', monospace;
+                padding: 15px;
+                font-size: 13px;
+            }}
+        """)
+        
+        # Add welcome message
+        self.append_welcome_message()
+    
+    def append_welcome_message(self):
+        """Display welcome message"""
+        html = f"""
+        <div style="color: {CyberpunkColors.TERTIARY}; text-align: center; padding: 20px;">
+            <h2 style="color: {CyberpunkColors.PRIMARY};">AI Pattern Analysis Console</h2>
+            <p>Waiting for pattern detection to start...</p>
+            <p style="color: {CyberpunkColors.TERTIARY}; font-size: 11px;">
+                Use Menu → Strategy → Run Pattern Detection to begin
+            </p>
+        </div>
+        """
+        self.setHtml(html)
+    
+    def display_pattern_analysis(self, pattern_data):
+        """Display a detected pattern with AI analysis"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        
+        html = f"""
+        <div style="border-left: 3px solid {CyberpunkColors.SUCCESS}; padding-left: 10px; margin: 10px 0;">
+            <div style="color: {CyberpunkColors.SUCCESS}; font-weight: bold; font-size: 14px;">
+                [{timestamp}] PATTERN DETECTED: {pattern_data.get('pattern_type', 'Unknown')}
+            </div>
+            <div style="color: {CyberpunkColors.PRIMARY}; margin-top: 5px;">
+                Symbol: {pattern_data.get('symbol', 'N/A')} | Timeframe: {pattern_data.get('timeframe', 'N/A')}
+            </div>
+            <div style="color: {CyberpunkColors.TEXT_LIGHT}; margin-top: 10px;">
+                <strong>AI Analysis:</strong><br/>
+                {pattern_data.get('ai_analysis', 'No analysis available')}
+            </div>
+            <div style="color: {CyberpunkColors.TERTIARY}; margin-top: 10px;">
+                <strong>Recommendation:</strong><br/>
+                {pattern_data.get('recommendation', 'No recommendation available')}
+            </div>
+        </div>
+        """
+        self.append(html)
+        
+        # Auto-scroll to bottom
+        self.verticalScrollBar().setValue(self.verticalScrollBar().maximum())
+        
+        # Limit to last 50 patterns
+        self.limit_content()
+    
+    def limit_content(self, max_patterns=50):
+        """Keep only the last max_patterns patterns"""
+        # This is a simple implementation - counts divs
+        html = self.toHtml()
+        pattern_count = html.count('PATTERN DETECTED:')
+        if pattern_count > max_patterns:
+            # Keep only recent patterns by clearing and showing welcome
+            self.append_welcome_message()
+    
+    def append_message(self, message, message_type="info"):
+        """Add a simple message (compatible with console interface)"""
+        color_map = {
+            "info": CyberpunkColors.TEXT_LIGHT,
+            "success": CyberpunkColors.SUCCESS,
+            "warning": CyberpunkColors.WARNING,
+            "error": CyberpunkColors.DANGER,
+        }
+        color = color_map.get(message_type, CyberpunkColors.TEXT_LIGHT)
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        
+        html = f'<div style="color:{color};">[{timestamp}] {message}</div>'
+        self.append(html)
+
+# Legacy compatibility - keep PortfolioVisualization as alias
+class PortfolioVisualization(AIAnalysisConsole):
+    """Legacy compatibility - redirects to AIAnalysisConsole"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
         
     def set_portfolio_data(self, tokens):
-        """
-        Set portfolio data for visualization
-        tokens: list of dicts with keys: name, allocation, performance, volatility
-        """
-        self.tokens = tokens
-        self.update()
-        
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        
-        # Draw background
-        painter.fillRect(self.rect(), QColor(CyberpunkColors.BACKGROUND))
-        
-        # Draw grid lines
-        pen = QPen(QColor(CyberpunkColors.PRIMARY).darker(300))
-        pen.setWidth(1)
-        painter.setPen(pen)
-        
-        # Draw horizontal grid lines
-        for i in range(0, self.height(), 20):
-            painter.drawLine(0, i, self.width(), i)
-            
-        # Draw vertical grid lines
-        for i in range(0, self.width(), 20):
-            painter.drawLine(i, 0, i, self.height())
-            
-        # Draw tokens if we have data
-        if not self.tokens:
-            # Draw placeholder text
-            painter.setPen(QColor(CyberpunkColors.TEXT_LIGHT))
-            painter.setFont(QFont("Rajdhani", 14))
-            painter.drawText(self.rect(), Qt.AlignCenter, "Portfolio Visualization\n(No data available)")
-            return
-            
-        center_x = self.width() / 2
-        center_y = self.height() / 2
-        radius = min(center_x, center_y) * 0.8
-        
-        # Update animation offset
-        self.animation_offset = (self.animation_offset + 1) % 360
-        
-        # Draw central hub
-        hub_radius = 30
-        # Draw hub glow
-        for i in range(3):
-            glow_size = hub_radius + (3-i)*4
-            painter.setPen(Qt.NoPen)
-            glow_color = QColor(CyberpunkColors.PRIMARY)
-            glow_color.setAlpha(50 - i*15)
-            painter.setBrush(QBrush(glow_color))
-            painter.drawEllipse(int(center_x - glow_size/2), int(center_y - glow_size/2), 
-                               int(glow_size), int(glow_size))
-        
-        # Draw hub
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(QColor(CyberpunkColors.PRIMARY)))
-        painter.drawEllipse(int(center_x - hub_radius/2), int(center_y - hub_radius/2), 
-                           int(hub_radius), int(hub_radius))
-        
-        # Draw tokens in a circular pattern
-        angle_step = 360 / len(self.tokens)
-        current_angle = self.animation_offset * 0.1  # Slow rotation
-        
-        for token in self.tokens:
-            # Calculate position
-            x = center_x + radius * 0.8 * math.cos(math.radians(current_angle))
-            y = center_y + radius * 0.8 * math.sin(math.radians(current_angle))
-            
-            # Determine color based on performance
-            if token.get('performance', 0) > 0:
-                color = QColor(CyberpunkColors.SUCCESS)
-            elif token.get('performance', 0) < 0:
-                color = QColor(CyberpunkColors.DANGER)
-            else:
-                color = QColor(CyberpunkColors.PRIMARY)
-                
-            # Determine size based on allocation
-            size = 10 + (token.get('allocation', 1) * 40)
-            
-            # Add pulsing effect based on volatility
-            volatility = token.get('volatility', 0.05)
-            pulse = math.sin(math.radians(self.animation_offset * 4 * volatility)) * 5
-            size += pulse
-            
-            # Draw connection line to center
-            pen = QPen(color.darker(200))
-            pen.setWidth(1)
-            painter.setPen(pen)
-            painter.drawLine(int(center_x), int(center_y), int(x), int(y))
-            
-            # Draw token circle with glow effect
-            # First draw glow
-            for i in range(3):
-                glow_size = size + (3-i)*4
-                painter.setPen(Qt.NoPen)
-                glow_color = QColor(color)
-                glow_color.setAlpha(50 - i*15)
-                painter.setBrush(QBrush(glow_color))
-                painter.drawEllipse(int(x - glow_size/2), int(y - glow_size/2), 
-                                   int(glow_size), int(glow_size))
-            
-            # Then draw main circle
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QBrush(color))
-            painter.drawEllipse(int(x - size/2), int(y - size/2), int(size), int(size))
-            
-            # Draw token name
-            painter.setPen(QColor(CyberpunkColors.TEXT_WHITE))
-            painter.setFont(QFont("Rajdhani", 8, QFont.Bold))
-            text_rect = painter.boundingRect(int(x - 50), int(y + size/2 + 5), 
-                                           100, 20, Qt.AlignCenter, token.get('name', ''))
-            painter.drawText(text_rect, Qt.AlignCenter, token.get('name', ''))
-            
-            # Draw allocation percentage
-            allocation_text = f"{token.get('allocation', 0)*100:.1f}%"
-            perf_text = f"{token.get('performance', 0)*100:+.1f}%"
-            combined_text = f"{allocation_text} ({perf_text})"
-            
-            text_rect = painter.boundingRect(int(x - 50), int(y + size/2 + 25), 
-                                           100, 20, Qt.AlignCenter, combined_text)
-            painter.drawText(text_rect, Qt.AlignCenter, combined_text)
-            
-            current_angle += angle_step
+        """Legacy method for compatibility - converts portfolio data to message"""
+        message = f"Portfolio update: {len(tokens)} tokens"
+        self.append_message(message, "info")
 
-class AgentStatusCard(NeonFrame):
-    def __init__(self, agent_name, color, parent=None):
+class DataUpdateWorker(QObject):
+    """Worker thread for monitoring data updates from Redis"""
+    data_updated = Signal(str, dict)  # data_type, data
+    
+    def __init__(self):
+        super().__init__()
+        self.running = False
+        self.redis_client = None
+        self.pubsub = None
+        # Redis connection moved to run() method to avoid startup errors
+        
+    def run(self):
+        """Run the Redis subscriber loop"""
+        # Try to connect to Redis when data collection is started
+        if REDIS_AVAILABLE:
+            # Retry connecting to Redis up to 5 times with delays
+            max_retries = 5
+            for attempt in range(max_retries):
+                try:
+                    self.redis_client = redis.Redis(
+                        host='localhost',
+                        port=6379,
+                        decode_responses=True,
+                        socket_connect_timeout=3
+                    )
+                    # Test connection
+                    self.redis_client.ping()
+                    self.pubsub = self.redis_client.pubsub()
+                    print("[DATA WORKER] Connected to Redis for real-time updates")
+                    break  # Success, exit retry loop
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        print(f"[DATA WORKER] Redis not ready yet (attempt {attempt + 1}/{max_retries}), waiting...")
+                        time.sleep(2)  # Wait 2 seconds before retry
+                    else:
+                        print(f"[DATA WORKER] Failed to connect to Redis after {max_retries} attempts: {e}")
+                        print("[DATA WORKER] Data collection may not have started properly")
+                        self.redis_client = None
+                        return
+        else:
+            print("[DATA WORKER] Redis library not available")
+            return
+
+        if not self.redis_client or not self.pubsub:
+            print("[DATA WORKER] Redis not available - data updates disabled")
+            return
+        
+        try:
+            # Subscribe to data collection channels
+            self.pubsub.subscribe('oi:updates', 'funding:updates', 'chart:updates')
+            self.running = True
+            print("[DATA WORKER] Listening for data updates...")
+            
+            for message in self.pubsub.listen():
+                if not self.running:
+                    break
+                    
+                if message['type'] == 'message':
+                    try:
+                        channel = message['channel']
+                        data = json.loads(message['data'])
+                        data_type = channel.split(':')[0]  # Extract 'oi', 'funding', or 'chart'
+                        self.data_updated.emit(data_type, data)
+                    except Exception as e:
+                        print(f"[DATA WORKER] Error processing message: {e}")
+                        
+        except Exception as e:
+            print(f"[DATA WORKER] Error in subscriber loop: {e}")
+        finally:
+            if self.pubsub:
+                self.pubsub.close()
+    
+    def stop(self):
+        """Stop the worker"""
+        self.running = False
+        if self.pubsub:
+            self.pubsub.close()
+
+class DataStatusCard(NeonFrame):
+    """Status card for displaying data collection metrics"""
+    def __init__(self, data_type, color, parent=None):
         super().__init__(color, parent)
-        self.agent_name = agent_name
+        self.data_type = data_type
         self.color = QColor(color)
-        self.status = "Inactive"
-        self.last_run = "Never"
-        self.next_run = "Not scheduled"
         
         # Create layout
         layout = QVBoxLayout(self)
         
-        # Agent name header
-        self.name_label = QLabel(agent_name)
+        # Data type header
+        self.name_label = QLabel(data_type)
         self.name_label.setStyleSheet(f"""
             QLabel {{
                 color: {color};
@@ -260,58 +308,35 @@ class AgentStatusCard(NeonFrame):
         # Status indicator
         status_layout = QHBoxLayout()
         status_layout.addWidget(QLabel("Status:"))
-        self.status_label = QLabel(self.status)
-        self.status_label.setStyleSheet(f"color: {CyberpunkColors.DANGER};")
+        self.status_label = QLabel("Idle")
+        self.status_label.setStyleSheet(f"color: {CyberpunkColors.TERTIARY};")
         status_layout.addWidget(self.status_label)
         status_layout.addStretch()
         layout.addLayout(status_layout)
         
-        # Last run
-        last_run_layout = QHBoxLayout()
-        last_run_layout.addWidget(QLabel("Last Run:"))
-        self.last_run_label = QLabel(self.last_run)
-        last_run_layout.addWidget(self.last_run_label)
-        last_run_layout.addStretch()
-        layout.addLayout(last_run_layout)
+        # Last update timestamp
+        update_layout = QHBoxLayout()
+        update_layout.addWidget(QLabel("Last Update:"))
+        self.last_update_label = QLabel("Never")
+        update_layout.addWidget(self.last_update_label)
+        update_layout.addStretch()
+        layout.addLayout(update_layout)
         
-        # Next run
-        next_run_layout = QHBoxLayout()
-        next_run_layout.addWidget(QLabel("Next Run:"))
-        self.next_run_label = QLabel(self.next_run)
-        next_run_layout.addWidget(self.next_run_label)
-        next_run_layout.addStretch()
-        layout.addLayout(next_run_layout)
-        
-        # Progress bar
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setTextVisible(False)
-        self.progress_bar.setStyleSheet(f"""
-            QProgressBar {{
-                background-color: {CyberpunkColors.BACKGROUND};
-                border: 1px solid {color};
-                border-radius: 2px;
-                height: 6px;
-            }}
-            QProgressBar::chunk {{
-                background-color: {color};
+        # Key metrics display
+        metrics_layout = QVBoxLayout()
+        metrics_layout.addWidget(QLabel("Metrics:"))
+        self.metrics_label = QLabel("--")
+        self.metrics_label.setWordWrap(True)
+        self.metrics_label.setStyleSheet(f"""
+            QLabel {{
+                color: {CyberpunkColors.PRIMARY};
+                font-family: 'Share Tech Mono', monospace;
+                font-size: 11px;
+                padding: 5px;
             }}
         """)
-        layout.addWidget(self.progress_bar)
-        
-        # Control buttons
-        button_layout = QHBoxLayout()
-        self.start_button = NeonButton("Start", CyberpunkColors.SUCCESS)
-        self.stop_button = NeonButton("Stop", CyberpunkColors.DANGER)
-        self.stop_button.setEnabled(False)
-        button_layout.addWidget(self.start_button)
-        button_layout.addWidget(self.stop_button)
-        layout.addLayout(button_layout)
-        
-        # Connect signals
-        self.start_button.clicked.connect(self.start_agent)
-        self.stop_button.clicked.connect(self.stop_agent)
+        metrics_layout.addWidget(self.metrics_label)
+        layout.addLayout(metrics_layout)
         
         # Set default styling
         self.setStyleSheet(f"""
@@ -321,70 +346,65 @@ class AgentStatusCard(NeonFrame):
             }}
         """)
         
-    def start_agent(self):
-        self.status = "Active"
-        self.status_label.setText(self.status)
+    def update_data(self, data: dict):
+        """Update card with new data"""
+        # Update status
+        self.status_label.setText("Collecting")
         self.status_label.setStyleSheet(f"color: {CyberpunkColors.SUCCESS};")
-        self.start_button.setEnabled(False)
-        self.stop_button.setEnabled(True)
         
-        # Update last run time
-        self.last_run = datetime.now().strftime("%H:%M:%S")
-        self.last_run_label.setText(self.last_run)
+        # Update last update time
+        self.last_update_label.setText(datetime.now().strftime("%H:%M:%S"))
         
-        # Update next run time (example: 30 minutes from now)
-        next_run_time = datetime.now() + timedelta(minutes=30)
-        self.next_run = next_run_time.strftime("%H:%M:%S")
-        self.next_run_label.setText(self.next_run)
+        # Update metrics based on data type
+        if self.data_type == "Open Interest":
+            metrics_text = f"OI: {data.get('oi', '--')}\nChange: {data.get('oi_change', '--')}%"
+        elif self.data_type == "Funding Rates":
+            metrics_text = f"Rate: {data.get('funding_rate', '--')}%\nNext: {data.get('next_funding', '--')}"
+        elif self.data_type == "Chart Analysis":
+            metrics_text = f"Trend: {data.get('trend', '--')}\nStrength: {data.get('strength', '--')}"
+        else:
+            metrics_text = str(data)
         
-        # Simulate progress
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_progress)
-        self.timer.start(100)
+        self.metrics_label.setText(metrics_text)
+    
+    def set_idle(self):
+        """Set card to idle state"""
+        self.status_label.setText("Idle")
+        self.status_label.setStyleSheet(f"color: {CyberpunkColors.TERTIARY};")
+    
+    def set_error(self, error_msg: str = "Error"):
+        """Set card to error state"""
+        self.status_label.setText(error_msg)
+        self.status_label.setStyleSheet(f"color: {CyberpunkColors.DANGER};")
+
+class AgentStatusCard(DataStatusCard):
+    """Legacy compatibility - redirects to DataStatusCard"""
+    def __init__(self, agent_name, color, parent=None):
+        super().__init__(agent_name, color, parent)
+        self.agent_name = agent_name
+        
+    def start_agent(self):
+        """Legacy method for compatibility"""
+        self.status_label.setText("Active")
+        self.status_label.setStyleSheet(f"color: {CyberpunkColors.SUCCESS};")
         
     def stop_agent(self):
-        self.status = "Inactive"
-        self.status_label.setText(self.status)
-        self.status_label.setStyleSheet(f"color: {CyberpunkColors.DANGER};")
-        self.start_button.setEnabled(True)
-        self.stop_button.setEnabled(False)
+        """Legacy method for compatibility"""
+        self.set_idle()
         
-        # Stop progress timer
-        if hasattr(self, 'timer'):
-            self.timer.stop()
-        self.progress_bar.setValue(0)
-        
-    def update_progress(self):
-        current_value = self.progress_bar.value()
-        if current_value >= 100:
-            self.progress_bar.setValue(0)
-        else:
-            self.progress_bar.setValue(current_value + 1)
-            
     def update_status(self, status_data):
         """Update card with real agent status data"""
         if 'status' in status_data:
-            self.status = status_data['status']
-            self.status_label.setText(self.status)
-            if self.status == "Active":
+            status = status_data['status']
+            self.status_label.setText(status)
+            if status == "Active" or status == "Collecting":
                 self.status_label.setStyleSheet(f"color: {CyberpunkColors.SUCCESS};")
-                self.start_button.setEnabled(False)
-                self.stop_button.setEnabled(True)
             else:
                 self.status_label.setStyleSheet(f"color: {CyberpunkColors.DANGER};")
-                self.start_button.setEnabled(True)
-                self.stop_button.setEnabled(False)
-                
-        if 'last_run' in status_data:
-            self.last_run = status_data['last_run']
-            self.last_run_label.setText(self.last_run)
-            
-        if 'next_run' in status_data:
-            self.next_run = status_data['next_run']
-            self.next_run_label.setText(self.next_run)
-            
-        if 'progress' in status_data:
-            self.progress_bar.setValue(status_data['progress'])
+        
+        # Update with data if available
+        if 'data' in status_data:
+            self.update_data(status_data['data'])
 
 class ConfigEditor(QWidget):
     """Widget for editing configuration values"""
@@ -656,6 +676,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("AI Crypto Trading System")
         self.resize(1200, 800)
         
+        # Create menu bar
+        self.setup_menu_bar()
+        
         # Set application style
         self.setStyleSheet(f"""
             QMainWindow {{
@@ -822,14 +845,18 @@ class MainWindow(QMainWindow):
         agent_cards_layout = QHBoxLayout()
         
         # Create agent cards with different colors
-        self.copybot_card = AgentStatusCard("Copybot Agent", CyberpunkColors.PRIMARY)
-        self.risk_card = AgentStatusCard("Risk Agent", CyberpunkColors.DANGER)
-        self.dca_card = AgentStatusCard("DCA/Staking Agent", CyberpunkColors.SUCCESS)
-        self.chart_card = AgentStatusCard("Chart Analysis Agent", CyberpunkColors.SECONDARY)
+        # Create data collection status cards
+        self.oi_card = DataStatusCard("Open Interest", CyberpunkColors.PRIMARY)
+        self.oi_card.setToolTip("Monitor Open Interest changes across exchanges - indicates market positioning")
         
-        agent_cards_layout.addWidget(self.copybot_card)
-        agent_cards_layout.addWidget(self.risk_card)
-        agent_cards_layout.addWidget(self.dca_card)
+        self.funding_card = DataStatusCard("Funding Rates", CyberpunkColors.SECONDARY)
+        self.funding_card.setToolTip("Track perpetual futures funding rates - indicates market sentiment")
+        
+        self.chart_card = DataStatusCard("Chart Analysis", CyberpunkColors.TERTIARY)
+        self.chart_card.setToolTip("Technical analysis and trend detection - identifies chart patterns")
+        
+        agent_cards_layout.addWidget(self.oi_card)
+        agent_cards_layout.addWidget(self.funding_card)
         agent_cards_layout.addWidget(self.chart_card)
         
         dashboard_layout.addLayout(agent_cards_layout)
@@ -845,6 +872,38 @@ class MainWindow(QMainWindow):
         self.config_editor = ConfigEditor(self.config_data)
         self.config_editor.config_saved.connect(self.save_config)
         config_layout.addWidget(self.config_editor)
+        
+        # Add Data Sources Configuration Group
+        data_sources_group = QGroupBox("Data Collection Sources")
+        data_sources_layout = QVBoxLayout()
+        
+        data_sources_layout.addWidget(QLabel("Select which data sources to monitor:"))
+        
+        self.oi_enabled_checkbox = QCheckBox("Open Interest Data")
+        self.oi_enabled_checkbox.setChecked(True)
+        self.oi_enabled_checkbox.setToolTip("Monitor Open Interest changes across exchanges")
+        
+        self.funding_enabled_checkbox = QCheckBox("Funding Rates")
+        self.funding_enabled_checkbox.setChecked(True)
+        self.funding_enabled_checkbox.setToolTip("Monitor perpetual futures funding rates")
+        
+        self.chart_enabled_checkbox = QCheckBox("Chart Analysis")
+        self.chart_enabled_checkbox.setChecked(True)
+        self.chart_enabled_checkbox.setToolTip("Technical analysis and trend detection")
+        
+        data_sources_layout.addWidget(self.oi_enabled_checkbox)
+        data_sources_layout.addWidget(self.funding_enabled_checkbox)
+        data_sources_layout.addWidget(self.chart_enabled_checkbox)
+        
+        # Add save button for data sources
+        save_data_sources_btn = NeonButton("Apply Data Sources", CyberpunkColors.SUCCESS)
+        save_data_sources_btn.clicked.connect(self.save_data_source_settings)
+        data_sources_layout.addWidget(save_data_sources_btn)
+        
+        data_sources_group.setLayout(data_sources_layout)
+        config_layout.addWidget(data_sources_group)
+        
+        config_layout.addStretch()
         
         # Add configuration tab
         tab_widget.addTab(config_widget, "Configuration")
@@ -899,6 +958,96 @@ class MainWindow(QMainWindow):
         # Setup agent threads
         self.setup_agent_threads()
         
+        # Setup data update worker for real-time market data
+        self.setup_data_worker()
+        
+        # Initialize strategy runner
+        self.strategy_runner = StrategyRunner()
+        self.console.append_message("Strategy runner initialized", "info")
+        
+        # Setup status bar
+        self.setup_status_bar()
+        
+    def setup_status_bar(self):
+        """Setup status bar for service states"""
+        self.status_bar = self.statusBar()
+        self.status_bar.setStyleSheet(f"""
+            QStatusBar {{
+                background-color: {CyberpunkColors.BACKGROUND};
+                color: {CyberpunkColors.TEXT_LIGHT};
+                border-top: 1px solid {CyberpunkColors.PRIMARY};
+            }}
+        """)
+        
+        self.data_status_label = QLabel("Data Collection: Idle")
+        self.data_status_label.setStyleSheet(f"color: {CyberpunkColors.TERTIARY}; padding: 5px;")
+        
+        self.strategy_status_label = QLabel("Strategy: Idle")
+        self.strategy_status_label.setStyleSheet(f"color: {CyberpunkColors.TERTIARY}; padding: 5px;")
+        
+        self.status_bar.addPermanentWidget(self.data_status_label)
+        self.status_bar.addPermanentWidget(self.strategy_status_label)
+        
+    def setup_data_worker(self):
+        """Setup worker thread for monitoring data collection updates"""
+        self.data_worker = DataUpdateWorker()
+        self.data_thread = QThread()
+        self.data_worker.moveToThread(self.data_thread)
+        
+        # Connect signals
+        self.data_worker.data_updated.connect(self.update_data_card)
+        self.data_thread.started.connect(self.data_worker.run)
+        
+        # Don't start automatically - will connect to Redis when data collection is started
+        self.console.append_message("Data monitoring initialized (connects when data collection starts)", "info")
+    
+    def update_data_card(self, data_type: str, data: dict):
+        """Update data status card with new data from Redis"""
+        # Map data type to card
+        card = None
+        if data_type == "oi":
+            card = self.oi_card
+        elif data_type == "funding":
+            card = self.funding_card
+        elif data_type == "chart" or data_type == "chartanalysis":
+            card = self.chart_card
+        
+        if card:
+            card.update_data(data)
+    
+    def save_data_source_settings(self):
+        """Save data source configuration"""
+        settings = {
+            'oi_enabled': self.oi_enabled_checkbox.isChecked(),
+            'funding_enabled': self.funding_enabled_checkbox.isChecked(),
+            'chart_enabled': self.chart_enabled_checkbox.isChecked()
+        }
+        
+        # Update card visibility based on settings
+        if not settings['oi_enabled']:
+            self.oi_card.set_idle()
+            self.oi_card.setVisible(False)
+        else:
+            self.oi_card.setVisible(True)
+            
+        if not settings['funding_enabled']:
+            self.funding_card.set_idle()
+            self.funding_card.setVisible(False)
+        else:
+            self.funding_card.setVisible(True)
+            
+        if not settings['chart_enabled']:
+            self.chart_card.set_idle()
+            self.chart_card.setVisible(False)
+        else:
+            self.chart_card.setVisible(True)
+        
+        # Save to config file if available
+        self.config_data.update(settings)
+        
+        enabled_sources = [k.replace('_enabled', '').upper() for k, v in settings.items() if v]
+        self.console.append_message(f"Data sources updated: {', '.join(enabled_sources)}", "success")
+        
     def load_config(self):
         """Load configuration from file"""
         if not self.config_path:
@@ -937,6 +1086,178 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.console.append_message(f"Error loading configuration: {str(e)}", "error")
             return {}
+    
+    def setup_menu_bar(self):
+        """Setup application menu bar"""
+        menubar = self.menuBar()
+        menubar.setStyleSheet(f"""
+            QMenuBar {{
+                background-color: {CyberpunkColors.BACKGROUND};
+                color: {CyberpunkColors.TEXT_LIGHT};
+                border-bottom: 1px solid {CyberpunkColors.PRIMARY};
+            }}
+            QMenuBar::item {{
+                background-color: transparent;
+                padding: 5px 10px;
+            }}
+            QMenuBar::item:selected {{
+                background-color: {CyberpunkColors.PRIMARY};
+                color: {CyberpunkColors.BACKGROUND};
+            }}
+            QMenu {{
+                background-color: {CyberpunkColors.BACKGROUND};
+                color: {CyberpunkColors.TEXT_LIGHT};
+                border: 1px solid {CyberpunkColors.PRIMARY};
+            }}
+            QMenu::item:selected {{
+                background-color: {CyberpunkColors.PRIMARY};
+                color: {CyberpunkColors.BACKGROUND};
+            }}
+        """)
+        
+        # File menu
+        file_menu = menubar.addMenu('File')
+        exit_action = file_menu.addAction('Exit')
+        exit_action.triggered.connect(self.close)
+        
+        # Data Collection menu
+        data_menu = menubar.addMenu('Data Collection')
+        self.start_data_action = data_menu.addAction('Start Data Collection')
+        self.stop_data_action = data_menu.addAction('Stop Data Collection')
+        self.start_data_action.triggered.connect(self.start_data_collection)
+        self.stop_data_action.triggered.connect(self.stop_data_collection)
+        self.stop_data_action.setEnabled(False)
+        
+        # Strategy menu
+        strategy_menu = menubar.addMenu('Strategy')
+        self.run_pattern_action = strategy_menu.addAction('Run Pattern Detection')
+        self.stop_strategy_action = strategy_menu.addAction('Stop Strategy')
+        self.run_pattern_action.triggered.connect(self.run_pattern_strategy)
+        self.stop_strategy_action.triggered.connect(self.stop_strategy)
+        self.stop_strategy_action.setEnabled(False)
+    
+    def start_data_collection(self):
+        """Start data collection service and monitoring"""
+        import subprocess
+        
+        self.console.append_message("Starting data collection service...", "system")
+        
+        # Start data.py as subprocess
+        data_script = Path(__file__).parent / "data.py"
+        
+        if not data_script.exists():
+            self.console.append_message(f"Error: data.py not found at {data_script}", "error")
+            return
+        
+        try:
+            self.data_process = subprocess.Popen(
+                [sys.executable, str(data_script)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+            )
+            self.console.append_message(f"Data collection service started (PID: {self.data_process.pid})", "success")
+        except Exception as e:
+            self.console.append_message(f"Failed to start data.py: {e}", "error")
+            return
+        
+        # Start the data worker thread if not already running
+        if not self.data_thread.isRunning():
+            self.data_thread.start()
+            self.console.append_message("Data monitoring thread started - connecting to Redis", "success")
+
+        # Update menu states
+        self.start_data_action.setEnabled(False)
+        self.stop_data_action.setEnabled(True)
+
+        # Update data cards to show they're ready
+        self.oi_card.set_idle()
+        self.funding_card.set_idle()
+        self.chart_card.set_idle()
+
+        # Update status bar
+        self.data_status_label.setText("Data Collection: Running")
+        self.data_status_label.setStyleSheet(f"color: {CyberpunkColors.SUCCESS}; padding: 5px;")
+
+        self.console.append_message("Data collection active - monitoring for updates", "info")
+    
+    def stop_data_collection(self):
+        """Stop data collection service"""
+        self.console.append_message("Stopping data collection service...", "warning")
+        
+        # Stop the data.py subprocess
+        if hasattr(self, 'data_process') and self.data_process:
+            try:
+                self.data_process.terminate()
+                self.data_process.wait(timeout=5)
+                self.console.append_message("Data collection service stopped", "info")
+            except Exception as e:
+                self.console.append_message(f"Error stopping data.py: {e}", "error")
+        
+        # Stop the data worker
+        if hasattr(self, 'data_worker'):
+            self.data_worker.stop()
+        
+        # Update menu states
+        self.start_data_action.setEnabled(True)
+        self.stop_data_action.setEnabled(False)
+        
+        # Update status bar
+        self.data_status_label.setText("Data Collection: Idle")
+        self.data_status_label.setStyleSheet(f"color: {CyberpunkColors.TERTIARY}; padding: 5px;")
+        
+        self.console.append_message("Data monitoring stopped", "info")
+    
+    def run_pattern_strategy(self):
+        """Run pattern detection strategy"""
+        self.console.append_message("Starting Pattern Detection strategy...", "system")
+        
+        # Build configuration from settings
+        symbols_str = self.config_data.get('TRADING_SYMBOLS', 'BTCUSDT,ETHUSDT,SOLUSDT')
+        symbols = [s.strip() for s in symbols_str.split(',')]
+        
+        config = {
+            'symbols': symbols,
+            'scan_interval': int(self.config_data.get('SCAN_INTERVAL', 300)),
+            'timeframe': self.config_data.get('TIMEFRAME', '1d')
+        }
+        
+        # Start strategy
+        success, message = self.strategy_runner.start_pattern_detection(config)
+        
+        if success:
+            self.console.append_message(message, "success")
+            self.run_pattern_action.setEnabled(False)
+            self.stop_strategy_action.setEnabled(True)
+            
+            # Update status bar
+            self.strategy_status_label.setText("Strategy: Pattern Detection Running")
+            self.strategy_status_label.setStyleSheet(f"color: {CyberpunkColors.SUCCESS}; padding: 5px;")
+            
+            # Connect pattern detection signal to AI analysis console
+            active_strategy = self.strategy_runner.get_active_strategy()
+            if active_strategy and hasattr(active_strategy, 'pattern_detected'):
+                active_strategy.pattern_detected.connect(self.portfolio_viz.display_pattern_analysis)
+                self.console.append_message("AI Analysis routing connected", "info")
+        else:
+            self.console.append_message(message, "error")
+    
+    def stop_strategy(self):
+        """Stop active strategy"""
+        self.console.append_message("Stopping strategy...", "warning")
+        
+        success, message = self.strategy_runner.stop_strategy()
+        
+        msg_type = "success" if success else "warning"
+        self.console.append_message(message, msg_type)
+        
+        # Update status bar
+        self.strategy_status_label.setText("Strategy: Idle")
+        self.strategy_status_label.setStyleSheet(f"color: {CyberpunkColors.TERTIARY}; padding: 5px;")
+        
+        # Update menu states
+        self.run_pattern_action.setEnabled(True)
+        self.stop_strategy_action.setEnabled(False)
     
     def save_config(self, config_data):
         """Save configuration to file"""
@@ -998,33 +1319,13 @@ class MainWindow(QMainWindow):
         message, msg_type = random.choice(messages)
         self.console.append_message(message, msg_type)
         
-        # Simulate portfolio changes
-        if hasattr(self, 'portfolio_viz') and self.portfolio_viz.tokens:
-            tokens = self.portfolio_viz.tokens
-            for token in tokens:
-                # Randomly adjust performance within a small range
-                perf_change = (random.random() - 0.5) * 0.05
-                token['performance'] = max(-0.5, min(0.5, token['performance'] + perf_change))
-            
-            self.portfolio_viz.set_portfolio_data(tokens)
+        # Portfolio simulation removed - now using AI analysis console instead
+        # The portfolio visualization area is now used for displaying AI pattern analysis
     
     def connect_agent_signals(self):
         """Connect signals for agent cards"""
-        # Copybot agent
-        self.copybot_card.start_button.clicked.connect(lambda: self.start_agent("copybot"))
-        self.copybot_card.stop_button.clicked.connect(lambda: self.stop_agent("copybot"))
-        
-        # Risk agent
-        self.risk_card.start_button.clicked.connect(lambda: self.start_agent("risk"))
-        self.risk_card.stop_button.clicked.connect(lambda: self.stop_agent("risk"))
-        
-        # DCA agent
-        self.dca_card.start_button.clicked.connect(lambda: self.start_agent("dca_staking"))
-        self.dca_card.stop_button.clicked.connect(lambda: self.stop_agent("dca_staking"))
-        
-        # Chart analysis agent
-        self.chart_card.start_button.clicked.connect(lambda: self.start_agent("chart_analysis"))
-        self.chart_card.stop_button.clicked.connect(lambda: self.stop_agent("chart_analysis"))
+        # Data collection cards don't need button connections
+        # They are controlled via menu actions
     
     def setup_agent_threads(self):
         """Setup threads for running agents"""
@@ -1095,14 +1396,13 @@ class MainWindow(QMainWindow):
     
     def update_agent_status(self, agent_name, status_data):
         """Update agent status card"""
+        # Map data collection agent names to cards
         card = None
-        if agent_name == "copybot":
-            card = self.copybot_card
-        elif agent_name == "risk":
-            card = self.risk_card
-        elif agent_name == "dca_staking":
-            card = self.dca_card
-        elif agent_name == "chart_analysis":
+        if agent_name == "oi":
+            card = self.oi_card
+        elif agent_name == "funding":
+            card = self.funding_card
+        elif agent_name == "chartanalysis" or agent_name == "chart_analysis":
             card = self.chart_card
         
         if card:
