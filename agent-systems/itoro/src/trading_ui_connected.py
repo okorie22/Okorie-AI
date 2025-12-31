@@ -8,8 +8,8 @@ import json
 import random
 import time
 
-from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QLabel, QPushButton, QSlider, QComboBox, 
+from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout,
+                             QHBoxLayout, QLabel, QPushButton, QSlider, QComboBox,
                              QLineEdit, QTextEdit, QProgressBar, QFrame, QGridLayout,
                              QSplitter, QGroupBox, QCheckBox, QSpacerItem, QSizePolicy,
                              QFileDialog, QMessageBox, QDialog, QDialogButtonBox, QScrollArea)
@@ -141,6 +141,34 @@ class AIAnalysisConsole(QTextEdit):
         """
         self.setHtml(html)
     
+    def show_running_message(self, symbols, scan_interval, timeframe):
+        """Display message when pattern detection is running"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        symbols_str = ", ".join(symbols)
+        interval_min = scan_interval // 60
+        interval_sec = scan_interval % 60
+        interval_str = f"{interval_min}m {interval_sec}s" if interval_min > 0 else f"{interval_sec}s"
+        
+        html = f"""
+        <div style="color: {CyberpunkColors.SUCCESS}; text-align: center; padding: 20px;">
+            <h2 style="color: {CyberpunkColors.PRIMARY};">AI Pattern Analysis Console</h2>
+            <p style="color: {CyberpunkColors.SUCCESS}; font-size: 14px; font-weight: bold;">
+                ✅ Pattern Detection Active
+            </p>
+            <p style="color: {CyberpunkColors.TEXT_LIGHT}; margin-top: 10px;">
+                Monitoring: <strong style="color: {CyberpunkColors.PRIMARY};">{symbols_str}</strong>
+            </p>
+            <p style="color: {CyberpunkColors.TEXT_LIGHT};">
+                Scan Interval: <strong style="color: {CyberpunkColors.PRIMARY};">{interval_str}</strong> | 
+                Timeframe: <strong style="color: {CyberpunkColors.PRIMARY};">{timeframe}</strong>
+            </p>
+            <p style="color: {CyberpunkColors.TERTIARY}; font-size: 11px; margin-top: 15px;">
+                Waiting for patterns to be detected...
+            </p>
+        </div>
+        """
+        self.setHtml(html)
+        
     def display_pattern_analysis(self, pattern_data):
         """Display a detected pattern with AI analysis"""
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -239,7 +267,7 @@ class DataUpdateWorker(QObject):
                     if attempt < max_retries - 1:
                         print(f"[DATA WORKER] Redis not ready yet (attempt {attempt + 1}/{max_retries}), waiting...")
                         time.sleep(2)  # Wait 2 seconds before retry
-                    else:
+            else:
                         print(f"[DATA WORKER] Failed to connect to Redis after {max_retries} attempts: {e}")
                         print("[DATA WORKER] Data collection may not have started properly")
                         self.redis_client = None
@@ -314,14 +342,6 @@ class DataStatusCard(NeonFrame):
         status_layout.addStretch()
         layout.addLayout(status_layout)
         
-        # Last update timestamp
-        update_layout = QHBoxLayout()
-        update_layout.addWidget(QLabel("Last Update:"))
-        self.last_update_label = QLabel("Never")
-        update_layout.addWidget(self.last_update_label)
-        update_layout.addStretch()
-        layout.addLayout(update_layout)
-        
         # Key metrics display
         metrics_layout = QVBoxLayout()
         metrics_layout.addWidget(QLabel("Metrics:"))
@@ -348,30 +368,85 @@ class DataStatusCard(NeonFrame):
         
     def update_data(self, data: dict):
         """Update card with new data"""
-        # Update status
-        self.status_label.setText("Collecting")
-        self.status_label.setStyleSheet(f"color: {CyberpunkColors.SUCCESS};")
-        
-        # Update last update time
-        self.last_update_label.setText(datetime.now().strftime("%H:%M:%S"))
+        # Update status based on data
+        status = data.get('status', 'active')
+        if status == 'active':
+            self.status_label.setText("Active")
+            self.status_label.setStyleSheet(f"color: {CyberpunkColors.SUCCESS};")
+        elif status == 'error':
+            self.status_label.setText("Error")
+            self.status_label.setStyleSheet(f"color: {CyberpunkColors.DANGER};")
+        else:
+            self.status_label.setText("Collecting")
+            self.status_label.setStyleSheet(f"color: {CyberpunkColors.SUCCESS};")
         
         # Update metrics based on data type
         if self.data_type == "Open Interest":
-            metrics_text = f"OI: {data.get('oi', '--')}\nChange: {data.get('oi_change', '--')}%"
+            alerts = data.get('alerts', '')
+            if alerts and alerts != "No alerts" and alerts.strip():
+                # Parse alerts and format inline: "ADA: -15.4%" -> "ADA -15.4%"
+                alert_lines = alerts.split('\n')
+                # Remove colon and join with commas
+                formatted_alerts = []
+                for alert in alert_lines:
+                    if alert.strip():  # Only process non-empty lines
+                        if ':' in alert:
+                            # Replace ": " with " " to remove colon
+                            formatted_alert = alert.replace(': ', ' ').replace(':', ' ')
+                            formatted_alerts.append(formatted_alert)
+                        else:
+                            formatted_alerts.append(alert)
+                # Join all alerts on one line with commas
+                if formatted_alerts:
+                    metrics_text = ", ".join(formatted_alerts)
+                else:
+                    metrics_text = "NO ALERTS"
+            else:
+                metrics_text = "NO ALERTS"
+            self.metrics_label.setText(metrics_text)
         elif self.data_type == "Funding Rates":
-            metrics_text = f"Rate: {data.get('funding_rate', '--')}%\nNext: {data.get('next_funding', '--')}"
+            alerts = data.get('alerts', '')
+            if alerts and alerts != "No alerts" and alerts.strip():
+                # Parse alerts - format is "MID-RANGE: SUSHI (-2.93%)" or "EXTREME: BTC (5.0%)"
+                # Keep the colon after category, just join with commas
+                alert_lines = alerts.split('\n')
+                formatted_alerts = []
+                for alert in alert_lines:
+                    if alert.strip():  # Only process non-empty lines
+                        formatted_alerts.append(alert.strip())
+                # Join all alerts on one line with commas
+                if formatted_alerts:
+                    metrics_text = ", ".join(formatted_alerts)
+                else:
+                    metrics_text = "NO ALERTS"
+            else:
+                metrics_text = "NO ALERTS"
+            self.metrics_label.setText(metrics_text)
         elif self.data_type == "Chart Analysis":
-            metrics_text = f"Trend: {data.get('trend', '--')}\nStrength: {data.get('strength', '--')}"
+            # Only update if sentiment key exists in data (prevents wrong data type from overwriting)
+            if 'sentiment' in data:
+                sentiment = data.get('sentiment', '--')
+                if sentiment and sentiment != '--' and sentiment != "Analyzing..." and sentiment is not None:
+                    # Show only the sentiment value (BULLISH, BEARISH, NEUTRAL, etc.)
+                    metrics_text = sentiment.upper()
+                elif sentiment == "Analyzing...":
+                    metrics_text = "Analyzing..."
+                else:
+                    metrics_text = "No data"
+                self.metrics_label.setText(metrics_text)
+            # If 'sentiment' key doesn't exist, don't update metrics (preserve existing)
+            # Status and timestamp are already updated above, so just skip metrics update
+            else:
+                return  # Skip metrics update, preserve existing metrics
         else:
             metrics_text = str(data)
-        
-        self.metrics_label.setText(metrics_text)
+            self.metrics_label.setText(metrics_text)
     
     def set_idle(self):
         """Set card to idle state"""
         self.status_label.setText("Idle")
         self.status_label.setStyleSheet(f"color: {CyberpunkColors.TERTIARY};")
-    
+        
     def set_error(self, error_msg: str = "Error"):
         """Set card to error state"""
         self.status_label.setText(error_msg)
@@ -391,7 +466,7 @@ class AgentStatusCard(DataStatusCard):
     def stop_agent(self):
         """Legacy method for compatibility"""
         self.set_idle()
-        
+            
     def update_status(self, status_data):
         """Update card with real agent status data"""
         if 'status' in status_data:
@@ -569,13 +644,7 @@ class AgentWorker(QObject):
             spec.loader.exec_module(module)
             
             # Initialize agent
-            if self.agent_name == "copybot":
-                self.agent = module.CopyBotAgent()
-            elif self.agent_name == "risk":
-                self.agent = module.RiskAgent()
-            elif self.agent_name == "dca_staking":
-                self.agent = module.DCAStakingAgent()
-            elif self.agent_name == "chart_analysis":
+            if self.agent_name == "chart_analysis":
                 self.agent = module.ChartAnalysisAgent()
             
             # Run agent
@@ -618,8 +687,6 @@ class AgentWorker(QObject):
                 self.status_update.emit(self.agent_name, status_data)
                 
                 # Update portfolio data (simulated)
-                if self.agent_name == "risk":
-                    self.update_portfolio_data()
         
         except Exception as e:
             self.console_message.emit(f"Error in {self.agent_name}: {str(e)}", "error")
@@ -855,9 +922,9 @@ class MainWindow(QMainWindow):
         self.chart_card = DataStatusCard("Chart Analysis", CyberpunkColors.TERTIARY)
         self.chart_card.setToolTip("Technical analysis and trend detection - identifies chart patterns")
         
-        agent_cards_layout.addWidget(self.oi_card)
-        agent_cards_layout.addWidget(self.funding_card)
         agent_cards_layout.addWidget(self.chart_card)
+        agent_cards_layout.addWidget(self.funding_card)
+        agent_cards_layout.addWidget(self.oi_card)
         
         dashboard_layout.addLayout(agent_cards_layout)
         
@@ -1003,14 +1070,22 @@ class MainWindow(QMainWindow):
     
     def update_data_card(self, data_type: str, data: dict):
         """Update data status card with new data from Redis"""
-        # Map data type to card
+        # Map data type to card with validation
         card = None
         if data_type == "oi":
             card = self.oi_card
+            # OI data can have 'alerts' or just 'status' (for status-only updates)
+            # The update_data method will handle missing alerts gracefully
         elif data_type == "funding":
             card = self.funding_card
+            # Funding data can have 'alerts' or just 'status' (for status-only updates)
+            # The update_data method will handle missing alerts gracefully
         elif data_type == "chart" or data_type == "chartanalysis":
             card = self.chart_card
+            # Validate: Chart data MUST have 'sentiment' field (not just 'status')
+            # This prevents funding/oi data from overwriting chart metrics
+            if 'sentiment' not in data:
+                return  # Don't update if data doesn't have sentiment field
         
         if card:
             card.update_data(data)
@@ -1150,13 +1225,23 @@ class MainWindow(QMainWindow):
             return
         
         try:
-            self.data_process = subprocess.Popen(
-                [sys.executable, str(data_script)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
-            )
+            # Create log files for subprocess output
+            import datetime
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            stdout_log = Path(__file__).parent / f"data_collection_stdout_{timestamp}.log"
+            stderr_log = Path(__file__).parent / f"data_collection_stderr_{timestamp}.log"
+
+            with open(stdout_log, 'w') as stdout_file, open(stderr_log, 'w') as stderr_file:
+                self.data_process = subprocess.Popen(
+                    [sys.executable, str(data_script)],
+                    stdout=stdout_file,
+                    stderr=stderr_file,
+                    cwd=Path(__file__).parent,  # Set working directory to src/
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                )
+
             self.console.append_message(f"Data collection service started (PID: {self.data_process.pid})", "success")
+            self.console.append_message(f"Logs: stdout={stdout_log.name}, stderr={stderr_log.name}", "info")
         except Exception as e:
             self.console.append_message(f"Failed to start data.py: {e}", "error")
             return
@@ -1234,6 +1319,13 @@ class MainWindow(QMainWindow):
             self.strategy_status_label.setText("Strategy: Pattern Detection Running")
             self.strategy_status_label.setStyleSheet(f"color: {CyberpunkColors.SUCCESS}; padding: 5px;")
             
+            # Update AI Analysis Console to show running status
+            self.portfolio_viz.show_running_message(
+                symbols, 
+                config['scan_interval'], 
+                config['timeframe']
+            )
+            
             # Connect pattern detection signal to AI analysis console
             active_strategy = self.strategy_runner.get_active_strategy()
             if active_strategy and hasattr(active_strategy, 'pattern_detected'):
@@ -1293,15 +1385,9 @@ class MainWindow(QMainWindow):
     
     def initialize_sample_data(self):
         """Initialize with sample data"""
-        # Sample portfolio data
-        sample_tokens = [
-            {"name": "SOL", "allocation": 0.35, "performance": 0.12, "volatility": 0.08},
-            {"name": "BONK", "allocation": 0.15, "performance": 0.25, "volatility": 0.15},
-            {"name": "JTO", "allocation": 0.20, "performance": -0.05, "volatility": 0.10},
-            {"name": "PYTH", "allocation": 0.10, "performance": 0.08, "volatility": 0.05},
-            {"name": "USDC", "allocation": 0.20, "performance": 0.0, "volatility": 0.01}
-        ]
-        self.portfolio_viz.set_portfolio_data(sample_tokens)
+        # REMOVED: No longer initializing portfolio data - this is now the AI Analysis Console
+        # The portfolio visualization has been repurposed for pattern analysis
+        pass
     
     def simulate_updates(self):
         """Simulate real-time updates"""
@@ -1334,9 +1420,6 @@ class MainWindow(QMainWindow):
         
         if self.src_path:
             agent_paths = {
-                "copybot": os.path.join(self.src_path, "agents", "copybot_agent.py"),
-                "risk": os.path.join(self.src_path, "agents", "risk_agent.py"),
-                "dca_staking": os.path.join(self.src_path, "agents", "dca_staking_agent.py"),
                 "chart_analysis": os.path.join(self.src_path, "agents", "chartanalysis_agent.py")
             }
             

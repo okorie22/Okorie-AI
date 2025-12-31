@@ -54,6 +54,11 @@ class SolPatternConfig:
         self.db_path = os.getenv('DB_PATH', 'patterns.db')
         self.log_level = os.getenv('LOG_LEVEL', 'INFO')
 
+        # Alert Settings
+        self.alert_cooldown_hours = int(os.getenv('ALERT_COOLDOWN_HOURS', '24'))
+
+        self._validate_config()
+
     def get_discord_config(self) -> Dict[str, str]:
         """Get Discord configuration for bot initialization"""
         return {
@@ -70,11 +75,6 @@ class SolPatternConfig:
             'discord': self.discord_notifications,
             'email': self.email_enabled  # Fallback only
         }
-
-        # Alert Settings
-        self.alert_cooldown_hours = int(os.getenv('ALERT_COOLDOWN_HOURS', '24'))
-
-        self._validate_config()
 
     def _validate_config(self):
         """Validate configuration and warn about missing required settings."""
@@ -132,13 +132,6 @@ class SolPatternConfig:
             'password': self.email_password,
             'from_email': self.from_email,
             'to_emails': [email.strip() for email in self.alert_emails if email.strip()]
-        }
-
-    def get_notification_config(self) -> Dict:
-        """Get notification settings."""
-        return {
-            'desktop': self.desktop_notifications,
-            'email': self.email_notifications and self.email_enabled
         }
 
     def get_trading_config(self) -> Dict:

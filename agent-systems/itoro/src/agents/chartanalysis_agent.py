@@ -127,7 +127,7 @@ class ChartAnalysisAgent(BaseAgent):
         
         # Initialize Anthropic client with new SDK format
         if anthropic_key:
-            self.client = anthropic.Anthropic()
+            self.client = anthropic.Anthropic(api_key=anthropic_key)
         else:
             raise ValueError("ANTHROPIC_KEY not found in environment variables!")
         

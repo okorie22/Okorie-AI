@@ -5246,7 +5246,7 @@ def get_anthropic_client():
         raise ValueError("ANTHROPIC_KEY not found in environment variables!")
     
     # Initialize client with new SDK format
-    return anthropic.Anthropic()
+    return anthropic.Anthropic(api_key=anthropic_key)
 
 def defi_lend_usdc(amount_usd: float, protocol: str = "solend", slippage: int = 200) -> bool:
     """
