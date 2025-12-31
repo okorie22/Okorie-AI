@@ -976,10 +976,9 @@ class MainWindow(QMainWindow):
         tab_widget.addTab(config_widget, "Configuration")
         
         # Add tabs for each agent
-        tab_widget.addTab(QWidget(), "Copybot")
-        tab_widget.addTab(QWidget(), "Risk Management")
-        tab_widget.addTab(QWidget(), "DCA & Staking")
-        tab_widget.addTab(QWidget(), "Chart Analysis")
+        tab_widget.addTab(QWidget(), "Stats")
+        tab_widget.addTab(QWidget(), "Data")
+        tab_widget.addTab(QWidget(), "Personality")
         
         # Add tab widget to content layout
         content_layout.addWidget(tab_widget)
