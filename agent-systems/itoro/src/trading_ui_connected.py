@@ -1007,11 +1007,9 @@ class MainWindow(QMainWindow):
         # Add initial console messages
         self.console.append_message("🌙 Moon Dev AI Agent Trading System Starting...", "system")
         self.console.append_message("📊 Active Agents and their Intervals:", "system")
-        self.console.append_message("  • Copybot: ✅ ON (Every 30 minutes)", "info")
-        self.console.append_message("  • Risk Management: ✅ ON (Every 10 minutes)", "info")
-        self.console.append_message("  • DCA & Staking: ✅ ON (Every 12 hours)", "info")
-        self.console.append_message("  • Chart Analysis: ✅ ON (Every 4 hours)", "info")
-        self.console.append_message("💓 System heartbeat - All agents running on schedule", "success")
+        # Removed: Detailed agent interval list - now only shows header
+        self.console.append_message("Data monitoring initialized (connects when data collection starts)", "info")
+        self.console.append_message("Strategy runner initialized", "info")
         
         # Setup timer for simulating real-time updates
         self.update_timer = QTimer(self)
@@ -1390,22 +1388,12 @@ class MainWindow(QMainWindow):
     
     def simulate_updates(self):
         """Simulate real-time updates"""
-        # Simulate console updates
-        messages = [
-            ("💓 System heartbeat - All agents running on schedule", "success"),
-            ("📊 Checking market conditions...", "info"),
-            ("💰 Current portfolio balance: $1,245.67", "info"),
-            ("🤖 CopyBot analyzing wallet 0x123...456", "info"),
-            ("⚠️ Risk threshold approaching for JTO position", "warning"),
-            ("✅ DCA purchase complete: Bought 0.25 SOL", "success")
-        ]
-        
-        # Add a random message to console
-        message, msg_type = random.choice(messages)
-        self.console.append_message(message, msg_type)
-        
+        # Removed simulated trading messages - now only real data collection and pattern detection messages appear
+        # The portfolio visualization area is now used for displaying AI pattern analysis
+
         # Portfolio simulation removed - now using AI analysis console instead
         # The portfolio visualization area is now used for displaying AI pattern analysis
+        pass
     
     def connect_agent_signals(self):
         """Connect signals for agent cards"""
