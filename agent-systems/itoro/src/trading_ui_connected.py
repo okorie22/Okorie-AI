@@ -857,7 +857,8 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         
         # Create header
-        header_frame = NeonFrame(CyberpunkColors.PRIMARY)
+        self.header_frame = NeonFrame(CyberpunkColors.PRIMARY)
+        header_frame = self.header_frame
         header_layout = QHBoxLayout(header_frame)
         
         # Logo and title
@@ -887,7 +888,9 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(header_frame)
         
         # Create content splitter (main content and console)
-        content_splitter = QSplitter(Qt.Vertical)
+        self.content_splitter = QSplitter(Qt.Vertical)
+        self.content_splitter.setChildrenCollapsible(False)  # Prevent console from being collapsed
+        content_splitter = self.content_splitter
         
         # Main content area
         content_widget = QWidget()
@@ -985,21 +988,32 @@ class MainWindow(QMainWindow):
         
         # Add content widget to splitter
         content_splitter.addWidget(content_widget)
+        # Set minimum size for content area to prevent it from taking all space
+        content_widget.setMinimumHeight(300)
         
         # Console output
         console_group = QGroupBox("System Console")
         console_layout = QVBoxLayout(console_group)
+        console_layout.setContentsMargins(5, 5, 5, 5)  # Add margins for better spacing
         self.console = ConsoleOutput()
         console_layout.addWidget(self.console)
         
         # Add console to splitter
         content_splitter.addWidget(console_group)
+        # Set minimum and maximum sizes for console to keep it visible but compact
+        console_group.setMinimumHeight(120)  # Reduced minimum height for more compact console
+        console_group.setMaximumHeight(180)  # Reduced maximum height to prevent it from taking too much space
         
-        # Set initial splitter sizes
-        content_splitter.setSizes([600, 200])
+        # Set initial splitter sizes with proper proportions (console should be smaller)
+        content_splitter.setSizes([700, 120])  # Reduced console initial size from 200 to 120
+        # Set stretch factors: content area gets more space (1), console gets less (0)
+        content_splitter.setStretchFactor(0, 1)  # Content area can grow
+        content_splitter.setStretchFactor(1, 0)  # Console maintains its size better
         
         # Add splitter to main layout
         main_layout.addWidget(content_splitter)
+        # Set stretch factor so splitter takes remaining space but respects status bar
+        main_layout.setStretchFactor(content_splitter, 1)
         
         # Initialize with sample data
         self.initialize_sample_data()
@@ -1031,6 +1045,23 @@ class MainWindow(QMainWindow):
         
         # Setup status bar
         self.setup_status_bar()
+    
+    def resizeEvent(self, event):
+        """Handle window resize to maintain proper layout"""
+        super().resizeEvent(event)
+        # Ensure console remains visible by adjusting splitter if needed
+        if hasattr(self, 'console') and hasattr(self, 'content_splitter'):
+            # Get current sizes
+            sizes = self.content_splitter.sizes()
+            if len(sizes) >= 2:
+                # Calculate available height (window height - header - status bar - margins)
+                available_height = self.height() - self.header_frame.height() - self.statusBar().height() - 50
+                # Ensure console has at least minimum height
+                min_console_height = 120  # Match the new minimum height
+                max_content_height = available_height - min_console_height
+                # Adjust if content area is too large
+                if sizes[0] > max_content_height and max_content_height > 0:
+                    self.content_splitter.setSizes([max_content_height, min_console_height])
         
     def setup_status_bar(self):
         """Setup status bar for service states"""
