@@ -449,13 +449,13 @@ class PatternService(QObject):
         
         return results
     
-    def stop(self, signum, frame):
+    def stop(self, signum=None, frame=None):
         """
         Stop the service gracefully.
         
         Args:
-            signum: Signal number
-            frame: Current stack frame
+            signum: Signal number (optional, for signal handler compatibility)
+            frame: Current stack frame (optional, for signal handler compatibility)
         """
         if not self.running:
             return
@@ -487,7 +487,10 @@ class PatternService(QObject):
         print("\n[SERVICE] Stopped successfully")
         print("="*80 + "\n")
         
-        sys.exit(0)
+        # Only call sys.exit(0) if called from signal handler (signum is not None)
+        # Otherwise, just stop the service gracefully
+        if signum is not None:
+            sys.exit(0)
     
     def get_status(self) -> Dict:
         """
