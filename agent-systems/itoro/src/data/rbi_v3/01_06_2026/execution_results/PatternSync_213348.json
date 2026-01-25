@@ -1,0 +1,8 @@
+{
+  "success": false,
+  "return_code": 1,
+  "stdout": "",
+  "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\Top Cash Pawn\\ITORO\\agent-systems\\itoro\\src\\data\\rbi_v3\\01_06_2026\\backtests_package\\PatternSync_PKG.py\", line 3, in <module>\n    from backtesting import Backtest, Strategy\n  File \"C:\\Users\\Top Cash Pawn\\AppData\\Roaming\\Python\\Python311\\site-packages\\backtesting\\__init__.py\", line 68, in <module>\n    from . import lib  # noqa: F401\n    ^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Top Cash Pawn\\AppData\\Roaming\\Python\\Python311\\site-packages\\backtesting\\lib.py\", line 26, in <module>\n    from ._plotting import plot_heatmaps as _plot_heatmaps\n  File \"C:\\Users\\Top Cash Pawn\\AppData\\Roaming\\Python\\Python311\\site-packages\\backtesting\\_plotting.py\", line 15, in <module>\n    from bokeh.colors import RGB\n  File \"C:\\Users\\Top Cash Pawn\\AppData\\Roaming\\Python\\Python311\\site-packages\\bokeh\\__init__.py\", line 97, in <module>\n    from .util import logconfig # isort:skip\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Top Cash Pawn\\AppData\\Roaming\\Python\\Python311\\site-packages\\bokeh\\util\\logconfig.py\", line 42, in <module>\n    from ..settings import settings\n  File \"C:\\Users\\Top Cash Pawn\\AppData\\Roaming\\Python\\Python311\\site-packages\\bokeh\\settings.py\", line 136, in <module>\n    import yaml\nModuleNotFoundError: No module named 'yaml'\n",
+  "execution_time": 8.250782,
+  "timestamp": "2026-01-06T21:33:48.162525"
+}

@@ -1,0 +1,47 @@
+STRATEGY_NAME: PatternSync
+
+STRATEGY_DETAILS:
+This strategy implements a focused candlestick pattern recognition system using TA-Lib's five most reliable reversal patterns. The core approach synchronizes pattern detection with position management to capitalize on daily timeframe reliability.
+
+KEY COMPONENTS:
+1. Pattern Detection: Uses TA-Lib's CDLENGULFING, CDLHAMMER, CDLDOJI, CDLMORNINGSTAR, and CDLEVENINGSTAR functions
+2. Timeframe Optimization: Specifically designed for daily (1d) timeframe where candlestick patterns demonstrate higher statistical reliability
+3. Categorical Selection: Allows parameter-based selection of which patterns to trade
+4. Pattern Interpretation: Patterns return integer values (-100 for bearish reversal, 0 for no pattern, +100 for bullish reversal)
+
+REQUIRED INDICATORS:
+- Open price array
+- High price array  
+- Low price array
+- Close price array
+- All five TA-Lib pattern functions must be calculated using self.I() wrapper
+
+ENTRY RULES:
+LONG positions triggered when:
+1. Selected pattern function returns +100 (bullish reversal signal)
+2. For bearish reversal patterns (Evening Star), entry occurs when pattern equals -100 (indicating completion of bearish pattern, suggesting potential bullish reversal)
+
+EXIT RULES:
+1. Primary: Trailing stop loss activated after +8.4% gain with +3.2% trailing offset
+2. Secondary: Fixed stop loss at -28.8% from entry
+3. Exit when opposite pattern signals (bearish patterns for long positions)
+
+RISK MANAGEMENT:
+1. Position Sizing: 1-3% of total equity per trade
+2. Maximum Drawdown: Strategy shows -28.8% stop loss level
+3. Trailing Stop Configuration:
+   - Activates after +8.4% unrealized gain
+   - Trails at +3.2% offset from highest price
+4. Performance Metrics: +93.6% ROI at 0 bars, +33.2% ROI at 5271 bars
+
+IMPLEMENTATION NOTES:
+1. Pattern functions require OHLC arrays in exact order: Open, High, Low, Close
+2. Use categorical parameters to enable/disable specific patterns
+3. Daily timeframe is critical - patterns on lower timeframes may have reduced reliability
+4. The strategy capitalizes on the high ROI potential (93.6%) while managing risk through strict position sizing and trailing stops
+
+OPTIMIZATION RECOMMENDATIONS:
+1. Consider adding confirmation from volume indicators
+2. Test pattern combinations for improved signal reliability
+3. Adjust trailing stop parameters based on market volatility
+4. Consider adding time-based exits for patterns that don't trigger trailing stops

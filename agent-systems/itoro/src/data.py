@@ -11,18 +11,10 @@ import time
 import logging
 import socket
 import subprocess
-import json
 from datetime import datetime, timedelta
 from typing import Dict
 import traceback
 import concurrent.futures
-
-# Try to import redis for UI updates
-try:
-    import redis
-    REDIS_AVAILABLE = True
-except ImportError:
-    REDIS_AVAILABLE = False
 
 # Hacker/AI Theme Colors
 class ColorTheme:
@@ -184,12 +176,16 @@ load_dotenv(env_path)
 # Import configuration
 from src.config import (
     CHART_ANALYSIS_INTERVAL_MINUTES,
+    WHALE_UPDATE_INTERVAL_HOURS,
+    TOKEN_ONCHAIN_UPDATE_INTERVAL_MINUTES,
+    TOKEN_ONCHAIN_ENABLED,
     OI_CHECK_INTERVAL_HOURS,
     FUNDING_CHECK_INTERVAL_MINUTES
 )
 
 # Import agents
 from src.agents.chartanalysis_agent import ChartAnalysisAgent
+from src.agents.whale_agent import WhaleAgent
 from src.agents.oi_agent import OIAgent
 from src.agents.funding_agent import FundingAgent
 
@@ -199,7 +195,7 @@ logger = logging.getLogger(__name__)
 class MultiAgentScheduler:
     """
     Robust multi-agent scheduler with sequential execution.
-    Agents run in order: OI → Funding → Chart Analysis, ensuring organized execution.
+    Agents run in order: OnChain → Chart Analysis → Whale, ensuring organized execution.
     """
     
     def __init__(self, silent_init=False):
@@ -209,34 +205,6 @@ class MultiAgentScheduler:
         self.agent_status = {}
         self.shutdown_event = threading.Event()
         self.silent_init = silent_init
-        
-        # Initialize Redis client for UI updates
-        self.redis_client = None
-        if REDIS_AVAILABLE:
-            try:
-                self.redis_client = redis.Redis(
-                    host='localhost',
-                    port=6379,
-                    decode_responses=True,
-                    socket_connect_timeout=2
-                )
-                # Test connection
-                self.redis_client.ping()
-                if not silent_init:
-                    logger.info("✅ Redis connected for UI updates")
-            except Exception as e:
-                logger.warning(f"⚠️ Redis not available for UI updates: {e}")
-                self.redis_client = None
-        
-        # Alert collection for UI updates
-        self.recent_alerts = {
-            'oi': [],
-            'funding': [],
-            'chart': []
-        }
-        self.alert_subscriber = None
-        if self.redis_client:
-            self._start_alert_subscriber()
         
         # Initialize agents
         self._initialize_agents()
@@ -251,21 +219,71 @@ class MultiAgentScheduler:
     def _initialize_agents(self):
         """Initialize all agents with their execution methods and intervals"""
         try:
-            # Define agent execution order: Chart Analysis -> Funding -> OI
-            self.agent_execution_order = ['chartanalysis', 'funding', 'oi']
+            # Define agent execution order: OI -> Funding -> OnChain -> Chart Analysis -> Whale
+            if TOKEN_ONCHAIN_ENABLED:
+                self.agent_execution_order = ['oi', 'funding', 'onchain', 'chartanalysis', 'whale']
+            else:
+                self.agent_execution_order = ['oi', 'funding', 'chartanalysis', 'whale']
             
-            # Chart Analysis Agent - runs every hour (FIRST)
+            # OnChain Agent - runs every hour (THIRD)
+            if TOKEN_ONCHAIN_ENABLED:
+                from src.agents.onchain_agent import OnChainAgent
+                onchain_agent = OnChainAgent()
+                self.agents['onchain'] = {
+                    'instance': onchain_agent,
+                    'interval_minutes': TOKEN_ONCHAIN_UPDATE_INTERVAL_MINUTES,
+                    'last_run': None,
+                    'next_run': datetime.now() + timedelta(minutes=30),  # Start 30 minutes after launch
+                    'execution_method': self._execute_onchain_analysis,
+                    'status': 'idle',
+                    'error_count': 0,
+                    'max_retries': 3,
+                    'max_runtime_minutes': 10,
+                    'order': 3
+                }
+            
+            # Chart Analysis Agent - runs every hour (FOURTH)
             chart_agent = ChartAnalysisAgent()
             self.agents['chartanalysis'] = {
                 'instance': chart_agent,
                 'interval_minutes': CHART_ANALYSIS_INTERVAL_MINUTES,
                 'last_run': None,
-                'next_run': datetime.now(),  # Start immediately
+                'next_run': datetime.now() + timedelta(minutes=45),  # Start 45 minutes after launch
                 'execution_method': self._execute_chart_analysis,
                 'status': 'idle',
                 'error_count': 0,
                 'max_retries': 3,
                 'max_runtime_minutes': 5,  # 5 minutes timeout
+                'order': 4
+            }
+            
+            # Whale Agent - runs every 48 hours (FIFTH)
+            whale_agent = WhaleAgent()
+            self.agents['whale'] = {
+                'instance': whale_agent,
+                'interval_minutes': WHALE_UPDATE_INTERVAL_HOURS * 60,  # Convert hours to minutes
+                'last_run': None,
+                'next_run': datetime.now() + timedelta(minutes=60),  # Start 60 minutes after launch
+                'execution_method': self._execute_whale_analysis,
+                'status': 'idle',
+                'error_count': 0,
+                'max_retries': 3,
+                'max_runtime_minutes': 15,  # 15 minutes timeout
+                'order': 5
+            }
+            
+            # OI Agent - runs every 4 hours (FIRST)
+            oi_agent = OIAgent()
+            self.agents['oi'] = {
+                'instance': oi_agent,
+                'interval_minutes': OI_CHECK_INTERVAL_HOURS * 60,  # Convert hours to minutes
+                'last_run': None,
+                'next_run': datetime.now(),  # Start immediately
+                'execution_method': self._execute_oi_analysis,
+                'status': 'idle',
+                'error_count': 0,
+                'max_retries': 3,
+                'max_runtime_minutes': 10,  # 10 minutes timeout
                 'order': 1
             }
             
@@ -275,28 +293,13 @@ class MultiAgentScheduler:
                 'instance': funding_agent,
                 'interval_minutes': FUNDING_CHECK_INTERVAL_MINUTES,  # Already in minutes
                 'last_run': None,
-                'next_run': datetime.now() + timedelta(minutes=1.5),  # Start 1.5 minutes after Chart Analysis
+                'next_run': datetime.now() + timedelta(minutes=15),  # Start 15 minutes after OI
                 'execution_method': self._execute_funding_analysis,
                 'status': 'idle',
                 'error_count': 0,
                 'max_retries': 3,
                 'max_runtime_minutes': 10,  # 10 minutes timeout
                 'order': 2
-            }
-            
-            # OI Agent - runs every 4 hours (THIRD)
-            oi_agent = OIAgent()
-            self.agents['oi'] = {
-                'instance': oi_agent,
-                'interval_minutes': OI_CHECK_INTERVAL_HOURS * 60,  # Convert hours to minutes
-                'last_run': None,
-                'next_run': datetime.now() + timedelta(minutes=3),  # Start 3 minutes after launch (1.5 + 1.5)
-                'execution_method': self._execute_oi_analysis,
-                'status': 'idle',
-                'error_count': 0,
-                'max_retries': 3,
-                'max_runtime_minutes': 10,  # 10 minutes timeout
-                'order': 3
             }
             
             # Initialize locks for each agent
@@ -312,103 +315,6 @@ class MultiAgentScheduler:
             logger.error(traceback.format_exc())
             raise
     
-    def _publish_ui_update(self, channel: str, data: dict):
-        """Publish update to Redis for UI consumption"""
-        if self.redis_client:
-            try:
-                # Add timestamp to data
-                data['timestamp'] = datetime.now().isoformat()
-                # Publish to Redis channel
-                self.redis_client.publish(channel, json.dumps(data))
-            except Exception as e:
-                logger.debug(f"Failed to publish UI update to {channel}: {e}")
-    
-    def _start_alert_subscriber(self):
-        """Subscribe to market_alert channel to collect agent alerts"""
-        try:
-            self.alert_subscriber = self.redis_client.pubsub()
-            self.alert_subscriber.subscribe('market_alert')
-            # Start background thread to process alerts
-            threading.Thread(target=self._process_alerts, daemon=True).start()
-            if not self.silent_init:
-                logger.info("✅ Alert subscriber started for UI updates")
-        except Exception as e:
-            logger.debug(f"Could not start alert subscriber: {e}")
-    
-    def _process_alerts(self):
-        """Process alerts from event bus and store for UI"""
-        try:
-            for message in self.alert_subscriber.listen():
-                if message['type'] == 'message':
-                    try:
-                        # Event bus wraps data in an envelope
-                        envelope = json.loads(message['data'])
-                        # Extract actual alert data from envelope
-                        alert_data = envelope.get('data', envelope)  # Fallback to envelope if no 'data' field
-                        agent_source = alert_data.get('agent_source', '')
-                        
-                        # Store recent alerts (keep last 3 per agent)
-                        if agent_source == 'oi_agent':
-                            alert_summary = self._format_oi_alert(alert_data)
-                            if alert_summary:
-                                self.recent_alerts['oi'].append(alert_summary)
-                                self.recent_alerts['oi'] = self.recent_alerts['oi'][-3:]  # Keep last 3
-                        elif agent_source == 'funding_agent':
-                            alert_summary = self._format_funding_alert(alert_data)
-                            if alert_summary:
-                                self.recent_alerts['funding'].append(alert_summary)
-                                self.recent_alerts['funding'] = self.recent_alerts['funding'][-3:]  # Keep last 3
-                        elif agent_source == 'chartanalysis_agent':
-                            alert_summary = self._format_chart_alert(alert_data)
-                            if alert_summary:
-                                self.recent_alerts['chart'].append(alert_summary)
-                                self.recent_alerts['chart'] = self.recent_alerts['chart'][-3:]
-                    except Exception as e:
-                        logger.debug(f"Error processing alert: {e}")
-        except Exception as e:
-            logger.debug(f"Alert subscriber error: {e}")
-    
-    def _format_oi_alert(self, alert_data):
-        """Format OI alert for UI display"""
-        try:
-            symbol = alert_data.get('symbol', 'N/A')
-            data = alert_data.get('data', {})
-            oi_change = data.get('oi_change_pct', 0)
-            if oi_change != 0:
-                return f"{symbol}: {oi_change:+.1f}%"
-        except Exception:
-            pass
-        return None
-    
-    def _format_funding_alert(self, alert_data):
-        """Format funding alert for UI display - ONLY Extreme and Mid-Range"""
-        try:
-            symbol = alert_data.get('symbol', 'N/A')
-            severity = alert_data.get('severity', '')
-            data = alert_data.get('data', {})
-            annual_rate = data.get('annual_rate', 0)
-            
-            # Severity is an integer: 4=CRITICAL, 2=MEDIUM, 3=HIGH, 1=LOW
-            # Only show EXTREME (CRITICAL=4) and MID-RANGE (MEDIUM=2)
-            # Filter out all others (Normal, Low, High)
-            if severity == 4:  # CRITICAL = EXTREME
-                category = "EXTREME"
-            elif severity == 2:  # MEDIUM = MID-RANGE
-                category = "MID-RANGE"
-            else:
-                # Don't show LOW, HIGH, or any other severity - filter them out
-                return None
-            
-            return f"{category}: {symbol} ({annual_rate:.2f}%)"
-        except Exception:
-            pass
-        return None
-    
-    def _format_chart_alert(self, alert_data):
-        """Format chart alert - will be handled via sentiment cache"""
-        # Chart alerts are handled differently via aggregated sentiment
-        return None
-    
     def _execute_chart_analysis(self, agent_info: Dict) -> bool:
         """Execute chart analysis agent with proper error handling"""
         try:
@@ -421,47 +327,42 @@ class MultiAgentScheduler:
             execution_time = time.time() - start_time
             if success:
                 logger.info(f"✅ Chart Analysis Agent completed successfully in {execution_time:.2f} seconds")
-                
-                # Get sentiment from agent
-                chart_agent = agent_info['instance']
-                sentiment = None
-                score = 0
-                confidence = 0
-                if hasattr(chart_agent, 'aggregated_sentiment_cache') and chart_agent.aggregated_sentiment_cache:
-                    sentiment_data = chart_agent.aggregated_sentiment_cache
-                    sentiment = sentiment_data.get('overall_sentiment', 'Neutral')
-                    score = sentiment_data.get('sentiment_score', 0)
-                    confidence = sentiment_data.get('confidence', 0)
-                else:
-                    sentiment = "Analyzing..."
-                
-                # Publish update to UI
-                self._publish_ui_update('chart:updates', {
-                    'status': 'active',
-                    'execution_time': round(execution_time, 2),
-                    'last_run': datetime.now().strftime("%H:%M:%S"),
-                    'sentiment': sentiment,
-                    'sentiment_score': round(score, 1),
-                    'confidence': round(confidence, 1)
-                })
             else:
                 logger.error(f"❌ Chart Analysis Agent failed in {execution_time:.2f} seconds")
-                # Publish error status
-                self._publish_ui_update('chart:updates', {
-                    'status': 'error',
-                    'error': 'Analysis failed'
-                })
             
             return success
             
         except Exception as e:
             logger.error(f"❌ Chart Analysis Agent execution failed: {str(e)}")
             logger.error(traceback.format_exc())
-            # Publish error status
-            self._publish_ui_update('chart:updates', {
-                'status': 'error',
-                'error': str(e)[:50]  # Truncate error message
-            })
+            return False
+    
+    def _execute_whale_analysis(self, agent_info: Dict) -> bool:
+        """Execute whale analysis agent with proper error handling"""
+        try:
+            logger.info("🐋 Starting Whale Analysis Agent execution...")
+            start_time = time.time()
+            
+            # Execute the agent (whale agent has async run method)
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                # Use execute_now() for single execution instead of run() which loops indefinitely
+                success = loop.run_until_complete(agent_info['instance'].execute_now())
+            finally:
+                loop.close()
+            
+            execution_time = time.time() - start_time
+            if success:
+                logger.info(f"✅ Whale Analysis Agent completed successfully in {execution_time:.2f} seconds")
+            else:
+                logger.error(f"❌ Whale Analysis Agent failed in {execution_time:.2f} seconds")
+            return success
+            
+        except Exception as e:
+            logger.error(f"❌ Whale Analysis Agent execution failed: {str(e)}")
+            logger.error(traceback.format_exc())
             return False
     
     def _execute_oi_analysis(self, agent_info: Dict) -> bool:
@@ -475,35 +376,11 @@ class MultiAgentScheduler:
             
             execution_time = time.time() - start_time
             logger.info(f"✅ OI Agent completed successfully in {execution_time:.2f} seconds")
-            
-            # Wait for alert subscriber to process alerts
-            time.sleep(0.5)
-            
-            # Get recent alerts
-            alerts_text = "\n".join(self.recent_alerts['oi']) if self.recent_alerts['oi'] else "No alerts"
-            
-            # Publish update to UI
-            self._publish_ui_update('oi:updates', {
-                'status': 'active',
-                'execution_time': round(execution_time, 2),
-                'last_run': datetime.now().strftime("%H:%M:%S"),
-                'alerts': alerts_text,
-                'alert_count': len(self.recent_alerts['oi'])
-            })
-            
-            # Clear alerts after publishing
-            self.recent_alerts['oi'] = []
-            
             return True
             
         except Exception as e:
             logger.error(f"❌ OI Agent execution failed: {str(e)}")
             logger.error(traceback.format_exc())
-            # Publish error status
-            self._publish_ui_update('oi:updates', {
-                'status': 'error',
-                'error': str(e)[:50]  # Truncate error message
-            })
             return False
     
     def _execute_funding_analysis(self, agent_info: Dict) -> bool:
@@ -517,35 +394,28 @@ class MultiAgentScheduler:
             
             execution_time = time.time() - start_time
             logger.info(f"✅ Funding Agent completed successfully in {execution_time:.2f} seconds")
-            
-            # Wait for alert subscriber to process alerts
-            time.sleep(0.5)
-            
-            # Get recent alerts
-            alerts_text = "\n".join(self.recent_alerts['funding']) if self.recent_alerts['funding'] else "No alerts"
-            
-            # Publish update to UI
-            self._publish_ui_update('funding:updates', {
-                'status': 'active',
-                'execution_time': round(execution_time, 2),
-                'last_run': datetime.now().strftime("%H:%M:%S"),
-                'alerts': alerts_text,
-                'alert_count': len(self.recent_alerts['funding'])
-            })
-            
-            # Clear alerts after publishing
-            self.recent_alerts['funding'] = []
-            
             return True
             
         except Exception as e:
             logger.error(f"❌ Funding Agent execution failed: {str(e)}")
             logger.error(traceback.format_exc())
-            # Publish error status
-            self._publish_ui_update('funding:updates', {
-                'status': 'error',
-                'error': str(e)[:50]  # Truncate error message
-            })
+            return False
+    
+    def _execute_onchain_analysis(self, agent_info: Dict) -> bool:
+        """Execute on-chain data agent"""
+        try:
+            logger.info("\033[0;34m🔗 Starting OnChain Agent execution...\033[0m")
+            start_time = time.time()
+            
+            agent_info['instance'].run_single_cycle()
+            
+            execution_time = time.time() - start_time
+            logger.info(f"\033[0;34m✅ OnChain Agent completed in {execution_time:.2f}s\033[0m")
+            return True
+            
+        except Exception as e:
+            logger.error(f"\033[0;34m❌ OnChain Agent failed: {str(e)}\033[0m")
+            logger.error(traceback.format_exc())
             return False
     
     def _should_run_agent(self, agent_name: str, agent_info: Dict) -> bool:

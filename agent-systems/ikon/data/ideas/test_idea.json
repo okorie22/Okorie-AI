@@ -1,0 +1,32 @@
+{
+  "idea_id": "test_001",
+  "created_at": 1737705600.0,
+  "topic": "IUL Cash Value Growth Basics",
+  "hook": "Most people don't understand how IUL cash value actually accumulates...",
+  "bullet_points": [
+    "Cash value grows based on index performance",
+    "Participation rates and caps limit gains",
+    "Not a replacement for 401(k) or IRA plans"
+  ],
+  "script": "",
+  "script_final": null,
+  "cta": "Download our free IUL checklist",
+  "disclaimer": "Educational only. Not financial or insurance advice. Consult a licensed professional.",
+  "keywords": ["iul", "cash value", "indexed universal life", "life insurance"],
+  "scores": {
+    "hook_score": 82,
+    "topic_fit_score": 78,
+    "compliance_risk": 15
+  },
+  "status": "ready",
+  "dedupe_key": "iul_basics_test_001",
+  "compliance_result": null,
+  "audio_path": null,
+  "video_path": null,
+  "thumbnail_path": null,
+  "youtube_video_id": null,
+  "youtube_url": null,
+  "published_at": null,
+  "analytics": null,
+  "error_history": []
+}

@@ -435,7 +435,14 @@ def fetch_coingecko_data(token_id, days):
         return None
 import base58
 import csv
-import anthropic
+
+# Optional import for Anthropic AI
+try:
+    import anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    anthropic = None
+    ANTHROPIC_AVAILABLE = False
 
 # Create cache directory
 os.makedirs("src/data/cache", exist_ok=True)
@@ -5237,14 +5244,16 @@ def market_sell_pumpfun(token_address, amount_tokens=None, percent=100, slippage
 
 def get_anthropic_client():
     """Get Anthropic client for AI operations"""
-    import anthropic
+    if not ANTHROPIC_AVAILABLE:
+        raise ImportError("Anthropic library not available. Please install with: pip install anthropic")
+
     import os
-    
+
     # The new SDK expects ANTHROPIC_KEY instead of ANTHROPIC_KEY
     anthropic_key = os.getenv("ANTHROPIC_KEY")
     if not anthropic_key:
         raise ValueError("ANTHROPIC_KEY not found in environment variables!")
-    
+
     # Initialize client with new SDK format
     return anthropic.Anthropic(api_key=anthropic_key)
 

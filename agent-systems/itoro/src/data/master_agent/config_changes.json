@@ -48,5 +48,105 @@
     "agent": "master_agent",
     "confidence": 0.75,
     "category": "data"
+  },
+  {
+    "timestamp": "2026-01-06T21:14:00.925012",
+    "parameter": "COPYBOT_AI_COOLDOWN_SECONDS",
+    "old_value": 300,
+    "new_value": 900,
+    "reason": "The CopyBot agent is likely inactive due to stale whale and sentiment data. Once data freshness improves, we need to optimize its analysis cycle. The range is 60-3600 seconds. A 900-second (15-minute) cooldown is balanced\u2014it allows for substantive new data to accumulate between analyses per token, preventing excessive computation, while being responsive enough to act on emerging whale trends identified by the refreshed data sources.",
+    "agent": "master_agent",
+    "confidence": 0.7,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-06T21:45:05.819362",
+    "parameter": "PAPER_MAX_POSITION_SIZE",
+    "old_value": 200.0,
+    "new_value": 150.0,
+    "reason": "The system is in paper trading with a portfolio value of ~$1006. The goal progress shows a significant monthly gap ($300). To begin closing this gap in a balanced manner, we need to allow meaningful but controlled position sizes. Increasing the maximum position size to $150 (from a likely lower default) enables the system to take positions sized at ~15% of the portfolio, which is substantial enough to impact P&L while remaining within prudent risk limits for a starting system.",
+    "agent": "master_agent",
+    "confidence": 0.8,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-06T22:16:14.559813",
+    "parameter": "RISK_AGENT_COOLDOWN_SECONDS",
+    "old_value": 1800,
+    "new_value": 1800,
+    "reason": "Given the system has not yet taken any trades, the initial risk environment is unknown. A cooldown of 1800 seconds (30 minutes) is appropriate for BALANCED MODE. It is shorter than the maximum, allowing the Risk Agent to perform regular sanity checks and emergency assessments as the first trades are placed, but not so short that it creates excessive overhead or interferes with the CopyBot's analysis cycle.",
+    "agent": "master_agent",
+    "confidence": 0.75,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-06T22:47:21.988768",
+    "parameter": "SENTIMENT_CHECK_INTERVAL",
+    "old_value": null,
+    "new_value": 900,
+    "reason": "Sentiment data is extremely stale (40558 minutes), severely degrading the overall data quality score. This is a critical gap. Reducing the check interval to 900 seconds (15 minutes) from a likely very high default will force more frequent sentiment updates. In BALANCED MODE, market sentiment is a key filter for trade decisions; fresh sentiment data will improve the confidence of all trading agents and help avoid trades against overwhelming negative or euphoric trends.",
+    "agent": "master_agent",
+    "confidence": 0.9,
+    "category": "data"
+  },
+  {
+    "timestamp": "2026-01-06T23:18:23.009896",
+    "parameter": "HARVESTING_INTERVAL_CHECK_MINUTES",
+    "old_value": 30,
+    "new_value": 30,
+    "reason": "The portfolio is currently static (100% in portfolio balance). Once trading begins, a more frequent check on reserve balances (SOL/USDC) will ensure the system maintains its target allocations for liquidity and staking. 30 minutes (within 10-180 range) is a balanced interval that allows for timely rebalancing without creating excessive operational noise.",
+    "agent": "master_agent",
+    "confidence": 0.7,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-06T23:49:18.371793",
+    "parameter": "COPYBOT_MIN_CONFIDENCE",
+    "old_value": 0,
+    "new_value": 65,
+    "reason": "To initiate trading activity safely in BALANCED MODE, we need a moderate confidence threshold. Setting it to 65 (from a possible default of 70 or higher) slightly increases opportunity acceptance while maintaining a quality filter. This balances the need to start generating trades with risk management, aiming to improve the win rate from its current 0% as the system begins operating.",
+    "agent": "master_agent",
+    "confidence": 0.75,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-07T00:20:17.172822",
+    "parameter": "RISK_AGENT_COOLDOWN_SECONDS",
+    "old_value": 1800,
+    "new_value": 900,
+    "reason": "With zero trades classified as wins or losses, the risk management framework may not be actively engaged. A cooldown of 900 seconds (15 minutes) ensures the Risk Agent performs regular portfolio and market checks to protect capital and lock in profits. This is crucial for Balanced mode to maintain safety while seeking to increase activity. It complements the more frequent CopyBot checks by providing a regular safety review.",
+    "agent": "master_agent",
+    "confidence": 0.75,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-07T00:51:15.439758",
+    "parameter": "HARVESTING_DEVIATION_THRESHOLD",
+    "old_value": 2.0,
+    "new_value": 3.0,
+    "reason": "The portfolio balance is nearly all in cash/stablecoins (total_value_usd \u2248 portfolio_balance_usd). The Harvesting Agent is responsible for rebalancing between SOL and USDC reserves. A deviation threshold of 3.0% (down from the likely default of 5.0% or higher) is more appropriate for BALANCED MODE. It will trigger rebalancing more promptly, ensuring the portfolio stays closer to its target SOL/USDC allocations, which is foundational for readiness to trade and consistent position sizing.",
+    "agent": "master_agent",
+    "confidence": 0.7,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-07T01:22:09.824373",
+    "parameter": "HARVESTING_DEVIATION_THRESHOLD",
+    "old_value": 2.0,
+    "new_value": 2.0,
+    "reason": "In BALANCED MODE, portfolio rebalancing should be proactive but not overly sensitive. A deviation threshold of 2.0% (reduced from a likely higher default) will trigger the Harvesting Agent to rebalance reserves (SOL/USDC) more frequently, ensuring the portfolio maintains its target allocations for optimal risk management and liquidity. This is crucial for consistent performance and capital preservation.",
+    "agent": "master_agent",
+    "confidence": 0.7,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-07T03:03:24.167962",
+    "parameter": "EMERGENCY_CHECK_INTERVAL_MINUTES",
+    "old_value": 60,
+    "new_value": 45,
+    "reason": "With stale data and no trading performance, underlying risk may be building unnoticed. The Risk Agent's emergency check is a critical safety monitor. Reducing the interval to 45 minutes (from a likely 60+ default) increases the frequency of hybrid AI-human risk assessments. This enhances capital preservation\u2014a core tenet of BALANCED MODE\u2014by ensuring any adverse market conditions or system issues are identified and escalated more promptly.",
+    "agent": "master_agent",
+    "confidence": 0.75,
+    "category": "trading"
   }
 ]

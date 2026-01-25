@@ -1,103 +1,26 @@
 """
-🌙 Moon Dev's LLM Trading Agent
-Handles all LLM-based trading decisions
+MOON DEV Moon Dev's Event-Driven Trading Agent
+Executes trades based on strategy signals with flexible risk management
 """
 
 # ============================================================================
-# AI MODEL CONFIGURATION - EDIT THESE SETTINGS
+# EVENT-DRIVEN TRADING AGENT
 # ============================================================================
-
-# AI Model Configuration (via Model Factory)
-# Available types: 'groq', 'openai', 'claude', 'deepseek', 'xai', 'ollama'
-# DeepSeek provides excellent reasoning for trading decisions
-AI_MODEL_TYPE = 'deepseek'  # Using DeepSeek for all AI trading decisions
-AI_MODEL_NAME = 'deepseek-chat'   # Fast chat model for trading
-
-# Available DeepSeek models:
-# - 'deepseek-chat' (default) - Fast chat model, good for trading
-# - 'deepseek-reasoner' - Enhanced reasoning capabilities
-
-# Available xAI models:
-# - 'grok-4-fast-reasoning' (default) - Best value! 2M context, cheap, fast
-# - 'grok-4-0709' - Most intelligent, higher cost
-# - 'grok-3' - Previous generation
-
-# Available Groq models:
-# - 'llama-3.3-70b-versatile' (default) - Fast & powerful
-
-# Available Claude models:
-# - 'claude-3-5-haiku-latest' (default) - Fast
-# - 'claude-3-5-sonnet-latest' - Balanced
-# - 'claude-3-opus-latest' - Most powerful
-
+# This agent listens for trading signals and executes trades immediately.
+# It supports flexible risk management for marketplace compatibility:
+# - Advanced strategies can provide their own risk parameters
+# - Simple strategies use user-defined defaults
+# - Safety limits always apply regardless of source
 # ============================================================================
-# END CONFIGURATION
-# ============================================================================
-
-# Keep only these prompts
-TRADING_PROMPT = """
-You are Moon Dev's AI Trading Assistant 🌙
-
-Analyze the provided market data and strategy signals (if available) to make a trading decision.
-
-Market Data Criteria:
-1. Price action relative to MA20 and MA40
-2. RSI levels and trend
-3. Volume patterns
-4. Recent price movements
-
-{strategy_context}
-
-Respond in this exact format:
-1. First line must be one of: BUY, SELL, or NOTHING (in caps)
-2. Then explain your reasoning, including:
-   - Technical analysis
-   - Strategy signals analysis (if available)
-   - Risk factors
-   - Market conditions
-   - Confidence level (as a percentage, e.g. 75%)
-
-Remember: 
-- Moon Dev always prioritizes risk management! 🛡️
-- Never trade USDC or SOL directly
-- Consider both technical and strategy signals
-"""
-
-ALLOCATION_PROMPT = """
-You are Moon Dev's Portfolio Allocation Assistant 🌙
-
-Given the total portfolio size and trading recommendations, allocate capital efficiently.
-Consider:
-1. Position sizing based on confidence levels
-2. Risk distribution
-3. Keep cash buffer as specified
-4. Maximum allocation per position
-
-Format your response as a Python dictionary:
-{
-    "token_address": allocated_amount,  # In USD
-    ...
-    "USDC_ADDRESS": remaining_cash  # Always use USDC_ADDRESS for cash
-}
-
-Remember:
-- Total allocations must not exceed total_size
-- Higher confidence should get larger allocations
-- Never allocate more than {MAX_POSITION_PERCENTAGE}% to a single position
-- Keep at least {CASH_PERCENTAGE}% in USDC as safety buffer
-- Only allocate to BUY recommendations
-- Cash must be stored as USDC using USDC_ADDRESS: {USDC_ADDRESS}
-"""
 
 import os
 import sys
-import pandas as pd
 import json
 from termcolor import colored, cprint
-from dotenv import load_dotenv
-from datetime import datetime, timedelta
+from datetime import datetime
 import time
 from pathlib import Path
+from typing import Dict, Any
 
 # Add project root to path for imports
 project_root = str(Path(__file__).parent.parent.parent)
@@ -107,236 +30,819 @@ if project_root not in sys.path:
 # Local imports
 from src.config import *
 from src import nice_funcs as n
-from src.scripts.data_processing.ohlcv_collector import collect_all_tokens
-from src.models.model_factory import model_factory
 from src.scripts.shared_services.redis_event_bus import get_event_bus
 
 # Load environment variables
-load_dotenv()
+os.environ.setdefault('REDIS_HOST', 'localhost')
+os.environ.setdefault('REDIS_PORT', '6379')
 
 class TradingAgent:
+    """
+    Event-Driven Trading Agent
+
+    Listens for trading signals from strategies and executes trades with flexible risk management.
+    Supports marketplace compatibility by allowing strategies to provide their own risk parameters
+    while maintaining user safety limits.
+    """
+
     def __init__(self):
-        # Initialize AI model via model factory
-        cprint(f"\n🤖 Initializing Trading Agent with {AI_MODEL_TYPE} model...", "cyan")
-        self.model = model_factory.get_model(AI_MODEL_TYPE, AI_MODEL_NAME)
+        cprint(">>> Initializing Event-Driven Trading Agent...", "cyan")
 
-        if not self.model:
-            cprint(f"❌ Failed to initialize {AI_MODEL_TYPE} model!", "red")
-            cprint("Available models:", "yellow")
-            for model_type in model_factory._models.keys():
-                cprint(f"  - {model_type}", "yellow")
-            sys.exit(1)
-
-        cprint(f"✅ Using model: {self.model.model_name}", "green")
-
-        # Initialize Redis event bus
+        # Initialize Redis event bus for signal communication
         self.event_bus = get_event_bus()
-        self.strategy_signals = []  # Queue for strategy signals
 
-        # Subscribe to trading signals from strategy agent
-        self.event_bus.subscribe('trading_signal', self.handle_trading_signal)
+        # Risk management configuration
+        self.risk_config = self._load_risk_config()
 
-        self.recommendations_df = pd.DataFrame(columns=['token', 'action', 'confidence', 'reasoning'])
-        cprint("🔄 Trading Agent connected to event bus for strategy signals", "cyan")
-        cprint("🤖 Moon Dev's LLM Trading Agent initialized!", "green")
+        # Trading state
+        self.active_positions = {}  # Track current positions
+        self.trade_history = []     # Track executed trades
 
-    def handle_trading_signal(self, signal_data: dict):
+        # Subscribe to trading signals from strategies
+        self.event_bus.subscribe('trading_signal', self.on_trading_signal)
+
+        cprint(">>> Trading Agent initialized - listening for strategy signals", "green")
+        cprint(f"$ Risk mode: {'Strategy parameters' if self.risk_config['inherit_strategy_risk'] else 'User defaults'}", "cyan")
+
+    def _load_risk_config(self) -> Dict[str, Any]:
+        """Load risk management configuration with marketplace compatibility"""
+        return {
+            # Safety limits (always applied, user-controlled)
+            'safety_limits': {
+                'max_position_pct': 0.10,      # Max 10% per trade
+                'max_stop_loss_pct': 0.15,     # Max 15% stop loss
+                'min_stop_loss_pct': 0.01,     # Min 1% stop loss
+                'max_portfolio_risk': 0.20,    # Max 20% total exposure
+                'max_open_positions': 5
+            },
+
+            # User default risk parameters (when strategy doesn't provide)
+            'default_risk': {
+                'position_size_pct': 0.05,     # 5% default
+                'stop_loss_pct': 0.05,         # 5% default stop
+                'take_profit_pct': 0.10,       # 10% default target
+                'trailing_stop_pct': 0.03      # 3% trailing stop
+            },
+
+            # User preference: inherit strategy risk or use defaults
+            'inherit_strategy_risk': True,    # User choice via UI
+
+            # Trading mode: paper or live
+            'trading_mode': os.getenv('TRADING_MODE', 'paper'),  # Default to paper trading
+        }
+
+    def on_trading_signal(self, signal_data: dict):
         """
-        Handle incoming trading signals from the strategy agent
+        Main entry point for trading signals - EVENT-DRIVEN EXECUTION
 
         Args:
-            signal_data: Trading signal from Redis event bus
+            signal_data: Trading signal from strategy via Redis
         """
         try:
-            cprint(f"📡 Trading Agent received signal: {signal_data.get('symbol', 'UNKNOWN')} {signal_data.get('direction', 'UNKNOWN')}", "cyan")
+            cprint(f"SIGNAL: Signal received: {signal_data.get('symbol', 'UNKNOWN')} {signal_data.get('direction', 'UNKNOWN')}", "cyan")
 
-            # Add to strategy signals queue
-            self.strategy_signals.append(signal_data)
+            # Validate signal structure
+            if not self._validate_signal(signal_data):
+                cprint("ERROR: Invalid signal format - ignoring", "red")
+                return
 
-            # Log signal details
-            confidence = signal_data.get('confidence', 0)
+            # Resolve risk parameters (strategy-provided or user defaults)
+            risk_params = self._resolve_risk_parameters(signal_data)
+
+            # Apply safety limits
+            if not self._check_safety_limits(risk_params, signal_data):
+                cprint("ERROR: Trade rejected - safety limits exceeded", "red")
+                return
+
+            # Execute the trade
+            self._execute_trade(signal_data, risk_params)
+
+        except Exception as e:
+            cprint(f"ERROR: Error processing trading signal: {e}", "red")
+
+    def _validate_signal(self, signal_data: dict) -> bool:
+        """Validate signal has required fields"""
+        required_fields = ['symbol', 'direction', 'confidence']
+        return all(field in signal_data for field in required_fields)
+
+    def _resolve_risk_parameters(self, signal_data: dict) -> Dict[str, Any]:
+        """
+        Resolve risk parameters with flexible logic:
+        1. Use strategy-provided parameters if user allows inheritance
+        2. Fall back to user defaults otherwise
+        """
+        strategy_risk = signal_data.get('risk_parameters', {})
+
+        if strategy_risk and self.risk_config['inherit_strategy_risk']:
+            # Use strategy-provided risk parameters
+            cprint(">>> Using strategy-provided risk parameters", "cyan")
+            risk_params = strategy_risk.copy()
+        else:
+            # Use user default risk parameters
+            source_msg = "strategy parameters ignored" if strategy_risk else "no strategy parameters provided"
+            cprint(f">>> Using user default risk parameters ({source_msg})", "cyan")
+            risk_params = self.risk_config['default_risk'].copy()
+
+        # Ensure all required parameters exist
+        risk_params.setdefault('position_size_pct', 0.05)
+        risk_params.setdefault('stop_loss_pct', 0.05)
+        risk_params.setdefault('take_profit_pct', 0.10)
+        risk_params.setdefault('trailing_stop_pct', 0.03)
+
+        return risk_params
+
+    def _check_safety_limits(self, risk_params: Dict[str, Any], signal_data: dict) -> bool:
+        """Apply user-defined safety limits that always override"""
+        limits = self.risk_config['safety_limits']
+
+        # Check position size
+        if risk_params['position_size_pct'] > limits['max_position_pct']:
+            cprint(f"ERROR: Position size {risk_params['position_size_pct']:.1%} exceeds limit {limits['max_position_pct']:.1%}", "red")
+            return False
+
+        # Check stop loss range
+        stop_loss = risk_params['stop_loss_pct']
+        if stop_loss < limits['min_stop_loss_pct'] or stop_loss > limits['max_stop_loss_pct']:
+            cprint(f"ERROR: Stop loss {stop_loss:.1%} outside allowed range [{limits['min_stop_loss_pct']:.1%}, {limits['max_stop_loss_pct']:.1%}]", "red")
+            return False
+
+        # Check portfolio exposure
+        total_exposure = sum(pos.get('size_pct', 0) for pos in self.active_positions.values())
+        new_exposure = total_exposure + risk_params['position_size_pct']
+        if new_exposure > limits['max_portfolio_risk']:
+            cprint(f"ERROR: Portfolio exposure {new_exposure:.1%} would exceed limit {limits['max_portfolio_risk']:.1%}", "red")
+            return False
+
+        # Check max positions
+        if len(self.active_positions) >= limits['max_open_positions']:
+            cprint(f"ERROR: Maximum positions ({limits['max_open_positions']}) already reached", "red")
+            return False
+
+        # Check for existing position in same symbol
+        symbol = signal_data['symbol']
+        if symbol in self.active_positions:
+            cprint(f"WARNING: Already have position in {symbol} - consider closing first", "yellow")
+            # Allow overriding existing positions for now
+
+        return True
+
+    def _execute_trade(self, signal_data: dict, risk_params: Dict[str, Any]):
+        """Execute the trade with resolved risk parameters"""
+        try:
+            symbol = signal_data['symbol']
+            direction = signal_data['direction']
+            confidence = signal_data['confidence']
             strategy = signal_data.get('strategy_type', 'unknown')
-            reasoning = signal_data.get('reasoning', 'No reasoning provided')
 
-            cprint(f"   🎯 Strategy: {strategy} | Confidence: {confidence:.1%}", "cyan")
-            cprint(f"   💭 Reasoning: {reasoning[:100]}{'...' if len(reasoning) > 100 else ''}", "cyan")
+            cprint(f">>> Executing {direction} trade for {symbol}", "green")
+            cprint(f"   $ Size: {risk_params['position_size_pct']:.1%} | SL: {risk_params['stop_loss_pct']:.1%} | TP: {risk_params['take_profit_pct']:.1%}", "cyan")
+            cprint(f"   >>> Strategy: {strategy} | Confidence: {confidence:.1%}", "cyan")
 
-        except Exception as e:
-            cprint(f"❌ Error handling trading signal: {e}", "red")
+            # Determine trading mode (paper vs live)
+            # Determine trading mode from configuration
+            trading_mode = self.risk_config.get('trading_mode', 'paper')
 
-    def chat_with_ai(self, system_prompt, user_content):
-        """Send prompt to AI model via model factory"""
-        try:
-            response = self.model.generate_response(
-                system_prompt=system_prompt,
-                user_content=user_content,
-                temperature=AI_TEMPERATURE,
-                max_tokens=AI_MAX_TOKENS
-            )
-
-            # Handle response format
-            if hasattr(response, 'content'):
-                return response.content
-            return str(response)
-
-        except Exception as e:
-            cprint(f"❌ AI model error: {e}", "red")
-            return None
-
-    def analyze_market_data(self, token, market_data):
-        """Analyze market data using AI model"""
-        try:
-            # Skip analysis for excluded tokens
-            if token in EXCLUDED_TOKENS:
-                print(f"⚠️ Skipping analysis for excluded token: {token}")
-                return None
-
-            # Prepare strategy context
-            strategy_context = ""
-            if 'strategy_signals' in market_data:
-                strategy_context = f"""
-Strategy Signals Available:
-{json.dumps(market_data['strategy_signals'], indent=2)}
-                """
+            if trading_mode == 'live':
+                success = self._execute_paper_trade(signal_data, risk_params)
             else:
-                strategy_context = "No strategy signals available."
+                success = self._execute_live_trade(signal_data, risk_params)
 
-            # Call AI model via model factory
-            response = self.chat_with_ai(
-                TRADING_PROMPT.format(strategy_context=strategy_context),
-                f"Market Data to Analyze:\n{market_data}"
-            )
-
-            if not response:
-                cprint(f"❌ No response from AI for {token}", "red")
-                return None
-
-            # Parse the response
-            lines = response.split('\n')
-            action = lines[0].strip() if lines else "NOTHING"
-            
-            # Extract confidence from the response (assuming it's mentioned as a percentage)
-            confidence = 0
-            for line in lines:
-                if 'confidence' in line.lower():
-                    # Extract number from string like "Confidence: 75%"
-                    try:
-                        confidence = int(''.join(filter(str.isdigit, line)))
-                    except:
-                        confidence = 50  # Default if not found
-            
-            # Add to recommendations DataFrame with proper reasoning
-            reasoning = '\n'.join(lines[1:]) if len(lines) > 1 else "No detailed reasoning provided"
-            self.recommendations_df = pd.concat([
-                self.recommendations_df,
-                pd.DataFrame([{
-                    'token': token,
-                    'action': action,
+            if success:
+                # Record the trade
+                trade_record = {
+                    'timestamp': datetime.now(),
+                    'symbol': symbol,
+                    'direction': direction,
+                    'size_pct': risk_params['position_size_pct'],
+                    'entry_price': self._get_current_price(symbol),
+                    'stop_loss_pct': risk_params['stop_loss_pct'],
+                    'take_profit_pct': risk_params['take_profit_pct'],
+                    'strategy': strategy,
                     'confidence': confidence,
-                    'reasoning': reasoning
-                }])
-            ], ignore_index=True)
-            
-            print(f"🎯 Moon Dev's AI Analysis Complete for {token[:4]}!")
-            return response
-            
+                    'risk_source': 'strategy' if signal_data.get('risk_parameters') else 'user_defaults'
+                }
+
+                self.trade_history.append(trade_record)
+                self.active_positions[symbol] = trade_record
+
+                cprint(f"SUCCESS: Trade executed successfully for {symbol}", "green")
+            else:
+                cprint(f"ERROR: Trade execution failed for {symbol}", "red")
+
         except Exception as e:
-            print(f"❌ Error in AI analysis: {str(e)}")
-            # Still add to DataFrame even on error, but mark as NOTHING with 0 confidence
-            self.recommendations_df = pd.concat([
-                self.recommendations_df,
-                pd.DataFrame([{
-                    'token': token,
-                    'action': "NOTHING",
-                    'confidence': 0,
-                    'reasoning': f"Error during analysis: {str(e)}"
-                }])
-            ], ignore_index=True)
-            return None
-    
-    def allocate_portfolio(self):
-        """Get AI-recommended portfolio allocation"""
+            cprint(f"ERROR: Error executing trade: {e}", "red")
+
+    def _execute_paper_trade(self, signal_data: dict, risk_params: Dict[str, Any]) -> bool:
+        """Execute paper trade (simulation)"""
         try:
-            cprint("\n💰 Calculating optimal portfolio allocation...", "cyan")
-            max_position_size = usd_size * (MAX_POSITION_PERCENTAGE / 100)
-            cprint(f"🎯 Maximum position size: ${max_position_size:.2f} ({MAX_POSITION_PERCENTAGE}% of ${usd_size:.2f})", "cyan")
+            symbol = signal_data['symbol']
+            direction = signal_data['direction']
 
-            # Get allocation from AI via model factory
-            allocation_prompt = f"""You are Moon Dev's Portfolio Allocation AI 🌙
+            # Get current price (simulated)
+            current_price = self._get_current_price(symbol)
+            if not current_price:
+                return False
 
-Given:
-- Total portfolio size: ${usd_size}
-- Maximum position size: ${max_position_size} ({MAX_POSITION_PERCENTAGE}% of total)
-- Minimum cash (USDC) buffer: {CASH_PERCENTAGE}%
-- Available tokens: {MONITORED_TOKENS}
-- USDC Address: {USDC_ADDRESS}
+            # Calculate position size in USD
+            portfolio_value = getattr(n, 'portfolio_value', 10000)  # Default $10k
+            position_size_usd = portfolio_value * risk_params['position_size_pct']
 
-Provide a portfolio allocation that:
-1. Never exceeds max position size per token
-2. Maintains minimum cash buffer
-3. Returns allocation as a JSON object with token addresses as keys and USD amounts as values
-4. Uses exact USDC address: {USDC_ADDRESS} for cash allocation
+            cprint(f"PAPER TRADE: PAPER TRADE: {direction} {symbol} at ${current_price:.4f}", "yellow")
+            cprint(f"   $ Position Size: ${position_size_usd:.2f} ({risk_params['position_size_pct']:.1%})", "yellow")
 
-Example format:
-{{
-    "token_address": amount_in_usd,
-    "{USDC_ADDRESS}": remaining_cash_amount  # Use exact USDC address
-}}"""
+            return True
 
-            response = self.chat_with_ai("", allocation_prompt)
+        except Exception as e:
+            cprint(f"ERROR: Paper trade error: {e}", "red")
+            return False
 
-            if not response:
-                cprint("❌ No response from AI for portfolio allocation", "red")
-                return None
+    def _execute_live_trade(self, signal_data: dict, risk_params: Dict[str, Any]) -> bool:
+        """Execute live trade (use existing live trading logic)"""
+        try:
+            # This would integrate with existing live trading functions
+            # For now, just log that live trading would happen
+            # Validate user RPC configuration
+            rpc_endpoint = os.getenv('USER_RPC_ENDPOINT')
+            if not rpc_endpoint:
+                cprint("ERROR: USER_RPC_ENDPOINT not configured for live trading", "red")
+                return False
 
-            # Parse the response
-            allocations = self.parse_allocation_response(response)
-            if not allocations:
-                return None
-                
-            # Fix USDC address if needed
-            if "USDC_ADDRESS" in allocations:
-                amount = allocations.pop("USDC_ADDRESS")
-                allocations[USDC_ADDRESS] = amount
-                
-            # Validate allocation totals
-            total_allocated = sum(allocations.values())
-            if total_allocated > usd_size:
-                cprint(f"❌ Total allocation ${total_allocated:.2f} exceeds portfolio size ${usd_size:.2f}", "red")
-                return None
-                
-            # Print allocations
-            cprint("\n📊 Portfolio Allocation:", "green")
-            for token, amount in allocations.items():
-                token_display = "USDC" if token == USDC_ADDRESS else token
-                cprint(f"  • {token_display}: ${amount:.2f}", "green")
-                
-            return allocations
+            wallet_address = os.getenv('DEFAULT_WALLET_ADDRESS')
+            if not wallet_address:
+                cprint("ERROR: DEFAULT_WALLET_ADDRESS not configured", "red")
+                return False
+
+            # Get token address
+            token_address = self._symbol_to_address(symbol)
+            if not token_address:
+                cprint(f"ERROR: Cannot resolve token address for {symbol}", "red")
+                return False
+
+            # Check wallet balance before trading
+            portfolio_value = self._get_live_portfolio_value()
+            if not portfolio_value or portfolio_value <= 0:
+                cprint("ERROR: Insufficient wallet balance for live trading", "red")
+                return False
+
+            # Calculate USD amount
+            usd_amount = portfolio_value * position_size_pct
+
+            # Get current price for validation
+            current_price = self._get_current_price(symbol)
+            if not current_price:
+                cprint(f"ERROR: Cannot get price for {symbol}", "red")
+                return False
+
+            cprint(f"LIVE TRADE: Executing {direction} ${usd_amount:.2f} of {symbol} (balance: ${portfolio_value:.2f})", "yellow")
+
+            # Execute trade using nice_funcs
+            success = False
+            if direction.upper() == "BUY":
+                # Convert USD to lamports for market_buy
+                lamports = int(usd_amount * 1000000)  # 1 USDC = 1,000,000 lamports
+                slippage = risk_params.get('slippage', 0.5)  # Default 0.5%
+
+                from src.nice_funcs import market_buy
+                result = market_buy(token_address, lamports, slippage=slippage)
+                success = result is not None
+
+            elif direction.upper() == "SELL":
+                # For selling, we need token amount - simplified calculation
+                token_amount = usd_amount / current_price
+                slippage = risk_params.get('slippage', 0.5)
+
+                from src.nice_funcs import market_sell
+                result = market_sell(token_address, token_amount, slippage=slippage)
+                success = result is not None
+
+            else:
+                cprint(f"ERROR: Invalid direction {direction}", "red")
+                return False
+
+            if success:
+                cprint(f"SUCCESS: Live {direction} trade executed for {symbol}", "green")
+                return True
+            else:
+                cprint(f"FAILED: Live {direction} trade failed for {symbol}", "red")
+                return False
+
+        except Exception as e:
+            cprint(f"ERROR: Live trade error: {e}", "red")
+            return False
+
+    def _get_current_price(self, symbol: str) -> float:
+        """Get current price for symbol (placeholder)"""
+        # This should integrate with price feed
+        # For now, return a mock price
+        return 100.0  # Mock price
+
+    def update_risk_config(self, new_config: Dict[str, Any]):
+        """Update risk configuration from UI"""
+        self.risk_config.update(new_config)
+        cprint("CONFIG: Risk configuration updated", "cyan")
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get trading agent status for UI"""
+        return {
+            'active_positions': len(self.active_positions),
+            'total_trades': len(self.trade_history),
+            'risk_mode': 'strategy_inherited' if self.risk_config['inherit_strategy_risk'] else 'user_defaults',
+            'safety_limits': self.risk_config['safety_limits']
+        }
+
+    def run_event_loop(self):
+        """Main event loop - purely event-driven"""
+        cprint(">>> Trading Agent active - listening for strategy signals...", "green")
+        cprint("INFO: Risk management ready with safety limits applied", "cyan")
+
+        try:
+            while True:
+                time.sleep(1)  # Keep alive, signals handled by callbacks
+        except KeyboardInterrupt:
+            cprint(">>> Trading Agent shutting down gracefully...", "cyan")
+
+
+def main():
+    """Event-driven main function - runs trading agent in signal-response mode"""
+    cprint("MOON DEV Event-Driven Trading System Starting Up!", "white", "on_blue")
+    cprint(">>> System will respond to strategy signals in real-time", "cyan")
+
+    try:
+        agent = TradingAgent()
+        agent.run_event_loop()
+
+    except KeyboardInterrupt:
+        cprint("\n>>> Moon Dev Trading System shutting down gracefully...", "white", "on_blue")
+    except Exception as e:
+        cprint(f"\nERROR: Fatal error: {str(e)}", "white", "on_red")
+        cprint("SUGGESTION: Moon Dev suggests checking the logs and trying again!", "white", "on_blue")
+
+
+if __name__ == "__main__":
+    main()
+class TradingAgent:
+    """
+    Event-Driven Trading Agent
+
+    Listens for trading signals from strategies and executes trades with flexible risk management.
+    Supports marketplace compatibility by allowing strategies to provide their own risk parameters
+    while maintaining user safety limits.
+    """
+
+    def __init__(self):
+        cprint(">>> Initializing Event-Driven Trading Agent...", "cyan")
+
+        # Initialize Redis event bus for signal communication
+        self.event_bus = get_event_bus()
+
+        # Risk management configuration
+        self.risk_config = self._load_risk_config()
+
+        # Trading state
+        self.active_positions = {}  # Track current positions
+        self.trade_history = []     # Track executed trades
+
+        # Subscribe to trading signals and config updates
+        self.event_bus.subscribe('trading_signal', self.on_trading_signal)
+        self.event_bus.subscribe('trading_config_update', self.on_config_update)
+
+        cprint(">>> Trading Agent initialized - listening for strategy signals", "green")
+        cprint(f"$ Risk mode: {'Strategy parameters' if self.risk_config['inherit_strategy_risk'] else 'User defaults'}", "cyan")
+
+    def _load_risk_config(self) -> Dict[str, Any]:
+        """Load risk management configuration with marketplace compatibility"""
+        return {
+            # Safety limits (always applied, user-controlled)
+            'safety_limits': {
+                'max_position_pct': 0.10,      # Max 10% per trade
+                'max_portfolio_risk': 0.20,    # Max 20% total exposure
+                'max_stop_loss_pct': 0.15,     # Max 15% stop loss
+                'min_stop_loss_pct': 0.01,     # Min 1% stop loss
+                'max_open_positions': 5
+            },
+
+            # User default risk parameters (when strategy doesn't provide)
+            'default_risk': {
+                'position_size_pct': 0.05,     # 5% default
+                'stop_loss_pct': 0.05,         # 5% default stop
+                'take_profit_pct': 0.10,       # 10% default target
+                'trailing_stop_pct': 0.03      # 3% trailing stop
+            },
+
+            # User preference: inherit strategy risk or use defaults
+            'inherit_strategy_risk': True,    # User choice via UI
+
+            # Trading mode: paper or live
+            'trading_mode': os.getenv('TRADING_MODE', 'paper'),  # Default to paper trading
+        }
+
+    def on_trading_signal(self, signal_data: dict):
+        """
+        Main entry point for trading signals - EVENT-DRIVEN EXECUTION
+
+        Args:
+            signal_data: Trading signal from strategy via Redis
+        """
+        try:
+            cprint(f"SIGNAL: Signal received: {signal_data.get('symbol', 'UNKNOWN')} {signal_data.get('direction', 'UNKNOWN')}", "cyan")
+
+            # Validate signal structure
+            if not self._validate_signal(signal_data):
+                cprint("ERROR: Invalid signal format - ignoring", "red")
+                return
+
+            # Resolve risk parameters (strategy-provided or user defaults)
+            risk_params = self._resolve_risk_parameters(signal_data)
+
+            # Apply safety limits
+            if not self._check_safety_limits(risk_params, signal_data):
+                cprint("ERROR: Trade rejected - safety limits exceeded", "red")
+                return
+
+            # Execute the trade
+            self._execute_trade(signal_data, risk_params)
+
+        except Exception as e:
+            cprint(f"ERROR: Error processing trading signal: {e}", "red")
+
+    def on_config_update(self, config_data: str):
+        """Handle configuration updates from UI"""
+        try:
+            if isinstance(config_data, str):
+                config = json.loads(config_data)
+            else:
+                config = config_data
+
+            # Update risk configuration
+            self.risk_config.update(config)
+            cprint("CONFIG: Risk configuration updated from UI", "cyan")
+
+            # Log key settings
+            inherit = config.get('inherit_strategy_risk', True)
+            mode = "strategy parameters" if inherit else "user defaults"
+            cprint(f">>> Risk mode: {mode}", "cyan")
+
+        except Exception as e:
+            cprint(f"ERROR: Error updating configuration: {e}", "red")
+
+    def _validate_signal(self, signal_data: dict) -> bool:
+        """Validate signal has required fields"""
+        required_fields = ['symbol', 'direction', 'confidence']
+        return all(field in signal_data for field in required_fields)
+
+    def _resolve_risk_parameters(self, signal_data: dict) -> Dict[str, Any]:
+        """
+        Resolve risk parameters with flexible logic:
+        1. Use strategy-provided parameters if user allows inheritance
+        2. Fall back to user defaults otherwise
+        """
+        strategy_risk = signal_data.get('risk_parameters', {})
+
+        if strategy_risk and self.risk_config['inherit_strategy_risk']:
+            # Use strategy-provided risk parameters
+            cprint(">>> Using strategy-provided risk parameters", "cyan")
+            risk_params = strategy_risk.copy()
+        else:
+            # Use user default risk parameters
+            source_msg = "strategy parameters ignored" if strategy_risk else "no strategy parameters provided"
+            cprint(f">>> Using user default risk parameters ({source_msg})", "cyan")
+            risk_params = self.risk_config['default_risk'].copy()
+
+        # Ensure all required parameters exist
+        risk_params.setdefault('position_size_pct', 0.05)
+        risk_params.setdefault('stop_loss_pct', 0.05)
+        risk_params.setdefault('take_profit_pct', 0.10)
+        risk_params.setdefault('trailing_stop_pct', 0.03)
+
+        return risk_params
+
+    def _check_safety_limits(self, risk_params: Dict[str, Any], signal_data: dict) -> bool:
+        """Apply user-defined safety limits that always override"""
+        limits = self.risk_config['safety_limits']
+
+        # Check position size
+        if risk_params['position_size_pct'] > limits['max_position_pct']:
+            cprint(f"ERROR: Position size {risk_params['position_size_pct']:.1%} exceeds limit {limits['max_position_pct']:.1%}", "red")
+            return False
+
+        # Check stop loss range
+        stop_loss = risk_params['stop_loss_pct']
+        if stop_loss < limits['min_stop_loss_pct'] or stop_loss > limits['max_stop_loss_pct']:
+            cprint(f"ERROR: Stop loss {stop_loss:.1%} outside allowed range [{limits['min_stop_loss_pct']:.1%}, {limits['max_stop_loss_pct']:.1%}]", "red")
+            return False
+
+        # Check portfolio exposure
+        total_exposure = sum(pos.get('size_pct', 0) for pos in self.active_positions.values())
+        new_exposure = total_exposure + risk_params['position_size_pct']
+        if new_exposure > limits['max_portfolio_risk']:
+            cprint(f"ERROR: Portfolio exposure {new_exposure:.1%} would exceed limit {limits['max_portfolio_risk']:.1%}", "red")
+            return False
+
+        # Check max positions
+        if len(self.active_positions) >= limits['max_open_positions']:
+            cprint(f"ERROR: Maximum positions ({limits['max_open_positions']}) already reached", "red")
+            return False
+
+        # Check for existing position in same symbol
+        symbol = signal_data['symbol']
+        if symbol in self.active_positions:
+            cprint(f"WARNING: Already have position in {symbol} - consider closing first", "yellow")
+            # Allow overriding existing positions for now
+
+        return True
+
+    def _execute_trade(self, signal_data: dict, risk_params: Dict[str, Any]):
+        """Execute the trade with resolved risk parameters"""
+        try:
+            symbol = signal_data['symbol']
+            direction = signal_data['direction']
+            confidence = signal_data['confidence']
+            strategy = signal_data.get('strategy_type', 'unknown')
+
+            cprint(f">>> Executing {direction} trade for {symbol}", "green")
+            cprint(f"   $ Size: {risk_params['position_size_pct']:.1%} | SL: {risk_params['stop_loss_pct']:.1%} | TP: {risk_params['take_profit_pct']:.1%}", "cyan")
+            cprint(f"   >>> Strategy: {strategy} | Confidence: {confidence:.1%}", "cyan")
+
+            # Determine trading mode (paper vs live)
+            # Determine trading mode from configuration
+            trading_mode = self.risk_config.get('trading_mode', 'paper')
+
+            if trading_mode == 'live':
+                success = self._execute_paper_trade(signal_data, risk_params)
+            else:
+                success = self._execute_live_trade(signal_data, risk_params)
+
+            if success:
+                # Record the trade
+                trade_record = {
+                    'timestamp': datetime.now(),
+                    'symbol': symbol,
+                    'direction': direction,
+                    'size_pct': risk_params['position_size_pct'],
+                    'entry_price': self._get_current_price(symbol),
+                    'stop_loss_pct': risk_params['stop_loss_pct'],
+                    'take_profit_pct': risk_params['take_profit_pct'],
+                    'strategy': strategy,
+                    'confidence': confidence,
+                    'risk_source': 'strategy' if signal_data.get('risk_parameters') else 'user_defaults'
+                }
+
+                self.trade_history.append(trade_record)
+                self.active_positions[symbol] = trade_record
+
+                cprint(f"SUCCESS: Trade executed successfully for {symbol}", "green")
+            else:
+                cprint(f"ERROR: Trade execution failed for {symbol}", "red")
             
         except Exception as e:
-            cprint(f"❌ Error in portfolio allocation: {str(e)}", "red")
-            return None
+            cprint(f"ERROR: Error executing trade: {e}", "red")
+
+    def _execute_paper_trade(self, signal_data: dict, risk_params: Dict[str, Any]) -> bool:
+        """Execute paper trade (simulation)"""
+        try:
+            symbol = signal_data['symbol']
+            direction = signal_data['direction']
+
+            # Get current price (simulated)
+            current_price = self._get_current_price(symbol)
+            if not current_price:
+                return False
+
+            # Calculate position size in USD
+            portfolio_value = getattr(n, 'portfolio_value', 10000)  # Default $10k
+            position_size_usd = portfolio_value * risk_params['position_size_pct']
+
+            cprint(f"PAPER TRADE: PAPER TRADE: {direction} {symbol} at ${current_price:.4f}", "yellow")
+            cprint(f"   $ Position Size: ${position_size_usd:.2f} ({risk_params['position_size_pct']:.1%})", "yellow")
+
+            return True
+
+        except Exception as e:
+            cprint(f"ERROR: Paper trade error: {e}", "red")
+            return False
+
+    def _execute_live_trade(self, signal_data: dict, risk_params: Dict[str, Any]) -> bool:
+        """Execute live trade (use existing live trading logic)"""
+        try:
+            # This would integrate with existing live trading functions
+            # For now, just log that live trading would happen
+            # Validate user RPC configuration
+            rpc_endpoint = os.getenv('USER_RPC_ENDPOINT')
+            if not rpc_endpoint:
+                cprint("ERROR: USER_RPC_ENDPOINT not configured for live trading", "red")
+                return False
+
+            wallet_address = os.getenv('DEFAULT_WALLET_ADDRESS')
+            if not wallet_address:
+                cprint("ERROR: DEFAULT_WALLET_ADDRESS not configured", "red")
+                return False
+
+            # Get token address
+            token_address = self._symbol_to_address(symbol)
+            if not token_address:
+                cprint(f"ERROR: Cannot resolve token address for {symbol}", "red")
+                return False
+
+            # Check wallet balance before trading
+            portfolio_value = self._get_live_portfolio_value()
+            if not portfolio_value or portfolio_value <= 0:
+                cprint("ERROR: Insufficient wallet balance for live trading", "red")
+                return False
+
+            # Calculate USD amount
+            usd_amount = portfolio_value * position_size_pct
+
+            # Get current price for validation
+            current_price = self._get_current_price(symbol)
+            if not current_price:
+                cprint(f"ERROR: Cannot get price for {symbol}", "red")
+                return False
+
+            cprint(f"LIVE TRADE: Executing {direction} ${usd_amount:.2f} of {symbol} (balance: ${portfolio_value:.2f})", "yellow")
+
+            # Execute trade using nice_funcs
+            success = False
+            if direction.upper() == "BUY":
+                # Convert USD to lamports for market_buy
+                lamports = int(usd_amount * 1000000)  # 1 USDC = 1,000,000 lamports
+                slippage = risk_params.get('slippage', 0.5)  # Default 0.5%
+
+                from src.nice_funcs import market_buy
+                result = market_buy(token_address, lamports, slippage=slippage)
+                success = result is not None
+
+            elif direction.upper() == "SELL":
+                # For selling, we need token amount - simplified calculation
+                token_amount = usd_amount / current_price
+                slippage = risk_params.get('slippage', 0.5)
+
+                from src.nice_funcs import market_sell
+                result = market_sell(token_address, token_amount, slippage=slippage)
+                success = result is not None
+
+            else:
+                cprint(f"ERROR: Invalid direction {direction}", "red")
+                return False
+
+            if success:
+                cprint(f"SUCCESS: Live {direction} trade executed for {symbol}", "green")
+                return True
+            else:
+                cprint(f"FAILED: Live {direction} trade failed for {symbol}", "red")
+                return False
+
+        except Exception as e:
+            cprint(f"ERROR: Live trade error: {e}", "red")
+            return False
+
+    def _get_current_price(self, symbol: str) -> float:
+        """Get current price for symbol (placeholder)"""
+        # This should integrate with price feed
+        # For now, return a mock price
+        return 100.0  # Mock price
+
+    def update_risk_config(self, new_config: Dict[str, Any]):
+        """Update risk configuration from UI"""
+        self.risk_config.update(new_config)
+        cprint("CONFIG: Risk configuration updated", "cyan")
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get trading agent status for UI"""
+        return {
+            'active_positions': len(self.active_positions),
+            'total_trades': len(self.trade_history),
+            'risk_mode': 'strategy_inherited' if self.risk_config['inherit_strategy_risk'] else 'user_defaults',
+            'safety_limits': self.risk_config['safety_limits']
+        }
+
+    def run_event_loop(self):
+        """Main event loop - purely event-driven"""
+        cprint(">>> Trading Agent active - listening for strategy signals...", "green")
+        cprint("INFO: Risk management ready with safety limits applied", "cyan")
+
+        try:
+            while True:
+                time.sleep(1)  # Keep alive, signals handled by callbacks
+        except KeyboardInterrupt:
+            cprint(">>> Trading Agent shutting down gracefully...", "cyan")
+
+    def _get_live_portfolio_value(self) -> float:
+        """Get actual wallet balance for live trading"""
+        try:
+            # Use user RPC endpoint for live trading
+            rpc_endpoint = os.getenv('USER_RPC_ENDPOINT')
+            rpc_api_key = os.getenv('USER_RPC_API_KEY')
+
+            if not rpc_endpoint:
+                cprint("ERROR: USER_RPC_ENDPOINT not configured for live trading", "red")
+                return 0.0
+
+            import requests
+            headers = {}
+            if rpc_api_key:
+                headers['Authorization'] = f'Bearer {rpc_api_key}'
+
+            wallet_address = os.getenv('DEFAULT_WALLET_ADDRESS')
+            if not wallet_address:
+                cprint("ERROR: DEFAULT_WALLET_ADDRESS not configured", "red")
+                return 0.0
+
+            # Get USDC balance (primary trading token)
+            usdc_address = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+            payload = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "getTokenAccountBalance",
+                "params": [usdc_address, {"encoding": "jsonParsed"}]
+            }
+
+            response = requests.post(rpc_endpoint, json=payload, headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if 'result' in data and 'value' in data['result']:
+                    # Convert from smallest unit to USD (USDC has 6 decimals)
+                    amount = int(data['result']['value']['amount'])
+                    balance_usd = amount / 1000000.0
+                    cprint(f"Wallet balance: ${balance_usd:.2f} USDC", "cyan")
+                    return balance_usd
+
+            cprint("WARNING: Could not retrieve wallet balance", "yellow")
+            return 0.0
+
+        except Exception as e:
+            cprint(f"ERROR: Failed to get wallet balance: {e}", "red")
+            return 0.0
+
+    def _symbol_to_address(self, symbol: str) -> str:
+        """Convert symbol to token address"""
+        # Common token mappings - expand as needed
+        symbol_map = {
+            'SOL': 'So11111111111111111111111111111111111111112',
+            'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+            'USDT': 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
+            'BTC': '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E',  # BTC (Wormhole)
+            'ETH': '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs',  # ETH (Wormhole)
+        }
+
+        # Handle common variations
+        clean_symbol = symbol.upper().strip()
+
+        # Direct match first
+        if clean_symbol in symbol_map:
+            return symbol_map[clean_symbol]
+
+        # Handle variations
+        if clean_symbol.endswith('USDT'):
+            base = clean_symbol[:-4]  # Remove USDT
+            if base in symbol_map:
+                return symbol_map[base]
+        elif clean_symbol.endswith('USD'):
+            base = clean_symbol[:-3]  # Remove USD
+            if base in symbol_map:
+                return symbol_map[base]
+
+        # For unknown symbols, log warning
+        cprint(f"WARNING: Unknown symbol {symbol}, cannot resolve token address", "yellow")
+        return None
+
+def main():
+    """Event-driven main function - runs trading agent in signal-response mode"""
+    cprint("MOON DEV Moon Dev Event-Driven Trading System Starting Up! >>>", "white", "on_blue")
+    cprint(">>> System will respond to strategy signals in real-time", "cyan")
+
+    try:
+        agent = TradingAgent()
+        agent.run_event_loop()
+
+    except KeyboardInterrupt:
+        cprint("\n>>> Moon Dev Trading System shutting down gracefully...", "white", "on_blue")
+    except Exception as e:
+        cprint(f"\nERROR: Fatal error: {str(e)}", "white", "on_red")
+        cprint("SUGGESTION: Moon Dev suggests checking the logs and trying again!", "white", "on_blue")
+
+if __name__ == "__main__":
+    main()
 
     def execute_allocations(self, allocation_dict):
         """Execute the allocations using spot or leverage trading"""
         from src.config import USE_LEVERAGE_TRADING, LEVERAGE_EXCHANGE, LEVERAGE_SUPPORTED_ASSETS
 
         try:
-            print("\n🚀 Moon Dev executing portfolio allocations...")
+            print("\n>>> Moon Dev executing portfolio allocations...")
 
             # Determine trading mode
             leverage_mode = USE_LEVERAGE_TRADING and LEVERAGE_EXCHANGE == 'hyperliquid'
             if leverage_mode:
-                print("⚡ LEVERAGE MODE: Using Hyperliquid perpetual futures")
+                print("LEVERAGE: LEVERAGE MODE: Using Hyperliquid perpetual futures")
             else:
-                print("🏪 SPOT MODE: Using traditional spot trading")
+                print("SPOT: SPOT MODE: Using traditional spot trading")
             for token, amount in allocation_dict.items():
                 # Skip USDC and other excluded tokens
                 if token in EXCLUDED_TOKENS:
-                    print(f"💵 Keeping ${amount:.2f} in {token}")
+                    print(f"$ Keeping ${amount:.2f} in {token}")
                     continue
 
-                print(f"\n🎯 Processing allocation for {token}...")
+                print(f"\n>>> Processing allocation for {token}...")
 
                 try:
                     # Check if token is supported for leverage trading
@@ -345,35 +851,35 @@ Example format:
 
                     if is_leverage_supported:
                         # LEVERAGE TRADING PATH
-                        print(f"⚡ Executing LEVERAGED trade for {token_symbol}")
+                        print(f"LEVERAGE: Executing LEVERAGED trade for {token_symbol}")
                         success = self._execute_leverage_trade(token, amount, 'BUY')
                         if success:
-                            print(f"✅ Leveraged entry complete for {token_symbol}")
+                            print(f"SUCCESS: Leveraged entry complete for {token_symbol}")
                         else:
-                            print(f"❌ Leveraged entry failed for {token_symbol}")
+                            print(f"ERROR: Leveraged entry failed for {token_symbol}")
                     else:
                         # SPOT TRADING PATH (existing logic)
                         current_position = n.get_token_balance_usd(token)
                         target_allocation = amount
 
-                        print(f"🎯 Target allocation: ${target_allocation:.2f} USD")
-                        print(f"📊 Current position: ${current_position:.2f} USD")
+                        print(f">>> Target allocation: ${target_allocation:.2f} USD")
+                        print(f"DATA: Current position: ${current_position:.2f} USD")
 
                         if current_position < target_allocation:
-                            print(f"✨ Executing SPOT entry for {token}")
+                            print(f"SPOT: Executing SPOT entry for {token}")
                             n.ai_entry(token, amount)
-                            print(f"✅ Spot entry complete for {token}")
+                            print(f"SUCCESS: Spot entry complete for {token}")
                         else:
-                            print(f"⏸️ Position already at target size for {token}")
+                            print(f"PAUSED: Position already at target size for {token}")
 
                 except Exception as e:
-                    print(f"❌ Error executing entry for {token}: {str(e)}")
+                    print(f"ERROR: Error executing entry for {token}: {str(e)}")
 
                 time.sleep(2)  # Small delay between entries
                 
         except Exception as e:
-            print(f"❌ Error executing allocations: {str(e)}")
-            print("🔧 Moon Dev suggests checking the logs and trying again!")
+            print(f"ERROR: Error executing allocations: {str(e)}")
+            print("SUGGESTION: Moon Dev suggests checking the logs and trying again!")
 
     def _execute_leverage_trade(self, token_address: str, usd_amount: float, direction: str):
         """
@@ -402,7 +908,7 @@ Example format:
             return result is not None and result.get('success', False)
 
         except Exception as e:
-            print(f"❌ Leverage trade execution failed: {str(e)}")
+            print(f"ERROR: Leverage trade execution failed: {str(e)}")
             return False
 
     def _get_token_symbol(self, token_address: str):
@@ -454,7 +960,7 @@ Example format:
                 return 0
 
         except Exception as e:
-            print(f"❌ Error getting leverage position for {token_symbol}: {str(e)}")
+            print(f"ERROR: Error getting leverage position for {token_symbol}: {str(e)}")
             return 0
 
     def _execute_leverage_exit(self, token_symbol: str, percentage: float = 100.0):
@@ -477,14 +983,14 @@ Example format:
             return result is not None and result.get('success', False)
 
         except Exception as e:
-            print(f"❌ Leverage exit failed for {token_symbol}: {str(e)}")
+            print(f"ERROR: Leverage exit failed for {token_symbol}: {str(e)}")
             return False
 
     def handle_exits(self):
         """Check and exit positions based on SELL or NOTHING recommendations"""
         from src.config import USE_LEVERAGE_TRADING, LEVERAGE_EXCHANGE, LEVERAGE_SUPPORTED_ASSETS
 
-        cprint("\n🔄 Checking for positions to exit...", "white", "on_blue")
+        cprint("\nCHECKING: Checking for positions to exit...", "white", "on_blue")
 
         # Determine trading mode
         leverage_mode = USE_LEVERAGE_TRADING and LEVERAGE_EXCHANGE == 'hyperliquid'
@@ -511,27 +1017,27 @@ Example format:
                 position_type = "spot"
 
             if current_position > 0 and action in ["SELL", "NOTHING"]:
-                cprint(f"\n🚫 AI Agent recommends {action} for {token}", "white", "on_yellow")
-                cprint(f"💰 Current {position_type} position: ${current_position:.2f}", "white", "on_blue")
+                cprint(f"\nAI RECOMMENDS: AI Agent recommends {action} for {token}", "white", "on_yellow")
+                cprint(f"$ Current {position_type} position: ${current_position:.2f}", "white", "on_blue")
 
                 try:
                     if is_leverage_supported:
                         # LEVERAGE EXIT
-                        cprint(f"📉 Closing LEVERAGED position...", "white", "on_cyan")
+                        cprint(f"CLOSING: Closing LEVERAGED position...", "white", "on_cyan")
                         success = self._execute_leverage_exit(token_symbol)
                         if success:
-                            cprint(f"✅ Successfully closed leveraged position", "white", "on_green")
+                            cprint(f"SUCCESS: Successfully closed leveraged position", "white", "on_green")
                         else:
-                            cprint(f"❌ Failed to close leveraged position", "white", "on_red")
+                            cprint(f"ERROR: Failed to close leveraged position", "white", "on_red")
                     else:
                         # SPOT EXIT
-                        cprint(f"📉 Closing SPOT position with chunk_kill...", "white", "on_cyan")
+                        cprint(f"CLOSING: Closing SPOT position with chunk_kill...", "white", "on_cyan")
                         n.chunk_kill(token, max_usd_order_size, slippage)
-                        cprint(f"✅ Successfully closed spot position", "white", "on_green")
+                        cprint(f"SUCCESS: Successfully closed spot position", "white", "on_green")
                 except Exception as e:
-                    cprint(f"❌ Error closing {position_type} position: {str(e)}", "white", "on_red")
+                    cprint(f"ERROR: Error closing {position_type} position: {str(e)}", "white", "on_red")
             elif current_position > 0:
-                cprint(f"✨ Keeping {position_type} position for {token} (${current_position:.2f}) - AI recommends {action}", "white", "on_blue")
+                cprint(f"SPOT: Keeping {position_type} position for {token} (${current_position:.2f}) - AI recommends {action}", "white", "on_blue")
 
     def parse_allocation_response(self, response):
         """Parse the AI's allocation response and handle both string and TextBlock formats"""
@@ -540,7 +1046,7 @@ Example format:
             if isinstance(response, list):
                 response = response[0].text if hasattr(response[0], 'text') else str(response[0])
             
-            print("🔍 Raw response received:")
+            print("DEBUG: Raw response received:")
             print(response)
             
             # Find the JSON block between curly braces
@@ -560,15 +1066,15 @@ Example format:
                 .replace(' ', '')           # Remove all spaces
                 .strip())                   # Remove leading/trailing whitespace
             
-            print("\n🧹 Cleaned JSON string:")
+            print("\nCLEANED: Cleaned JSON string:")
             print(json_str)
             
             # Parse the cleaned JSON
             allocations = json.loads(json_str)
             
-            print("\n📊 Parsed allocations:")
+            print("\nDATA: Parsed allocations:")
             for token, amount in allocations.items():
-                print(f"  • {token}: ${amount}")
+                print(f"  - {token}: ${amount}")
             
             # Validate amounts are numbers
             for token, amount in allocations.items():
@@ -580,8 +1086,8 @@ Example format:
             return allocations
             
         except Exception as e:
-            print(f"❌ Error parsing allocation response: {str(e)}")
-            print("🔍 Raw response:")
+            print(f"ERROR: Error parsing allocation response: {str(e)}")
+            print("DEBUG: Raw response:")
             print(response)
             return None
 
@@ -602,18 +1108,18 @@ Example format:
             # Parse the JSON
             allocations = json.loads(json_str)
             
-            print("📊 Parsed allocations:")
+            print("DATA: Parsed allocations:")
             for token, amount in allocations.items():
-                print(f"  • {token}: ${amount}")
+                print(f"  - {token}: ${amount}")
             
             return allocations
             
         except json.JSONDecodeError as e:
-            print(f"❌ Error parsing allocation JSON: {e}")
-            print(f"🔍 Raw text received:\n{allocation_text}")
+            print(f"ERROR: Error parsing allocation JSON: {e}")
+            print(f"DEBUG: Raw text received:\n{allocation_text}")
             return None
         except Exception as e:
-            print(f"❌ Unexpected error parsing allocations: {e}")
+            print(f"ERROR: Unexpected error parsing allocations: {e}")
             return None
 
     def run(self):
@@ -624,10 +1130,10 @@ Example format:
         """Run one complete trading cycle"""
         try:
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            cprint(f"\n⏰ AI Agent Run Starting at {current_time}", "white", "on_green")
+            cprint(f"\nTIME: AI Agent Run Starting at {current_time}", "white", "on_green")
             
             # Collect OHLCV data for all tokens
-            cprint("📊 Collecting market data...", "white", "on_blue")
+            cprint("DATA: Collecting market data...", "white", "on_blue")
             market_data = collect_all_tokens()
             
             # Get strategy signals received from event bus
@@ -643,16 +1149,16 @@ Example format:
                 strategy_signals_by_token[token].append(signal)
 
             if current_strategy_signals:
-                cprint(f"🎯 Processing {len(current_strategy_signals)} strategy signals from event bus", "cyan")
+                cprint(f">>> Processing {len(current_strategy_signals)} strategy signals from event bus", "cyan")
 
             # Analyze each token's data
             for token, data in market_data.items():
-                cprint(f"\n🤖 AI Agent Analyzing Token: {token}", "white", "on_green")
+                cprint(f"\nAI AGENT: AI Agent Analyzing Token: {token}", "white", "on_green")
 
                 # Include strategy signals for this token if available
                 if token in strategy_signals_by_token:
                     signals_for_token = strategy_signals_by_token[token]
-                    cprint(f"📊 Including {len(signals_for_token)} strategy signals in analysis", "cyan")
+                    cprint(f"DATA: Including {len(signals_for_token)} strategy signals in analysis", "cyan")
                     data['strategy_signals'] = signals_for_token
 
                     # Log strategy signals
@@ -660,15 +1166,15 @@ Example format:
                         direction = signal.get('direction', 'UNKNOWN')
                         confidence = signal.get('confidence', 0)
                         strategy = signal.get('strategy_type', 'unknown')
-                        cprint(f"   🎯 {strategy}: {direction} ({confidence:.1%} confidence)", "cyan")
+                        cprint(f"   >>> {strategy}: {direction} ({confidence:.1%} confidence)", "cyan")
 
                 analysis = self.analyze_market_data(token, data)
-                print(f"\n📈 Analysis for contract: {token}")
+                print(f"\nANALYSIS: Analysis for contract: {token}")
                 print(analysis)
                 print("\n" + "="*50 + "\n")
             
             # Show recommendations summary
-            cprint("\n📊 Moon Dev's Trading Recommendations:", "white", "on_blue")
+            cprint("\nDATA: Moon Dev's Trading Recommendations:", "white", "on_blue")
             summary_df = self.recommendations_df[['token', 'action', 'confidence']].copy()
             print(summary_df.to_string(index=False))
             
@@ -676,36 +1182,36 @@ Example format:
             self.handle_exits()
             
             # Then proceed with new allocations
-            cprint("\n💰 Calculating optimal portfolio allocation...", "white", "on_blue")
+            cprint("\n$ Calculating optimal portfolio allocation...", "white", "on_blue")
             allocation = self.allocate_portfolio()
             
             if allocation:
-                cprint("\n💼 Moon Dev's Portfolio Allocation:", "white", "on_blue")
+                cprint("\nPORTFOLIO: Moon Dev's Portfolio Allocation:", "white", "on_blue")
                 print(json.dumps(allocation, indent=4))
                 
-                cprint("\n🎯 Executing allocations...", "white", "on_blue")
+                cprint("\n>>> Executing allocations...", "white", "on_blue")
                 self.execute_allocations(allocation)
-                cprint("\n✨ All allocations executed!", "white", "on_blue")
+                cprint("\nSPOT: All allocations executed!", "white", "on_blue")
             else:
-                cprint("\n⚠️ No allocations to execute!", "white", "on_yellow")
+                cprint("\nWARNING: No allocations to execute!", "white", "on_yellow")
             
             # Clean up temp data
-            cprint("\n🧹 Cleaning up temporary data...", "white", "on_blue")
+            cprint("\nCLEANED: Cleaning up temporary data...", "white", "on_blue")
             try:
                 for file in os.listdir('temp_data'):
                     if file.endswith('_latest.csv'):
                         os.remove(os.path.join('temp_data', file))
-                cprint("✨ Temp data cleaned successfully!", "white", "on_green")
+                cprint("SPOT: Temp data cleaned successfully!", "white", "on_green")
             except Exception as e:
-                cprint(f"⚠️ Error cleaning temp data: {str(e)}", "white", "on_yellow")
+                cprint(f"WARNING: Error cleaning temp data: {str(e)}", "white", "on_yellow")
             
         except Exception as e:
-            cprint(f"\n❌ Error in trading cycle: {str(e)}", "white", "on_red")
-            cprint("🔧 Moon Dev suggests checking the logs and trying again!", "white", "on_blue")
+            cprint(f"\nERROR: Error in trading cycle: {str(e)}", "white", "on_red")
+            cprint("SUGGESTION: Moon Dev suggests checking the logs and trying again!", "white", "on_blue")
 
 def main():
     """Main function to run the trading agent every 15 minutes"""
-    cprint("🌙 Moon Dev AI Trading System Starting Up! 🚀", "white", "on_blue")
+    cprint("MOON DEV Moon Dev AI Trading System Starting Up! >>>", "white", "on_blue")
     
     agent = TradingAgent()
     INTERVAL = SLEEP_BETWEEN_RUNS_MINUTES * 60  # Convert minutes to seconds
@@ -715,19 +1221,20 @@ def main():
             agent.run_trading_cycle()
             
             next_run = datetime.now() + timedelta(minutes=SLEEP_BETWEEN_RUNS_MINUTES)
-            cprint(f"\n⏳ AI Agent run complete. Next run at {next_run.strftime('%Y-%m-%d %H:%M:%S')}", "white", "on_green")
+            cprint(f"\nCOMPLETE: AI Agent run complete. Next run at {next_run.strftime('%Y-%m-%d %H:%M:%S')}", "white", "on_green")
             
             # Sleep until next interval
             time.sleep(INTERVAL)
                 
         except KeyboardInterrupt:
-            cprint("\n👋 Moon Dev AI Agent shutting down gracefully...", "white", "on_blue")
+            cprint("\n>>> Moon Dev AI Agent shutting down gracefully...", "white", "on_blue")
             break
         except Exception as e:
-            cprint(f"\n❌ Error: {str(e)}", "white", "on_red")
-            cprint("🔧 Moon Dev suggests checking the logs and trying again!", "white", "on_blue")
+            cprint(f"\nERROR: Error: {str(e)}", "white", "on_red")
+            cprint("SUGGESTION: Moon Dev suggests checking the logs and trying again!", "white", "on_blue")
             # Still sleep and continue on error
             time.sleep(INTERVAL)
 
 if __name__ == "__main__":
     main() 
+

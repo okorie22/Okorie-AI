@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-01-15T08:47:53.197604",
+  "ui_state": {
+    "window_geometry": {
+      "x": 390,
+      "y": 0,
+      "width": 500,
+      "height": 635
+    },
+    "splitter_sizes": [
+      375,
+      120
+    ],
+    "selected_tab": 0
+  },
+  "settings": {
+    "oi_enabled": true,
+    "funding_enabled": true,
+    "chart_enabled": true,
+    "trading_symbols": "BTCUSDT,ETHUSDT,SOLUSDT",
+    "scan_interval": 300,
+    "timeframe": "1d"
+  },
+  "data_alerts": {
+    "oi_alerts": "NO ALERTS",
+    "funding_alerts": "NO ALERTS",
+    "sentiment_data": "STRONG_BULLISH",
+    "oi_status": "Active",
+    "funding_status": "Active",
+    "sentiment_status": "Active"
+  },
+  "autorun_settings": {
+    "autorun_system": true
+  }
+}

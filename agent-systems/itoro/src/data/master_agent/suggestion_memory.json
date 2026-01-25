@@ -10,5 +10,65 @@
     "parameter": "WHALE_UPDATE_INTERVAL_HOURS",
     "value": 12,
     "category": "data"
+  },
+  {
+    "timestamp": "2026-01-06T21:14:01.007399",
+    "parameter": "COPYBOT_AI_COOLDOWN_SECONDS",
+    "value": 900,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-06T21:45:05.948699",
+    "parameter": "PAPER_MAX_POSITION_SIZE",
+    "value": 150.0,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-06T22:16:14.663237",
+    "parameter": "RISK_AGENT_COOLDOWN_SECONDS",
+    "value": 1800,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-06T22:47:22.101791",
+    "parameter": "SENTIMENT_CHECK_INTERVAL",
+    "value": 900,
+    "category": "data"
+  },
+  {
+    "timestamp": "2026-01-06T23:18:23.114133",
+    "parameter": "HARVESTING_INTERVAL_CHECK_MINUTES",
+    "value": 30,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-06T23:49:18.401088",
+    "parameter": "COPYBOT_MIN_CONFIDENCE",
+    "value": 65,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-07T00:20:17.211805",
+    "parameter": "RISK_AGENT_COOLDOWN_SECONDS",
+    "value": 900,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-07T00:51:15.482355",
+    "parameter": "HARVESTING_DEVIATION_THRESHOLD",
+    "value": 3.0,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-07T01:22:09.854094",
+    "parameter": "HARVESTING_DEVIATION_THRESHOLD",
+    "value": 2.0,
+    "category": "trading"
+  },
+  {
+    "timestamp": "2026-01-07T03:03:24.272791",
+    "parameter": "EMERGENCY_CHECK_INTERVAL_MINUTES",
+    "value": 45,
+    "category": "trading"
   }
 ]
