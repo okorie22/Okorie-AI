@@ -103,17 +103,20 @@ async def sendgrid_webhook(request: Request, db: Session = Depends(get_db)):
 
 
 def _should_append_booking_link(intent_value: str, response_text: Optional[str]) -> bool:
-    """Append Calendly link when intent is scheduling-related or reply invites picking a time."""
-    if intent_value in ("interested", "scheduling"):
-        return True
+    """Append Calendly link only when the reply explicitly invites them to pick a time (close-now), not on value-first replies."""
     if not response_text:
         return False
     r = response_text.lower()
-    return any(phrase in r for phrase in (
+    invite_phrases = (
         "pick a time", "choose a slot", "pick a slot", "grab a slot",
         "when's a good time", "when's good for you", "what time works",
-        "book a time", "choose a time",
-    ))
+        "book a time", "choose a time", "pick a time here", "grab a time",
+    )
+    if any(phrase in r for phrase in invite_phrases):
+        return True
+    if intent_value == "scheduling":
+        return True
+    return False
 
 
 @app.post("/webhooks/sendgrid/inbound")
