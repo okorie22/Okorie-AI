@@ -62,8 +62,8 @@ class SendGridService:
             logger.debug("Outside send window")
             return {"success": False, "error": "Outside window"}
         
-        # Check for TEST MODE
         from ..config import sendgrid_config
+        # Check for TEST MODE
         if sendgrid_config.test_mode:
             logger.info(f"🧪 TEST MODE: Would send email to {to_email}")
             logger.info(f"   Subject: {subject}")
@@ -115,7 +115,8 @@ class SendGridService:
                 subject=subject,
                 plain_text_content=Content("text/plain", body)
             )
-            
+            if sendgrid_config.reply_to:
+                message.reply_to = sendgrid_config.reply_to
             # Send via SendGrid
             response = self.client.send(message)
             
@@ -157,6 +158,10 @@ class SendGridService:
         except Exception as e:
             logger.error(f"Error sending email to {to_email}: {e}")
             return {"success": False, "error": str(e)}
+    
+    def send(self, to_email: str, subject: str, body: str, lead_id: int, conversation_id: int, metadata: Optional[Dict] = None) -> Dict:
+        """Alias for send_email so callers can use .send()."""
+        return self.send_email(to_email, subject, body, lead_id, conversation_id, metadata)
     
     def handle_webhook(self, webhook_data: Dict) -> Dict:
         """

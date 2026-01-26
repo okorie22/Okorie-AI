@@ -30,6 +30,8 @@ class SendGridConfig(BaseSettings):
     api_key: str = Field(default="", alias="SENDGRID_API_KEY")
     from_email: str = Field(default="appointments@example.com", alias="SENDGRID_FROM_EMAIL")
     from_name: str = Field(default="Your Name", alias="SENDGRID_FROM_NAME")
+    # Reply-To for inbound parse (e.g. replies@reimaginewealth.org so lead replies hit SendGrid → webhook)
+    reply_to: str = Field(default="", alias="SENDGRID_REPLY_TO")
     
     # TEST MODE - Set to True to prevent actual email sends (logs only)
     test_mode: bool = Field(default=False, alias="SENDGRID_TEST_MODE")
