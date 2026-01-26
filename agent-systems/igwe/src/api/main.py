@@ -119,6 +119,31 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
         lead = lead_repo.get_by_email(from_email)
         if not lead:
             logger.warning(f"Inbound email from unknown sender: {from_email}")
+            from ..storage.models import MessageDirection, MessageChannel
+            _UNKNOWN_SENDER_EMAIL = "inbound-unknown@system"
+            unknown_lead = lead_repo.get_by_email(_UNKNOWN_SENDER_EMAIL)
+            if not unknown_lead:
+                unknown_lead = lead_repo.create({
+                    "email": _UNKNOWN_SENDER_EMAIL,
+                    "first_name": "Unknown",
+                    "last_name": "Inbound",
+                })
+            conv = conv_repo.get_active_by_lead(unknown_lead.id)
+            if not conv:
+                conv = conv_repo.create(unknown_lead.id, MessageChannel.EMAIL.value)
+            inbound_html = form_data.get("html") or ""
+            msg_repo.create({
+                "conversation_id": conv.id,
+                "direction": MessageDirection.INBOUND,
+                "channel": MessageChannel.EMAIL,
+                "body": inbound_text or inbound_html or "",
+                "message_metadata": {
+                    "from": from_email,
+                    "subject": form_data.get("subject"),
+                    "to": form_data.get("to"),
+                    "html": inbound_html,
+                },
+            })
             return {"success": True, "message": "Email received but sender not found"}
         
         # Find or create conversation

@@ -81,9 +81,14 @@ async def messages_dashboard(request: Request, db: Session = Depends(get_db)):
         direction_label = "Inbound" if msg.direction == MessageDirection.INBOUND else "Outbound"
         direction_class = "msg-inbound" if msg.direction == MessageDirection.INBOUND else "msg-outbound"
         channel_label = (msg.channel or MessageChannel.EMAIL).value if msg.channel else "email"
-        lead_name = f"{lead.first_name or ''} {lead.last_name or ''}".strip() or lead.email or "—"
-        preview = safe_preview(msg.body)
         meta = (msg.message_metadata or {})
+        if lead.email == "inbound-unknown@system":
+            display_from = meta.get("from") or "—"
+            lead_name = f"Unknown sender: {display_from}"
+        else:
+            lead_name = f"{lead.first_name or ''} {lead.last_name or ''}".strip() or lead.email or "—"
+            display_from = lead.email or "—"
+        preview = safe_preview(msg.body)
         subject = meta.get("subject", "")
         messages_html += f"""
             <div class="message-card {direction_class}">
@@ -92,7 +97,7 @@ async def messages_dashboard(request: Request, db: Session = Depends(get_db)):
                     <span class="message-channel">{channel_label}</span>
                     <span class="message-time">{fmt_ts(msg.created_at)}</span>
                 </div>
-                <div class="message-lead">{lead_name} &lt;{lead.email or '—'}&gt;</div>
+                <div class="message-lead">{lead_name} &lt;{display_from}&gt;</div>
                 <div class="message-subject">{subject or '—'}</div>
                 <div class="message-preview">{preview or '—'}</div>
             </div>
