@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from typing import Dict, Optional
 from loguru import logger
 import os
+import random
 
 from ..storage.database import get_db
 from ..channels.email import SendGridService
@@ -292,10 +293,10 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
             return {"success": True, "action": "unsubscribed"}
         
         elif analysis.next_action == ReplyAction.AUTO_REPLY:
-            # Auto-reply
-            logger.info(f"Auto-replying to conversation {conversation.id}")
+            # Auto-reply: queue delayed send (30–90 min)
+            from ..config import llm_config
+            from ..workflow.tasks import send_delayed_reply
             
-            # Append Calendly link when scheduling-related or when reply invites picking a time
             response_body = analysis.response_text
             if _should_append_booking_link(analysis.intent.value, analysis.response_text):
                 calendly_service = CalendlyService(db)
@@ -307,20 +308,24 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
                 response_body += f"\n\nYou can book a time here: {booking_link}"
                 logger.info("Appended Calendly link to scheduling response")
             
-            # Send response
-            email_service = SendGridService(db)
-            email_service.send(
-                to_email=lead.email,
-                subject=f"Re: {form_data.get('subject', 'Your inquiry')}",
-                body=response_body,
-                lead_id=lead.id,
-                conversation_id=conversation.id
+            min_sec = llm_config.reply_delay_min_minutes * 60
+            max_sec = llm_config.reply_delay_max_minutes * 60
+            countdown = random.randint(min_sec, max_sec)
+            logger.info(f"Queuing delayed reply for conversation {conversation.id} in {countdown // 60} min")
+            
+            send_delayed_reply.apply_async(
+                kwargs={
+                    "conversation_id": conversation.id,
+                    "channel": "email",
+                    "body": response_body,
+                    "lead_id": lead.id,
+                    "to_email": lead.email,
+                    "subject": f"Re: {form_data.get('subject', 'Your inquiry')}",
+                },
+                countdown=countdown,
             )
             
-            # Any auto-reply means they responded — move to ENGAGED so follow-up sequence is skipped
-            conv_repo.update(conversation.id, {"state": ConversationState.ENGAGED})
-            
-            return {"success": True, "action": "auto_replied"}
+            return {"success": True, "action": "auto_reply_queued"}
         
         return {"success": True}
     
@@ -464,23 +469,29 @@ async def twilio_webhook(request: Request, db: Session = Depends(get_db)):
             return JSONResponse(content={"twiml": str(resp)})
         
         elif analysis.next_action == ReplyAction.AUTO_REPLY:
-            # Auto-reply
-            logger.info(f"Auto-replying to SMS conversation {conversation.id}")
+            # Auto-reply: queue delayed send (30–90 min), return holding message
+            from ..config import llm_config
+            from ..workflow.tasks import send_delayed_reply
             
-            # Save outbound message
-            msg_repo.create({
-                "conversation_id": conversation.id,
-                "direction": MessageDirection.OUTBOUND,
-                "channel": conversation.channel,
-                "body": analysis.response_text
-            })
+            response_body = analysis.response_text
+            min_sec = llm_config.reply_delay_min_minutes * 60
+            max_sec = llm_config.reply_delay_max_minutes * 60
+            countdown = random.randint(min_sec, max_sec)
+            logger.info(f"Queuing delayed SMS reply for conversation {conversation.id} in {countdown // 60} min")
             
-            # Any auto-reply means they responded — move to ENGAGED so follow-up sequence is skipped
-            conv_repo.update(conversation.id, {"state": ConversationState.ENGAGED})
+            send_delayed_reply.apply_async(
+                kwargs={
+                    "conversation_id": conversation.id,
+                    "channel": "sms",
+                    "body": response_body,
+                    "lead_id": lead.id,
+                    "to_phone": from_phone,
+                },
+                countdown=countdown,
+            )
             
-            # Send TwiML response
             resp = MessagingResponse()
-            resp.message(analysis.response_text)
+            resp.message("Thanks for your message. We'll get back to you shortly.")
             return JSONResponse(content={"twiml": str(resp)})
         
         # Default response

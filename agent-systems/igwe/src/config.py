@@ -84,6 +84,9 @@ class LLMConfig(BaseSettings):
     reply_confidence_threshold: float = Field(default=0.70, alias="REPLY_CONFIDENCE_THRESHOLD")
     auto_reply_enabled: bool = Field(default=True, alias="AUTO_REPLY_ENABLED")
     human_notification_email: str = Field(default="", alias="HUMAN_NOTIFICATION_EMAIL")
+    # Delay before sending auto-reply (seconds); random between min and max minutes, converted to seconds when used
+    reply_delay_min_minutes: int = Field(default=30, alias="REPLY_DELAY_MIN_MINUTES")
+    reply_delay_max_minutes: int = Field(default=90, alias="REPLY_DELAY_MAX_MINUTES")
     
     # GPT-4 specific settings
     gpt4_model: str = Field(default="gpt-4-0125-preview", alias="GPT4_MODEL")

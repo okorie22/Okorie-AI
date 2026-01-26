@@ -4,6 +4,7 @@ Celery tasks for workflow automation.
 from celery import Task
 from loguru import logger
 from datetime import datetime, timedelta
+from typing import Optional
 import asyncio
 from pathlib import Path
 
@@ -227,6 +228,71 @@ def send_message_task(self, conversation_id: int, template_name: str):
     result = sender.send_conversation_message(conversation, template_name)
     
     return result
+
+
+@celery_app.task(base=DatabaseTask, bind=True)
+def send_delayed_reply(
+    self,
+    conversation_id: int,
+    channel: str,
+    body: str,
+    lead_id: int,
+    to_email: Optional[str] = None,
+    to_phone: Optional[str] = None,
+    subject: Optional[str] = None,
+):
+    """
+    Send a reply-agent response after a delay (30–90 min).
+    Called from SendGrid/Twilio webhooks when analysis is AUTO_REPLY; the actual send happens here.
+    """
+    from ..channels.email import SendGridService
+    from ..channels.sms import TwilioService
+    from ..storage.repositories import ConversationRepository
+    from ..storage.models import ConversationState
+    
+    logger.info(f"Sending delayed reply for conversation {conversation_id} via {channel}")
+    
+    conv_repo = ConversationRepository(self.db)
+    conversation = conv_repo.get_by_id(conversation_id)
+    if not conversation:
+        logger.error(f"Conversation {conversation_id} not found for delayed reply")
+        return {"error": "Conversation not found"}
+    
+    if channel == "email":
+        if not to_email:
+            logger.error("Delayed email reply missing to_email")
+            return {"error": "Missing to_email"}
+        email_service = SendGridService(self.db)
+        result = email_service.send(
+            to_email=to_email,
+            subject=subject or "Re: Your inquiry",
+            body=body,
+            lead_id=lead_id,
+            conversation_id=conversation_id,
+        )
+        if not result.get("success"):
+            return result
+    elif channel == "sms":
+        if not to_phone:
+            logger.error("Delayed SMS reply missing to_phone")
+            return {"error": "Missing to_phone"}
+        sms_service = TwilioService(self.db)
+        result = sms_service.send_sms(
+            to_number=to_phone,
+            body=body,
+            lead_id=lead_id,
+            conversation_id=conversation_id,
+            check_consent=False,
+        )
+        if not result.get("success"):
+            return result
+    else:
+        logger.error(f"Unknown channel for delayed reply: {channel}")
+        return {"error": f"Unknown channel: {channel}"}
+    
+    conv_repo.update(conversation_id, {"state": ConversationState.ENGAGED})
+    logger.info(f"Delayed reply sent for conversation {conversation_id}")
+    return {"success": True, "conversation_id": conversation_id, "channel": channel}
 
 
 def count_leads_imported_today(db):
