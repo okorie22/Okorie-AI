@@ -51,7 +51,7 @@ class AppointmentSetterSystem:
         try:
             # Try common Redis locations
             redis_paths = [
-                Path(r"C:\Users\Top Cash Pawn\ITORO\redis\redis-server.exe"),
+                Path(r"C:\Users\Top Cash Pawn\Okorie-AI\redis\redis-server.exe"),
                 Path(r"C:\Program Files\Redis\redis-server.exe"),
                 Path(r"redis-server.exe"),  # In PATH
             ]
@@ -119,7 +119,7 @@ class AppointmentSetterSystem:
             else:
                 logger.error("[ERROR] Could not auto-start Redis")
                 logger.info("Please start Redis manually:")
-                logger.info("  Windows: cd C:\\Users\\Top Cash Pawn\\ITORO\\redis && .\\redis-server.exe")
+                logger.info("  Windows: cd C:\\Users\\Top Cash Pawn\\Okorie-AI\\redis && .\\redis-server.exe")
                 logger.info("  Linux/Mac: redis-server &")
                 return False
     

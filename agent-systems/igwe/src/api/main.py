@@ -33,6 +33,14 @@ app.include_router(appointments_router)
 app.include_router(messages_router)
 
 
+@app.on_event("startup")
+def ensure_db_tables():
+    """Create tables if missing (e.g. Render Postgres)."""
+    from ..storage import models  # noqa: F401  # register models with Base
+    from ..storage.database import init_db
+    init_db()
+
+
 # Health check
 @app.get("/health")
 async def health_check():
