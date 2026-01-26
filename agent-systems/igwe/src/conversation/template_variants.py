@@ -14,7 +14,7 @@ Do you handle your own retirement planning or do you have someone you trust for 
 
 If you're open, I can share a quick idea that's working for a few business owners I've been talking to.
 
-Worth a 10–15 min call this week?"""
+Worth a 20–30 min call this week?"""
     },
     {
         "id": "opener_email_v2",
@@ -32,9 +32,9 @@ Up for a quick call?"""
         "subject": "worth a call?",
         "body": """Hi {first_name},
 
-Working with some {industry} owners on retirement planning — wanted to see if you'd be open to a brief call.
+Working with some {industry} owners on retirement planning and wanted to see if you'd be open to a brief call.
 
-No pitch, just sharing what's been working. 10 minutes tops.
+No pitch, just sharing what's been working. 30 minutes tops.
 
 Interested?"""
     },
@@ -45,7 +45,7 @@ Interested?"""
 
 Quick one: are you happy with how your retirement plan is structured?
 
-A lot of {industry} folks I talk to aren't — usually because they didn't know there were other options.
+A lot of {industry} folks I talk to aren't, usually because they didn't know there were other options.
 
 Can I send you a quick overview?"""
     },
@@ -54,11 +54,11 @@ Can I send you a quick overview?"""
         "subject": "business owners",
         "body": """Hey {first_name},
 
-I help business owners set up retirement plans that actually make sense — better tax breaks, more flexibility than a 401k.
+I help business owners set up retirement plans that actually make sense. Better tax breaks and more flexibility than a 401k.
 
 If you're curious, happy to walk you through it. 
 
-10 min call work?"""
+30 min call work?"""
     },
     {
         "id": "opener_email_v6",
@@ -77,11 +77,11 @@ No pressure, just a quick 15-minute call.
         "subject": "retirement question",
         "body": """Hi {first_name},
 
-Quick question — are you exploring options beyond the standard 401k for retirement?
+Quick question: are you exploring options beyond the standard 401k for retirement?
 
 I work with {industry} owners on tax-advantaged strategies that tend to outperform traditional plans.
 
-Worth a quick 10 min call?"""
+Worth a quick 30 min call?"""
     },
     {
         "id": "opener_email_v8",
@@ -99,11 +99,11 @@ Open to a quick call this week?"""
         "subject": "for {industry} owners",
         "body": """Hey {first_name},
 
-Working with a few {industry} business owners on retirement planning — wanted to reach out.
+Working with a few {industry} business owners on retirement planning and wanted to reach out.
 
 Most don't realize there are ways to save significantly more than a 401k allows while reducing taxes.
 
-10 min to walk you through it?"""
+30 min to walk you through it?"""
     },
     {
         "id": "opener_email_v10",
@@ -165,7 +165,7 @@ Still open to a brief call, or should I take you off my list?"""
 
 Totally get it if timing isn't right.
 
-But if you're curious — 10 min call this week?"""
+But if you're curious, 30 min call this week?"""
     },
     {
         "id": "followup1_email_v4",
@@ -181,7 +181,7 @@ Worth a call or no?"""
         "subject": "Re: {previous_subject}",
         "body": """Hey {first_name},
 
-Following up on this — still interested in a quick call about retirement planning?
+Following up on this, still interested in a quick call about retirement planning?
 
 Let me know either way."""
     },
@@ -201,14 +201,14 @@ Still worth connecting on retirement planning?"""
 
 Wanted to circle back on this. If timing's not right, all good.
 
-Otherwise, 10 min call work?"""
+Otherwise, 30 min call work?"""
     },
     {
         "id": "followup1_email_v8",
         "subject": "one more try",
         "body": """{first_name},
 
-Last bump on this — open to a quick call or should I assume it's not a fit?"""
+Last bump on this. Open to a quick call or should I assume it's not a fit?"""
     }
 ]
 
@@ -310,11 +310,11 @@ When works for you? {calendly_link}"""
 SMS_OPENER_VARIANTS = [
     {
         "id": "sms_opener_v1",
-        "body": "Hey {first_name} — quick one: are you open to a 10 min call this week about retirement planning? Reply YES for times. Reply STOP to opt out."
+        "body": "Hey {first_name} — quick one: are you open to a 30 min call this week about retirement planning? Reply YES for times. Reply STOP to opt out."
     },
     {
         "id": "sms_opener_v2",
-        "body": "{first_name}, do you have 10 min this week to talk retirement strategy? Reply YES if interested. STOP to unsubscribe."
+        "body": "{first_name}, do you have 30 min this week to talk retirement strategy? Reply YES if interested. STOP to unsubscribe."
     },
     {
         "id": "sms_opener_v3",
@@ -322,7 +322,7 @@ SMS_OPENER_VARIANTS = [
     },
     {
         "id": "sms_opener_v4",
-        "body": "{first_name} — quick question about retirement planning for {industry} owners. 10 min call? Reply YES. Reply STOP to opt out."
+        "body": "{first_name} — quick question about retirement planning for {industry} owners. 30 min call? Reply YES. Reply STOP to opt out."
     },
     {
         "id": "sms_opener_v5",

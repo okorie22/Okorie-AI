@@ -81,7 +81,7 @@ class LLMConfig(BaseSettings):
     provider: str = Field(default="deepseek", alias="LLM_PROVIDER")  # "deepseek" or "openai"
     
     # Reply handling (GPT-4 for inbound replies)
-    reply_confidence_threshold: float = Field(default=0.75, alias="REPLY_CONFIDENCE_THRESHOLD")
+    reply_confidence_threshold: float = Field(default=0.70, alias="REPLY_CONFIDENCE_THRESHOLD")
     auto_reply_enabled: bool = Field(default=True, alias="AUTO_REPLY_ENABLED")
     human_notification_email: str = Field(default="", alias="HUMAN_NOTIFICATION_EMAIL")
     

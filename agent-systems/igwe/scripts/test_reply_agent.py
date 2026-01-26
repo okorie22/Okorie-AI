@@ -7,10 +7,17 @@ import os
 from pathlib import Path
 
 # Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+_igwe_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_igwe_root))
+
+# Load .env from igwe root so OPENAI_API_KEY etc. are available
+_env = _igwe_root / ".env"
+if _env.exists():
+    from dotenv import load_dotenv
+    load_dotenv(_env)
 
 from src.conversation.reply_agent import ReplyAgent, ReplyAction, ReplyIntent
-from src.config import app_config
+from src.config import llm_config
 from loguru import logger
 from datetime import datetime
 
@@ -84,36 +91,36 @@ TEST_CASES = [
         "name": "Complex Question - Tax Benefits",
         "message": "Can you explain the tax benefits and compare it to my 401k?",
         "expected_intent": ReplyIntent.COMPLEX_QUESTION,
-        "expected_action": ReplyAction.ESCALATE,
-        "expected_escalate": True
+        "expected_action": ReplyAction.AUTO_REPLY,
+        "expected_escalate": False
     },
     {
         "name": "Multiple Questions",
         "message": "How does this work? What are the fees? How much do I need? When can we start?",
         "expected_intent": None,  # Don't test specific intent
-        "expected_action": ReplyAction.ESCALATE,
-        "expected_escalate": True
+        "expected_action": ReplyAction.AUTO_REPLY,
+        "expected_escalate": False
     },
     {
         "name": "Objection - Not Interested",
         "message": "Not interested right now, maybe later",
         "expected_intent": ReplyIntent.OBJECTION,
-        "expected_action": ReplyAction.ESCALATE,
-        "expected_escalate": True
+        "expected_action": ReplyAction.AUTO_REPLY,
+        "expected_escalate": False
     },
     {
         "name": "Objection - Already Have Coverage",
         "message": "I already have life insurance",
         "expected_intent": ReplyIntent.OBJECTION,
-        "expected_action": ReplyAction.ESCALATE,
-        "expected_escalate": True
+        "expected_action": ReplyAction.AUTO_REPLY,
+        "expected_escalate": False
     },
     {
         "name": "Objection - Cost Concern",
         "message": "How much does this cost? Sounds expensive",
         "expected_intent": ReplyIntent.OBJECTION,
-        "expected_action": ReplyAction.ESCALATE,
-        "expected_escalate": True
+        "expected_action": ReplyAction.AUTO_REPLY,
+        "expected_escalate": False
     },
     {
         "name": "Unsubscribe - Stop",
@@ -184,7 +191,7 @@ def run_tests():
     """Run all test cases and report results"""
     
     # Check if GPT-4 is configured
-    if not app_config.llm_config.openai_api_key:
+    if not llm_config.openai_api_key:
         logger.error("❌ OpenAI API key not configured. Set OPENAI_API_KEY in .env file.")
         logger.info("You can still test pre-screening logic (unsubscribe, threats, compliance triggers)")
         print("\nRunning pre-screening tests only...\n")
@@ -193,7 +200,7 @@ def run_tests():
     
     # Initialize agent
     logger.info("Initializing ReplyAgent with GPT-4...")
-    agent = ReplyAgent(app_config.llm_config)
+    agent = ReplyAgent(llm_config)
     
     # Run tests
     results = {
@@ -224,17 +231,17 @@ def run_tests():
             
             # Check escalation
             if analysis.escalate != test["expected_escalate"]:
-                print(f"❌ FAIL: Expected escalate={test['expected_escalate']}, got {analysis.escalate}")
+                print(f"[FAIL] Expected escalate={test['expected_escalate']}, got {analysis.escalate}")
                 passed = False
             
             # Check action
             if analysis.next_action != test["expected_action"]:
-                print(f"❌ FAIL: Expected action={test['expected_action'].value}, got {analysis.next_action.value}")
+                print(f"[FAIL] Expected action={test['expected_action'].value}, got {analysis.next_action.value}")
                 passed = False
             
             # Check intent (if specified)
             if test["expected_intent"] and analysis.intent != test["expected_intent"]:
-                print(f"⚠️  WARNING: Expected intent={test['expected_intent'].value}, got {analysis.intent.value}")
+                print(f"WARNING: Expected intent={test['expected_intent'].value}, got {analysis.intent.value}")
                 # Don't fail on intent mismatch, just warn
             
             # Display results
@@ -249,14 +256,14 @@ def run_tests():
                 print(f"Response: \"{analysis.response_text}\"")
             
             if passed:
-                print("✅ PASS")
+                print("[PASS]")
                 results["passed"] += 1
             else:
-                print("❌ FAIL")
+                print("[FAIL]")
                 results["failed"] += 1
         
         except Exception as e:
-            print(f"❌ ERROR: {e}")
+            print(f"[ERROR] {e}")
             logger.error(f"Test error: {e}", exc_info=True)
             results["errors"] += 1
     
@@ -265,23 +272,23 @@ def run_tests():
     print("TEST SUMMARY")
     print("="*80)
     print(f"Total: {len(TEST_CASES)}")
-    print(f"✅ Passed: {results['passed']}")
-    print(f"❌ Failed: {results['failed']}")
-    print(f"⚠️  Errors: {results['errors']}")
+    print(f"Passed: {results['passed']}")
+    print(f"Failed: {results['failed']}")
+    print(f"Errors: {results['errors']}")
     
     success_rate = (results["passed"] / len(TEST_CASES)) * 100
     print(f"\nSuccess Rate: {success_rate:.1f}%")
     
     if results["failed"] == 0 and results["errors"] == 0:
-        print("\n🎉 All tests passed!")
+        print("\nAll tests passed!")
     else:
-        print("\n⚠️  Some tests failed. Review output above.")
+        print("\nSome tests failed. Review output above.")
 
 
 def run_prescreening_tests():
     """Run only pre-screening tests (no API calls)"""
     
-    agent = ReplyAgent(app_config.llm_config)
+    agent = ReplyAgent(llm_config)
     
     prescreening_tests = [
         {
@@ -313,9 +320,9 @@ def run_prescreening_tests():
             print(f"Escalate: {result.escalate}")
             
             if result.next_action == test["expected_action"]:
-                print("✅ PASS")
+                print("[PASS]")
             else:
-                print(f"❌ FAIL: Expected {test['expected_action'].value}")
+                print(f"[FAIL] Expected {test['expected_action'].value}")
         else:
             print("No pre-screening match (would go to GPT-4)")
 
@@ -324,27 +331,31 @@ def test_notification():
     """Test notification email"""
     from src.channels.notifications import NotificationService
     from src.storage.database import get_db
+    from src.config import settings
     
     print("\n" + "="*80)
     print("TESTING NOTIFICATION SYSTEM")
     print("="*80 + "\n")
     
-    if not app_config.llm_config.human_notification_email:
-        print("❌ HUMAN_NOTIFICATION_EMAIL not configured in .env")
+    if not llm_config.human_notification_email:
+        print("[FAIL] HUMAN_NOTIFICATION_EMAIL not configured in .env")
         return
     
+    class _Config:
+        llm_config = settings.llm
+        sendgrid_config = settings.sendgrid
     db = next(get_db())
-    notification_service = NotificationService(db, app_config)
+    notification_service = NotificationService(db, _Config())
     
-    print(f"Sending test notification to: {app_config.llm_config.human_notification_email}")
+    print(f"Sending test notification to: {llm_config.human_notification_email}")
     
     success = notification_service.send_test_notification()
     
     if success:
-        print("✅ Test notification sent successfully!")
+        print("[PASS] Test notification sent successfully!")
         print("Check your email inbox.")
     else:
-        print("❌ Failed to send test notification")
+        print("[FAIL] Failed to send test notification")
         print("Check SendGrid configuration and logs.")
 
 

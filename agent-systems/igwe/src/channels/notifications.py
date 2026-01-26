@@ -364,6 +364,7 @@ class NotificationService:
         recipient = to_email or self.notification_email
         
         subject = "[TEST] Escalation Notification System"
+        ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
         body = """
 <!DOCTYPE html>
 <html>
@@ -388,7 +389,7 @@ class NotificationService:
 </head>
 <body>
     <div class="header">
-        <h2>✅ Notification System Test</h2>
+        <h2>Notification System Test</h2>
     </div>
     <p>This is a test notification from your IUL Appointment Setter system.</p>
     <p>If you're receiving this, your escalation notification system is configured correctly!</p>
@@ -400,10 +401,10 @@ class NotificationService:
     </ul>
     <p style="color: #6c757d; font-size: 14px; margin-top: 30px;">
         Sent from: IUL Appointment Setter<br>
-        Time: {timestamp}
+        Time: """ + ts + """
     </p>
 </body>
 </html>
-""".format(timestamp=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"))
+"""
         
         return self._send_email(recipient, subject, body)

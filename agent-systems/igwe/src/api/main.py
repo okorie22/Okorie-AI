@@ -4,7 +4,7 @@ FastAPI main application - webhooks and admin endpoints.
 from fastapi import FastAPI, Depends, HTTPException, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from typing import Dict
+from typing import Dict, Optional
 from loguru import logger
 import os
 
@@ -100,6 +100,20 @@ async def sendgrid_webhook(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error processing SendGrid webhook: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _should_append_booking_link(intent_value: str, response_text: Optional[str]) -> bool:
+    """Append Calendly link when intent is scheduling-related or reply invites picking a time."""
+    if intent_value in ("interested", "scheduling"):
+        return True
+    if not response_text:
+        return False
+    r = response_text.lower()
+    return any(phrase in r for phrase in (
+        "pick a time", "choose a slot", "pick a slot", "grab a slot",
+        "when's a good time", "when's good for you", "what time works",
+        "book a time", "choose a time",
+    ))
 
 
 @app.post("/webhooks/sendgrid/inbound")
@@ -278,9 +292,9 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
             # Auto-reply
             logger.info(f"Auto-replying to conversation {conversation.id}")
             
-            # If intent is scheduling-related, append Calendly link
+            # Append Calendly link when scheduling-related or when reply invites picking a time
             response_body = analysis.response_text
-            if analysis.intent.value in ["interested", "scheduling"]:
+            if _should_append_booking_link(analysis.intent.value, analysis.response_text):
                 calendly_service = CalendlyService(db)
                 booking_link = calendly_service.get_booking_link(
                     lead.first_name or "",

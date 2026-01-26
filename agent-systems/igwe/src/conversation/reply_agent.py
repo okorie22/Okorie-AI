@@ -109,7 +109,16 @@ class ReplyAgent:
                 conversation_history
             )
             
-            # Apply confidence gating
+            # Wrong person: always unsubscribe, never escalate
+            if analysis.intent == ReplyIntent.WRONG_PERSON:
+                analysis.escalate = False
+                analysis.next_action = ReplyAction.UNSUBSCRIBE
+                analysis.escalation_reason = None
+                if not analysis.response_text or not analysis.response_text.strip():
+                    analysis.response_text = "My apologies. I'll remove you from our list right away."
+                return analysis
+            
+            # Apply confidence gating (skip for WRONG_PERSON—handled above)
             if analysis.confidence < self.confidence_threshold:
                 logger.warning(f"Low confidence ({analysis.confidence}), escalating")
                 analysis.escalate = True
@@ -143,6 +152,17 @@ class ReplyAgent:
         Returns ReplyAnalysis if match found, None otherwise.
         """
         message_lower = message.lower().strip()
+        
+        # "Spam" + stop/unsubscribe = complaint, escalate (don't treat as simple unsubscribe)
+        if "spam" in message_lower and any(kw in message_lower for kw in UNSUBSCRIBE_KEYWORDS):
+            return ReplyAnalysis(
+                intent=ReplyIntent.COMPLAINT,
+                confidence=1.0,
+                escalate=True,
+                escalation_reason="Complaint (spam) - needs human attention",
+                next_action=ReplyAction.ESCALATE,
+                sentiment="negative"
+            )
         
         # Check for unsubscribe intent
         if any(keyword in message_lower for keyword in UNSUBSCRIBE_KEYWORDS):
@@ -315,16 +335,9 @@ class ReplyAgent:
         """
         Additional validation and safety checks on the analysis.
         """
-        # Count questions in message
+        # Count questions in message (for recommendations only; we no longer escalate on count)
         question_count = message.count("?")
         analysis.question_count = question_count
-        
-        # If multiple questions (>2), escalate
-        if question_count > 2 and not analysis.escalate:
-            logger.warning(f"Multiple questions detected ({question_count}), escalating")
-            analysis.escalate = True
-            analysis.escalation_reason = f"Multiple questions ({question_count}) detected"
-            analysis.next_action = ReplyAction.ESCALATE
         
         # If response is too long, escalate (safety)
         if analysis.response_text and len(analysis.response_text) > 500:
@@ -334,8 +347,12 @@ class ReplyAgent:
             analysis.next_action = ReplyAction.ESCALATE
             analysis.response_text = None
         
-        # If negative sentiment and not already escalating, escalate
-        if analysis.sentiment == "negative" and not analysis.escalate:
+        # If negative sentiment and not already escalating, escalate (except objection/unsubscribe/wrong_person—we handle those)
+        if (
+            analysis.sentiment == "negative"
+            and not analysis.escalate
+            and analysis.intent not in (ReplyIntent.OBJECTION, ReplyIntent.UNSUBSCRIBE, ReplyIntent.WRONG_PERSON)
+        ):
             logger.warning("Negative sentiment detected, escalating")
             analysis.escalate = True
             analysis.escalation_reason = "Negative sentiment detected"
@@ -346,12 +363,18 @@ class ReplyAgent:
             response_lower = analysis.response_text.lower()
             violations = [t for t in COMPLIANCE_TRIGGERS if t in response_lower]
             if violations:
-                logger.error(f"AI response contains compliance violations: {violations}")
-                analysis.escalate = True
-                analysis.escalation_reason = f"AI generated prohibited content: {violations[:2]}"
-                analysis.next_action = ReplyAction.ESCALATE
-                analysis.response_text = None
-                analysis.compliance_violations = violations
+                # Allow refusals like "I can't give tax advice" — not actually giving advice
+                if violations == ["tax advice"] and any(
+                    ref in response_lower for ref in ("can't", "cannot", "won't", "don't", "we don't", "i don't", "over email", "in email")
+                ):
+                    pass  # decline to escalate
+                else:
+                    logger.error(f"AI response contains compliance violations: {violations}")
+                    analysis.escalate = True
+                    analysis.escalation_reason = f"AI generated prohibited content: {violations[:2]}"
+                    analysis.next_action = ReplyAction.ESCALATE
+                    analysis.response_text = None
+                    analysis.compliance_violations = violations
         
         return analysis
     
