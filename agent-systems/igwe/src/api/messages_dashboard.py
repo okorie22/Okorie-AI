@@ -2,6 +2,7 @@
 Inbound and Outbound Messages Dashboard.
 Tracks messages sent and received via the messages table.
 """
+import json
 from html import escape
 from fastapi import APIRouter, Depends, Request, Query, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -171,6 +172,15 @@ async def messages_dashboard(
     if request.query_params.get("send_error") == "1":
         send_status.append(('error', 'Could not send message. Check lead suppression and rate limits.'))
 
+    # For typeahead: id, label, email, search (lowercased name + email)
+    conversations_for_js = []
+    for c, lead in recent_conversations:
+        name = ("%s %s" % (lead.first_name or "", lead.last_name or "")).strip() or lead.email or "—"
+        email = (lead.email or "").strip()
+        search = (name + " " + email).lower()
+        conversations_for_js.append({"id": c.id, "label": name, "email": email, "search": search})
+    conversations_js_embed = json.dumps(conversations_for_js).replace("</script>", "</scr\" + \"ipt>")
+
     html_content = f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -295,6 +305,13 @@ async def messages_dashboard(
             .reply-form .form-actions {{ display: flex; gap: 0.5rem; margin-top: 0.75rem; }}
             .compose-section {{ margin-bottom: 1.5rem; padding: 1rem; background: #f0fff4; border: 1px solid #9ae6b4; border-radius: 8px; }}
             .compose-section h3 {{ font-size: 1rem; margin-bottom: 0.75rem; color: #276749; }}
+            .compose-section .reply-form textarea[name="body"] {{ width: 100%; min-width: 520px; box-sizing: border-box; max-width: 900px; }}
+            .compose-to-wrap {{ position: relative; max-width: 520px; }}
+            .compose-to-wrap input[type="text"] {{ width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 1rem; box-sizing: border-box; }}
+            .compose-to-suggestions {{ position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; max-height: 220px; overflow-y: auto; z-index: 20; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }}
+            .compose-to-suggestions li {{ list-style: none; padding: 0.5rem 0.75rem; cursor: pointer; border-bottom: 1px solid #f0f0f0; }}
+            .compose-to-suggestions li:hover {{ background: #edf2f7; }}
+            .compose-to-suggestions li:last-child {{ border-bottom: none; }}
             .btn-link {{ background: none; border: none; color: #667eea; cursor: pointer; font-size: 0.9rem; padding: 0 0.25rem; }}
             .btn-link:hover {{ text-decoration: underline; }}
             .btn {{ padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; border: 1px solid transparent; font-size: 0.9rem; }}
@@ -366,13 +383,14 @@ async def messages_dashboard(
                 </div>
                 <div id="compose-form-wrap" class="compose-section" style="display:none;">
                     <h3>New message</h3>
-                    <form method="post" action="/messages/send" class="reply-form">
+                    <form method="post" action="/messages/send" class="reply-form" id="compose-form">
                         <div class="form-group">
-                            <label>To (conversation)</label>
-                            <select name="conversation_id" required>
-                                <option value="">— Pick a conversation —</option>
-                                {"".join('<option value="%s">%s &lt;%s&gt;</option>' % (c.id, escape(("%s %s" % (lead.first_name or "", lead.last_name or "")).strip() or lead.email or "—"), escape(lead.email or "")) for c, lead in recent_conversations)}
-                            </select>
+                            <label>To (type name or email)</label>
+                            <div class="compose-to-wrap">
+                                <input type="text" id="compose-to-search" placeholder="Type name or email..." autocomplete="off">
+                                <input type="hidden" name="conversation_id" id="compose-conversation-id">
+                                <ul id="compose-to-suggestions" class="compose-to-suggestions" style="display:none;"></ul>
+                            </div>
                         </div>
                         <div class="form-group"><label>Subject</label><input type="text" name="subject" required placeholder="Subject"></div>
                         <div class="form-group"><label>Message</label><textarea name="body" rows="4" required placeholder="Your message"></textarea></div>
@@ -399,6 +417,8 @@ async def messages_dashboard(
             </div>
         </div>
         <script>
+        var CONVERSATIONS = {conversations_js_embed};
+
         function toggleExpand(msgId) {{
             var el = document.getElementById("msg-full-" + msgId);
             if (!el) return;
@@ -413,8 +433,68 @@ async def messages_dashboard(
         }}
         function toggleCompose() {{
             var wrap = document.getElementById("compose-form-wrap");
-            if (wrap) wrap.style.display = wrap.style.display === "none" ? "block" : "none";
+            if (wrap) {{
+                wrap.style.display = wrap.style.display === "none" ? "block" : "none";
+                if (wrap.style.display === "block") {{
+                    var s = document.getElementById("compose-to-search");
+                    var h = document.getElementById("compose-conversation-id");
+                    var ul = document.getElementById("compose-to-suggestions");
+                    if (s) s.value = "";
+                    if (h) h.value = "";
+                    if (ul) {{ ul.style.display = "none"; ul.innerHTML = ""; }}
+                }}
+            }}
         }}
+        (function() {{
+            var searchEl = document.getElementById("compose-to-search");
+            var hiddenEl = document.getElementById("compose-conversation-id");
+            var ul = document.getElementById("compose-to-suggestions");
+            var form = document.getElementById("compose-form");
+            if (!searchEl || !hiddenEl || !ul || !form) return;
+
+            function esc(s) {{ var t = (s || '').toString(); return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }}
+            function showSuggestions(query) {{
+                query = (query || "").trim().toLowerCase();
+                if (!query) {{ ul.style.display = "none"; ul.innerHTML = ""; return; }}
+                var list = CONVERSATIONS.filter(function(c) {{ return c.search.indexOf(query) >= 0; }}).slice(0, 12);
+                ul.innerHTML = list.map(function(c) {{
+                    var lab = esc(c.label), em = esc(c.email);
+                    return '<li data-id="' + c.id + '" data-label="' + (c.label || '').replace(/"/g, '&quot;') + '" data-email="' + (c.email || '').replace(/"/g, '&quot;') + '">' + (lab && em ? lab + ' &lt;' + em + '&gt;' : (em || lab)) + '</li>';
+                }}).join("");
+                ul.style.display = list.length ? "block" : "none";
+            }}
+            searchEl.addEventListener("input", function() {{
+                if (!hiddenEl.value || searchEl.value !== (hiddenEl.getAttribute("data-display") || "")) {{
+                    hiddenEl.value = "";
+                    hiddenEl.removeAttribute("data-display");
+                }}
+                showSuggestions(searchEl.value);
+            }});
+            searchEl.addEventListener("focus", function() {{ showSuggestions(searchEl.value); }});
+            ul.addEventListener("click", function(e) {{
+                var li = e.target.closest("li[data-id]");
+                if (!li) return;
+                var id = li.getAttribute("data-id");
+                var c = CONVERSATIONS.filter(function(x) {{ return String(x.id) === String(id); }})[0];
+                if (!c) return;
+                hiddenEl.value = id;
+                var display = (c.label && c.email ? c.label + " <" + c.email + ">" : (c.email || c.label || ""));
+                hiddenEl.setAttribute("data-display", display);
+                searchEl.value = display;
+                ul.style.display = "none";
+                ul.innerHTML = "";
+            }});
+            document.addEventListener("click", function(e) {{
+                if (!searchEl.contains(e.target) && !ul.contains(e.target)) ul.style.display = "none";
+            }});
+            form.addEventListener("submit", function(e) {{
+                if (!hiddenEl.value) {{
+                    e.preventDefault();
+                    alert("Please choose a recipient by typing a name or email and selecting from the list.");
+                    return;
+                }}
+            }});
+        }})();
         </script>
     </body>
     </html>

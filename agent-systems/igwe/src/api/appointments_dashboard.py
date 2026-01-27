@@ -38,12 +38,12 @@ async def appointments_dashboard(
     unmatched_page: int = Query(1, ge=1, description="Unmatched page"),
     past_page: int = Query(1, ge=1, description="Past page"),
     deals_page: int = Query(1, ge=1, description="Deals page"),
-    per_page: int = Query(25, ge=1, le=100, description="Rows per section"),
+    per_page: int = Query(15, ge=1, le=100, description="Rows per section"),
 ):
     """
     Appointments and deals management dashboard.
     Shows upcoming appointments, past appointments needing review, and closed deals.
-    Uses compact rows and per-section pagination (default 25 per page).
+    Uses compact rows and per-section pagination (default 15 per page).
     """
     now = datetime.utcnow()
     past_cutoff = now - timedelta(days=14)
