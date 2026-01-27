@@ -2,6 +2,7 @@
 Appointments and Deals Management Dashboard.
 Allows tracking of scheduled appointments and closed deals.
 """
+from html import escape
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -119,7 +120,13 @@ async def appointments_dashboard(
     # Stats (use full counts)
     total_pending_review = total_past
     total_upcoming_appointments = total_scheduled + total_unmatched
-    total_booked = db.query(Appointment).count() + db.query(UnmatchedAppointment).count()
+    # Exclude "linked" and "canceled" unmatched so we don't double-count events that are now in appointments
+    total_booked = (
+        db.query(Appointment).count()
+        + db.query(UnmatchedAppointment).filter(
+            UnmatchedAppointment.status.in_(["active", "no_show"])
+        ).count()
+    )
     total_revenue = sum(deal[0].premium_amount or 0 for deal in closed_deals_all)
     total_commission = sum(deal[0].commission_amount or 0 for deal in closed_deals_all)
     
@@ -199,14 +206,16 @@ async def appointments_dashboard(
         next_link = f'<a href="/appointments{qs(past_page=past_page + 1)}">Next ›</a>' if end < total_past else '<span class="pagination-disabled">Next ›</span>'
         past_pagination = f'<div class="pagination-bar">Showing {start}–{end} of {total_past} {prev_link} {next_link}</div>'
     
-    # Build closed deals HTML (compact table)
+    # Build closed deals HTML (compact table, editable)
     deals_html = ""
     if deals_slice:
-        deals_html = '<table class="compact-table"><thead><tr><th>Name</th><th>Company</th><th>Premium</th><th>Commission</th><th>Closed</th></tr></thead><tbody>'
+        deals_html = '<table class="compact-table"><thead><tr><th>Name</th><th>Company</th><th>Premium</th><th>Commission</th><th>Closed</th><th>Actions</th></tr></thead><tbody>'
         for deal, lead, appointment in deals_slice:
             name = f"{lead.first_name or ''} {lead.last_name or ''}".strip() or "—"
             company = (lead.company_name or "—") + (" • " + (lead.job_title or "") if lead.job_title else "")
-            deals_html += f'<tr class="compact-row"><td>{name}</td><td>{company}</td><td>${(deal.premium_amount or 0):,.0f}</td><td>${(deal.commission_amount or 0):,.0f}</td><td>{deal.created_at.strftime("%b %d, %Y")}</td></tr>'
+            fn_esc, ln_esc, co_esc = escape(lead.first_name or ""), escape(lead.last_name or ""), escape(lead.company_name or "")
+            deals_html += f'<tr class="compact-row"><td>{name}</td><td>{company}</td><td>${(deal.premium_amount or 0):,.0f}</td><td>${(deal.commission_amount or 0):,.0f}</td><td>{deal.created_at.strftime("%b %d, %Y")}</td><td><button type="button" onclick="toggleDealEdit({deal.id})" class="btn btn-outline">✏️ Edit</button></td></tr>'
+            deals_html += f'<tr id="deal-edit-{deal.id}" class="deal-form-row"><td colspan="6" class="deal-form-cell"><form method="post" action="/appointments/deals/{deal.id}/update"><div class="deal-form-inline"><div class="form-group"><label>Premium ($)</label><input type="number" name="premium_amount" step="0.01" value="{deal.premium_amount or 0}" required></div><div class="form-group"><label>Commission ($)</label><input type="number" name="commission_amount" step="0.01" value="{deal.commission_amount or 0}" required></div><div class="form-group"><label>First name</label><input type="text" name="first_name" value="{fn_esc}"></div><div class="form-group"><label>Last name</label><input type="text" name="last_name" value="{ln_esc}"></div><div class="form-group"><label>Company</label><input type="text" name="company_name" value="{co_esc}"></div><div class="form-actions"><button type="submit" class="btn btn-success">Save</button><button type="button" onclick="toggleDealEdit({deal.id})" class="btn btn-outline">Cancel</button></div></div></form></td></tr>'
         deals_html += "</tbody></table>"
     else:
         deals_html = '<div class="empty-state"><div class="empty-state-icon">🎯</div><p>No closed deals yet. Keep going!</p></div>'
@@ -584,6 +593,8 @@ async def appointments_dashboard(
             .deal-form-cell .deal-form {{ padding: 0.5rem; margin: 0; border: none; display: block; }}
             .deal-form-cell .form-group {{ margin-bottom: 0.5rem; }}
             .deal-form-cell .form-group label {{ margin-bottom: 0.25rem; font-size: 0.85rem; }}
+            .deal-form-inline {{ display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }}
+            .deal-form-inline .form-group {{ margin-bottom: 0; }}
             .pagination-bar {{ margin-top: 0.75rem; font-size: 0.9rem; color: #4a5568; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }}
             .pagination-bar a {{ color: #667eea; font-weight: 500; }}
             .pagination-disabled {{ color: #a0aec0; }}
@@ -591,6 +602,10 @@ async def appointments_dashboard(
         <script>
             function toggleDealForm(appointmentId) {{
                 var row = document.getElementById('deal-form-' + appointmentId);
+                if (row) row.classList.toggle('visible');
+            }}
+            function toggleDealEdit(dealId) {{
+                var row = document.getElementById('deal-edit-' + dealId);
                 if (row) row.classList.toggle('visible');
             }}
         </script>
@@ -830,6 +845,37 @@ async def update_unmatched_status(
     return RedirectResponse(url="/appointments", status_code=303)
 
 
+@router.post("/appointments/deals/{deal_id}/update")
+async def update_deal(
+    deal_id: int,
+    premium_amount: float = Form(...),
+    commission_amount: float = Form(...),
+    first_name: str = Form(""),
+    last_name: str = Form(""),
+    company_name: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Update a closed deal's amounts and/or lead name/company."""
+    deal = db.query(Deal).filter(Deal.id == deal_id).first()
+    if not deal:
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse("Deal not found", status_code=404)
+    lead = db.query(Lead).filter(Lead.id == deal.lead_id).first()
+    if not lead:
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse("Lead not found", status_code=404)
+    deal.premium_amount = premium_amount
+    deal.commission_amount = commission_amount
+    if first_name is not None:
+        lead.first_name = first_name.strip() or lead.first_name
+    if last_name is not None:
+        lead.last_name = last_name.strip() or lead.last_name
+    if company_name is not None:
+        lead.company_name = company_name.strip() or lead.company_name
+    db.commit()
+    return RedirectResponse(url="/appointments", status_code=303)
+
+
 @router.post("/appointments/unmatched/{unmatched_id}/close-deal")
 async def close_deal_from_unmatched(
     unmatched_id: int,
@@ -879,5 +925,6 @@ async def close_deal_from_unmatched(
     )
     db.add(deal)
     conv.state = ConversationState.CLOSED_WON
+    u.status = "linked"  # so this row is excluded from unmatched counts/lists
     db.commit()
     return RedirectResponse(url="/appointments", status_code=303)

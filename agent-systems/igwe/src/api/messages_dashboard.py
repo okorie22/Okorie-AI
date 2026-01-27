@@ -2,23 +2,36 @@
 Inbound and Outbound Messages Dashboard.
 Tracks messages sent and received via the messages table.
 """
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from html import escape
+from fastapi import APIRouter, Depends, Request, Query, Form
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from datetime import datetime, timedelta
+from urllib.parse import urlencode
 
 from ..storage.database import get_db
 from ..storage.models import Message, MessageDirection, MessageChannel, Conversation, Lead
+from ..channels.email import SendGridService
 
 router = APIRouter(tags=["messages"])
 
 
+def _messages_qs(direction: str, channel: str, **kw):
+    p = {"direction": direction, "channel": channel}
+    p.update(kw)
+    return "?" + urlencode(p)
+
+
 @router.get("/messages", response_class=HTMLResponse)
-async def messages_dashboard(request: Request, db: Session = Depends(get_db)):
+async def messages_dashboard(
+    request: Request,
+    db: Session = Depends(get_db),
+    direction: str = Query("all", description="Filter: all, inbound, outbound"),
+    channel: str = Query("all", description="Filter: all, email, sms"),
+):
     """
-    Inbound and outbound messages dashboard.
-    Shows counts and recent activity from the messages table.
+    Inbound and outbound messages dashboard with filters.
     """
     now = datetime.utcnow()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -54,16 +67,22 @@ async def messages_dashboard(request: Request, db: Session = Depends(get_db)):
         Message.channel == MessageChannel.SMS,
     ).count()
 
-    # Recent messages (last 7 days, join to get lead)
-    recent = (
+    # Recent messages (last 7 days), optional filters
+    q = (
         db.query(Message, Conversation, Lead)
         .join(Conversation, Message.conversation_id == Conversation.id)
         .join(Lead, Conversation.lead_id == Lead.id)
         .filter(Message.created_at >= week_start)
-        .order_by(desc(Message.created_at))
-        .limit(200)
-        .all()
     )
+    if direction == "inbound":
+        q = q.filter(Message.direction == MessageDirection.INBOUND)
+    elif direction == "outbound":
+        q = q.filter(Message.direction == MessageDirection.OUTBOUND)
+    if channel == "email":
+        q = q.filter(Message.channel == MessageChannel.EMAIL)
+    elif channel == "sms":
+        q = q.filter(Message.channel == MessageChannel.SMS)
+    recent = q.order_by(desc(Message.created_at)).limit(200).all()
 
     def safe_preview(body, max_len=120):
         if not body:
@@ -90,16 +109,34 @@ async def messages_dashboard(request: Request, db: Session = Depends(get_db)):
             display_from = lead.email or "—"
         preview = safe_preview(msg.body)
         subject = meta.get("subject", "")
+        body_esc = escape((msg.body or "").replace("\n", "<br>"))
+        reply_subject = "Re: " + (subject or "your message") if subject else "Re: your message"
+        reply_form = ""
+        if msg.direction == MessageDirection.INBOUND and lead.email != "inbound-unknown@system":
+            reply_form = f"""
+                <div id="reply-form-{msg.id}" class="reply-form-row" style="display:none;">
+                    <form method="post" action="/messages/send" class="reply-form">
+                        <input type="hidden" name="conversation_id" value="{conv.id}">
+                        <div class="form-group"><label>Subject</label><input type="text" name="subject" value="{escape(reply_subject)}"></div>
+                        <div class="form-group"><label>Message</label><textarea name="body" rows="4" required></textarea></div>
+                        <div class="form-actions"><button type="submit" class="btn btn-success">Send reply</button><button type="button" onclick="toggleReplyForm({msg.id})" class="btn btn-outline">Cancel</button></div>
+                    </form>
+                </div>
+            """
         messages_html += f"""
-            <div class="message-card {direction_class}">
+            <div class="message-card {direction_class}" data-msg-id="{msg.id}">
                 <div class="message-meta">
                     <span class="message-direction">{direction_label}</span>
                     <span class="message-channel">{channel_label}</span>
                     <span class="message-time">{fmt_ts(msg.created_at)}</span>
+                    <button type="button" class="btn-link" onclick="toggleExpand({msg.id})">View full</button>
+                    {f'<button type="button" class="btn-link" onclick="toggleReplyForm(' + str(msg.id) + ')">Reply</button>' if msg.direction == MessageDirection.INBOUND and lead.email != "inbound-unknown@system" else ''}
                 </div>
-                <div class="message-lead">{lead_name} &lt;{display_from}&gt;</div>
-                <div class="message-subject">{subject or '—'}</div>
-                <div class="message-preview">{preview or '—'}</div>
+                <div class="message-lead">{escape(lead_name)} &lt;{escape(display_from)}&gt;</div>
+                <div class="message-subject">{escape(subject or "—")}</div>
+                <div class="message-preview">{escape(preview or "—")}</div>
+                <div id="msg-full-{msg.id}" class="message-full" style="display:none; margin-top:0.75rem; padding:0.75rem; background:#edf2f7; border-radius:6px; white-space:pre-wrap;">{(msg.body or "").replace("<", "&lt;").replace(">", "&gt;")}</div>
+                {reply_form}
             </div>
         """
 
@@ -110,6 +147,29 @@ async def messages_dashboard(request: Request, db: Session = Depends(get_db)):
             <p>No messages in the last 7 days. Outbound and inbound activity will appear here.</p>
         </div>
         """
+
+    # Recent conversations for Compose dropdown (last 50 by last_message_at or updated_at)
+    conv_q = (
+        db.query(Conversation, Lead)
+        .join(Lead, Conversation.lead_id == Lead.id)
+        .filter(Lead.email != "inbound-unknown@system")
+        .order_by(desc(Conversation.updated_at))
+        .limit(50)
+    )
+    recent_conversations = [(c, lead) for c, lead in conv_q.all()]
+
+    # Filter links (direction, channel) – build once for template
+    qs_all_all = _messages_qs("all", "all")
+    qs_inbound = _messages_qs("inbound", channel)
+    qs_outbound = _messages_qs("outbound", channel)
+    qs_email = _messages_qs(direction, "email")
+    qs_sms = _messages_qs(direction, "sms")
+
+    send_status = []
+    if request.query_params.get("sent") == "1":
+        send_status.append(('success', 'Message sent.'))
+    if request.query_params.get("send_error") == "1":
+        send_status.append(('error', 'Could not send message. Check lead suppression and rate limits.'))
 
     html_content = f"""
     <!DOCTYPE html>
@@ -223,6 +283,27 @@ async def messages_dashboard(request: Request, db: Session = Depends(get_db)):
 
             .empty-state {{ text-align: center; padding: 3rem; color: #a0aec0; }}
             .empty-state-icon {{ font-size: 3rem; margin-bottom: 1rem; }}
+            .filter-row {{ display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-bottom: 1rem; }}
+            .filter-group {{ display: flex; gap: 0.5rem; align-items: center; }}
+            .filter-group label {{ font-size: 0.85rem; color: #718096; margin-right: 0.25rem; }}
+            .filter-link {{ padding: 0.35rem 0.75rem; border-radius: 6px; text-decoration: none; font-size: 0.9rem; background: #edf2f7; color: #4a5568; }}
+            .filter-link:hover {{ background: #e2e8f0; color: #2d3748; }}
+            .filter-link.active {{ background: #667eea; color: white; }}
+            .reply-form-row {{ margin-top: 0.75rem; padding: 1rem; background: #f7fafc; border-radius: 8px; border: 1px solid #e2e8f0; }}
+            .reply-form .form-group {{ margin-bottom: 0.75rem; }}
+            .reply-form .form-group label {{ display: block; font-size: 0.85rem; font-weight: 600; color: #4a5568; margin-bottom: 0.25rem; }}
+            .reply-form .form-actions {{ display: flex; gap: 0.5rem; margin-top: 0.75rem; }}
+            .compose-section {{ margin-bottom: 1.5rem; padding: 1rem; background: #f0fff4; border: 1px solid #9ae6b4; border-radius: 8px; }}
+            .compose-section h3 {{ font-size: 1rem; margin-bottom: 0.75rem; color: #276749; }}
+            .btn-link {{ background: none; border: none; color: #667eea; cursor: pointer; font-size: 0.9rem; padding: 0 0.25rem; }}
+            .btn-link:hover {{ text-decoration: underline; }}
+            .btn {{ padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; border: 1px solid transparent; font-size: 0.9rem; }}
+            .btn-primary {{ background: #667eea; color: white; }}
+            .btn-primary:hover {{ background: #5a67d8; }}
+            .btn-success {{ background: #48bb78; color: white; }}
+            .btn-success:hover {{ background: #38a169; }}
+            .btn-outline {{ background: transparent; color: #4a5568; border-color: #e2e8f0; }}
+            .btn-outline:hover {{ background: #f7fafc; }}
         </style>
     </head>
     <body>
@@ -240,6 +321,7 @@ async def messages_dashboard(request: Request, db: Session = Depends(get_db)):
             <div class="subtitle">
                 Last updated: {now.strftime("%Y-%m-%d %H:%M:%S")} UTC • Auto-refresh every 60s
             </div>
+            {"".join(f'<div class="alert alert-{k}" style="margin-bottom:1rem; padding:0.75rem 1rem; border-radius:8px; background:{"#c6f6d5" if k=="success" else "#fed7d7"}; color:{"#22543d" if k=="success" else "#822727"};">{escape(v)}</div>' for k, v in send_status)}
 
             <div class="stats-grid">
                 <div class="stat-card">
@@ -277,14 +359,94 @@ async def messages_dashboard(request: Request, db: Session = Depends(get_db)):
             <div class="section">
                 <div class="section-header">
                     <h2 class="section-title">Recent Messages (last 7 days)</h2>
-                    <span class="section-badge">{len(recent)}</span>
+                    <div style="display:flex; align-items:center; gap:1rem;">
+                        <button type="button" class="btn btn-primary" onclick="toggleCompose()">✉️ Compose</button>
+                        <span class="section-badge">{len(recent)}</span>
+                    </div>
+                </div>
+                <div id="compose-form-wrap" class="compose-section" style="display:none;">
+                    <h3>New message</h3>
+                    <form method="post" action="/messages/send" class="reply-form">
+                        <div class="form-group">
+                            <label>To (conversation)</label>
+                            <select name="conversation_id" required>
+                                <option value="">— Pick a conversation —</option>
+                                {"".join('<option value="%s">%s &lt;%s&gt;</option>' % (c.id, escape(("%s %s" % (lead.first_name or "", lead.last_name or "")).strip() or lead.email or "—"), escape(lead.email or "")) for c, lead in recent_conversations)}
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Subject</label><input type="text" name="subject" required placeholder="Subject"></div>
+                        <div class="form-group"><label>Message</label><textarea name="body" rows="4" required placeholder="Your message"></textarea></div>
+                        <div class="form-actions"><button type="submit" class="btn btn-success">Send</button><button type="button" onclick="toggleCompose()" class="btn btn-outline">Cancel</button></div>
+                    </form>
+                </div>
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label>Direction:</label>
+                        <a href="/messages{qs_all_all}" class="filter-link {"active" if direction == "all" else ""}">All</a>
+                        <a href="/messages{qs_inbound}" class="filter-link {"active" if direction == "inbound" else ""}">Inbound</a>
+                        <a href="/messages{qs_outbound}" class="filter-link {"active" if direction == "outbound" else ""}">Outbound</a>
+                    </div>
+                    <div class="filter-group">
+                        <label>Channel:</label>
+                        <a href="/messages{qs_all_all if channel == "all" else _messages_qs(direction, "all")}" class="filter-link {"active" if channel == "all" else ""}">All</a>
+                        <a href="/messages{qs_email}" class="filter-link {"active" if channel == "email" else ""}">Email</a>
+                        <a href="/messages{qs_sms}" class="filter-link {"active" if channel == "sms" else ""}">SMS</a>
+                    </div>
                 </div>
                 <div class="messages-list-scroll">
                     {messages_html}
                 </div>
             </div>
         </div>
+        <script>
+        function toggleExpand(msgId) {{
+            var el = document.getElementById("msg-full-" + msgId);
+            if (!el) return;
+            var card = el.closest(".message-card");
+            var viewLink = card ? card.querySelector(".message-meta .btn-link") : null;
+            el.style.display = el.style.display === "none" ? "block" : "none";
+            if (viewLink) viewLink.textContent = el.style.display === "none" ? "View full" : "Collapse";
+        }}
+        function toggleReplyForm(msgId) {{
+            var el = document.getElementById("reply-form-" + msgId);
+            if (el) el.style.display = el.style.display === "none" ? "block" : "none";
+        }}
+        function toggleCompose() {{
+            var wrap = document.getElementById("compose-form-wrap");
+            if (wrap) wrap.style.display = wrap.style.display === "none" ? "block" : "none";
+        }}
+        </script>
     </body>
     </html>
     """
     return HTMLResponse(content=html_content)
+
+
+@router.post("/messages/send", response_class=RedirectResponse)
+async def messages_send(
+    db: Session = Depends(get_db),
+    conversation_id: int = Form(...),
+    subject: str = Form(...),
+    body: str = Form(...),
+):
+    """
+    Send an outbound email in a conversation (reply or compose). Uses SendGridService.
+    Redirects to /messages on success or /messages?send_error=1 on failure.
+    """
+    conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if not conv:
+        return RedirectResponse(url="/messages?send_error=1", status_code=303)
+    lead = db.query(Lead).filter(Lead.id == conv.lead_id).first()
+    if not lead or not lead.email or lead.email == "inbound-unknown@system":
+        return RedirectResponse(url="/messages?send_error=1", status_code=303)
+    svc = SendGridService(db)
+    out = svc.send_email(
+        to_email=lead.email,
+        subject=subject.strip(),
+        body=(body or "").strip(),
+        lead_id=lead.id,
+        conversation_id=conv.id,
+    )
+    if out.get("success"):
+        return RedirectResponse(url="/messages?sent=1", status_code=303)
+    return RedirectResponse(url="/messages?send_error=1", status_code=303)

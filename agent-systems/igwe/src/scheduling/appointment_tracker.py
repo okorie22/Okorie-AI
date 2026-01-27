@@ -211,6 +211,14 @@ class AppointmentTracker:
         
         self.db.add(appointment)
         
+        # Mark any UnmatchedAppointment for this event as "linked" so it no longer appears in unmatched lists
+        linked_ua = self.db.query(UnmatchedAppointment).filter(
+            UnmatchedAppointment.calendly_event_id == event_uuid
+        ).first()
+        if linked_ua:
+            linked_ua.status = "linked"
+            logger.info(f"Unmatched appointment {linked_ua.id} marked linked (now in appointments)")
+        
         # Update conversation state
         from ..workflow.state_machine import StateMachine
         state_machine = StateMachine(self.db)
