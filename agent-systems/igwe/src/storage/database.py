@@ -13,9 +13,10 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./iul_appointment_setter.db")
 
 # Create engine
+# SQLite: timeout (seconds) to wait for lock before "database is locked"; reduces 500s when Celery/app contend.
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+    connect_args={"check_same_thread": False, "timeout": 15} if DATABASE_URL.startswith("sqlite") else {},
     pool_pre_ping=True,
 )
 
