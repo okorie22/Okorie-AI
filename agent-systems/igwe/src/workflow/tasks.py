@@ -74,29 +74,34 @@ def dispatch_outbound_messages(self):
         logger.debug("Outside send window, skipping dispatch")
         return {"skipped": "outside_window"}
     
-    # Check if we can send a batch
-    batch_size = sendgrid_config.batch_size
-    if not rate_limiter.can_send_batch(batch_size):
-        logger.warning("Rate limit reached, deferring dispatch")
-        stats = rate_limiter.get_send_stats()
-        return {
-            "skipped": "rate_limited",
-            "stats": stats
-        }
-    
-    # Log current stats
+    # Use an effective batch size capped by hourly/daily headroom so we still send
+    # when batch_size > hourly_cap (e.g. batch_size=20, hourly_cap=10).
     stats = rate_limiter.get_send_stats()
+    batch_size = sendgrid_config.batch_size
+    effective_batch = min(
+        batch_size,
+        max(0, stats["hourly_remaining"]),
+        max(0, stats["daily_remaining"]),
+    )
+    if effective_batch <= 0:
+        logger.warning("Rate limit reached, deferring dispatch")
+        return {"skipped": "rate_limited", "stats": stats}
+    if effective_batch < batch_size:
+        logger.debug(
+            f"Capping batch to headroom: requested={batch_size}, effective={effective_batch}"
+        )
+    
     logger.info(
         f"Dispatch stats: {stats['sent_today']}/{stats['daily_cap']} daily, "
-        f"{stats['sent_this_hour']}/{stats['hourly_cap']} hourly"
+        f"{stats['sent_this_hour']}/{stats['hourly_cap']} hourly, effective_batch={effective_batch}"
     )
     
-    # Process pending actions with batch limit (existing workflow engine logic)
+    # Process pending actions with effective batch limit
     engine = WorkflowEngine(self.db)
-    result = engine.process_pending_actions(limit=batch_size)
+    result = engine.process_pending_actions(limit=effective_batch)
     
     logger.info(
-        f"Dispatched {result['processed']} messages (batch size: {batch_size}), {result['errors']} errors"
+        f"Dispatched {result['processed']} messages (batch size: {effective_batch}), {result['errors']} errors"
     )
     
     # Print completion to terminal

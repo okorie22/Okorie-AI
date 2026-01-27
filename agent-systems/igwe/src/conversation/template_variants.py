@@ -466,3 +466,29 @@ def get_all_variant_ids(stage: str) -> list[str]:
     """Get all variant IDs for a stage"""
     variants = TEMPLATE_VARIANTS.get(stage, [])
     return [v["id"] for v in variants]
+
+
+# -----------------------------------------------------------------------------
+# Email signature / footer (appended to all outbound email bodies)
+# Placeholders: {sender_name}, {sender_company} — filled from SendGrid config.
+# -----------------------------------------------------------------------------
+EMAIL_SIGNATURE_OPTIONS = [
+    {
+        "id": "sig_default",
+        "format": "\n\n--\n{sender_name}\n{sender_company}",
+        "description": "Classic dashed line, name then company",
+    },
+    {
+        "id": "sig_compact",
+        "format": "\n\n{sender_name}\n{sender_company}",
+        "description": "No dash, name and company only",
+    },
+    {
+        "id": "sig_full",
+        "format": "\n\nBest regards,\n{sender_name}\n{sender_company}",
+        "description": "Best regards + name + company",
+    },
+]
+
+# Default format used when SENDGRID_SIGNATURE_STYLE is not set or unknown
+DEFAULT_EMAIL_SIGNATURE_FORMAT = EMAIL_SIGNATURE_OPTIONS[0]["format"]

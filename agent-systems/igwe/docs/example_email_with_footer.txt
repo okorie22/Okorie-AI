@@ -1,0 +1,65 @@
+# Example outbound email with footer
+
+Configure in .env:
+  SENDGRID_FROM_NAME=Jane Smith
+  SENDGRID_SIGNATURE_COMPANY=Reimagine Wealth
+  SENDGRID_SIGNATURE_STYLE=sig_default   # or sig_compact | sig_full
+
+----------------------------------------------------------------------
+EXAMPLE 1: sig_default (SENDGRID_SIGNATURE_STYLE=sig_default)
+----------------------------------------------------------------------
+
+To: lead@example.com
+From: Jane Smith <appointments@yourdomain.com>
+Subject: curious
+
+Maria —
+
+Curious if you've looked into alternatives to standard retirement plans for business owners.
+
+Most financial_services folks I work with didn't know these existed until recently.
+
+Worth a conversation?
+
+--
+Jane Smith
+Reimagine Wealth
+
+----------------------------------------------------------------------
+EXAMPLE 2: sig_compact (SENDGRID_SIGNATURE_STYLE=sig_compact)
+----------------------------------------------------------------------
+
+To: lead@example.com
+From: Jane Smith <appointments@yourdomain.com>
+Subject: quick question
+
+Hey James —
+
+Do you handle your own retirement planning or do you have someone you trust for that?
+
+If you're open, I can share a quick idea that's working for a few business owners I've been talking to.
+
+Worth a 20–30 min call this week?
+
+Jane Smith
+Reimagine Wealth
+
+----------------------------------------------------------------------
+EXAMPLE 3: sig_full (SENDGRID_SIGNATURE_STYLE=sig_full)
+----------------------------------------------------------------------
+
+To: lead@example.com
+From: Jane Smith <appointments@yourdomain.com>
+Subject: worth a call?
+
+Hi Sarah,
+
+Working with some technology owners on retirement planning and wanted to see if you'd be open to a brief call.
+
+No pitch, just sharing what's been working. 30 minutes tops.
+
+Interested?
+
+Best regards,
+Jane Smith
+Reimagine Wealth

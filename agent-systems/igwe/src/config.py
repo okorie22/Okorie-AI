@@ -30,6 +30,10 @@ class SendGridConfig(BaseSettings):
     api_key: str = Field(default="", alias="SENDGRID_API_KEY")
     from_email: str = Field(default="appointments@example.com", alias="SENDGRID_FROM_EMAIL")
     from_name: str = Field(default="Your Name", alias="SENDGRID_FROM_NAME")
+    # Signature footer: company name shown under sender name in email body
+    signature_company: str = Field(default="", alias="SENDGRID_SIGNATURE_COMPANY")
+    # Signature style: sig_default | sig_compact | sig_full (see template_variants.EMAIL_SIGNATURE_OPTIONS)
+    signature_style: str = Field(default="sig_default", alias="SENDGRID_SIGNATURE_STYLE")
     # Reply-To for inbound parse (e.g. replies@reimaginewealth.org so lead replies hit SendGrid → webhook)
     reply_to: str = Field(default="", alias="SENDGRID_REPLY_TO")
     

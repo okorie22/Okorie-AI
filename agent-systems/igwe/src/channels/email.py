@@ -1,6 +1,7 @@
 """
 SendGrid email integration with reply webhook support.
 """
+from datetime import datetime, timezone
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
 from sqlalchemy.orm import Session
@@ -10,6 +11,18 @@ import os
 
 from ..storage.models import Lead, Message, MessageDirection, MessageChannel
 from ..storage.repositories import MessageRepository, EventRepository
+
+
+def _email_body_with_footer(body: str, from_name: str, signature_company: str, signature_style: str) -> str:
+    """Append sender signature footer to body. Uses template_variants.EMAIL_SIGNATURE_OPTIONS."""
+    from ..conversation.template_variants import EMAIL_SIGNATURE_OPTIONS, DEFAULT_EMAIL_SIGNATURE_FORMAT
+    fmt = DEFAULT_EMAIL_SIGNATURE_FORMAT
+    for opt in EMAIL_SIGNATURE_OPTIONS:
+        if opt.get("id") == signature_style:
+            fmt = opt["format"]
+            break
+    footer = fmt.format(sender_name=from_name or "", sender_company=signature_company or "")
+    return (body or "").rstrip() + footer
 
 
 class SendGridService:
@@ -63,18 +76,22 @@ class SendGridService:
             return {"success": False, "error": "Outside window"}
         
         from ..config import sendgrid_config
+        body_with_footer = _email_body_with_footer(
+            body, self.from_name, sendgrid_config.signature_company, sendgrid_config.signature_style
+        )
+        sent_at_utc = datetime.now(timezone.utc)
         # Check for TEST MODE
         if sendgrid_config.test_mode:
             logger.info(f"🧪 TEST MODE: Would send email to {to_email}")
             logger.info(f"   Subject: {subject}")
-            logger.info(f"   Body preview: {body[:200]}...")
+            logger.info(f"   Body preview: {body_with_footer[:200]}...")
             
             # Still log to database (for testing workflow)
             message_record = self.message_repo.create({
                 "conversation_id": conversation_id,
                 "direction": MessageDirection.OUTBOUND,
                 "channel": MessageChannel.EMAIL,
-                "body": body,
+                "body": body_with_footer,
                 "message_metadata": {
                     "subject": subject,
                     "to": to_email,
@@ -82,7 +99,7 @@ class SendGridService:
                     "test_mode": True,
                     **(metadata or {})
                 },
-                "sent_at": None
+                "sent_at": sent_at_utc,
             })
             
             # Log event
@@ -108,31 +125,31 @@ class SendGridService:
             }
         
         try:
-            # Create email
+            # Create email (body includes footer)
             message = Mail(
                 from_email=Email(self.from_email, self.from_name),
                 to_emails=To(to_email),
                 subject=subject,
-                plain_text_content=Content("text/plain", body)
+                plain_text_content=Content("text/plain", body_with_footer)
             )
             if sendgrid_config.reply_to:
                 message.reply_to = sendgrid_config.reply_to
             # Send via SendGrid
             response = self.client.send(message)
-            
-            # Log message to database
+
+            # Log message to database; sent_at set here; delivered_at set by SendGrid webhook when event=delivered
             message_record = self.message_repo.create({
                 "conversation_id": conversation_id,
                 "direction": MessageDirection.OUTBOUND,
                 "channel": MessageChannel.EMAIL,
-                "body": body,
+                "body": body_with_footer,
                 "message_metadata": {
                     "subject": subject,
                     "to": to_email,
                     "sendgrid_id": response.headers.get("X-Message-Id"),
                     **(metadata or {})
                 },
-                "sent_at": None  # Will be updated on delivery webhook
+                "sent_at": sent_at_utc,
             })
             
             # Log event
@@ -182,11 +199,28 @@ class SendGridService:
                 logger.warning(f"Message not found for SendGrid ID: {sendgrid_id}")
                 return {"success": False, "error": "Message not found"}
             
-            # Update message based on event type
+            # Parse timestamp (SendGrid sends Unix epoch or ISO string); store as UTC datetime
+            def _parse_ts(ts) -> Optional[datetime]:
+                if ts is None:
+                    return None
+                if isinstance(ts, (int, float)):
+                    return datetime.fromtimestamp(ts, tz=timezone.utc)
+                if isinstance(ts, str):
+                    try:
+                        return datetime.fromtimestamp(int(ts), tz=timezone.utc)
+                    except ValueError:
+                        pass
+                    try:
+                        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    except ValueError:
+                        return None
+                return ts
+
+            ts = _parse_ts(webhook_data.get("timestamp"))
             if event_type == "delivered":
-                message.delivered_at = webhook_data.get("timestamp")
+                message.delivered_at = ts
             elif event_type == "open":
-                message.read_at = webhook_data.get("timestamp")
+                message.read_at = ts
             elif event_type == "click":
                 # Update metadata with click info
                 if not message.message_metadata:
