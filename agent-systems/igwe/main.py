@@ -97,31 +97,37 @@ class AppointmentSetterSystem:
             logger.error(f"[ERROR] Error starting Redis: {e}")
             return None
     
+    def _is_external_redis(self) -> bool:
+        """True if REDIS_URL points to an external service (Render Redis, Upstash, etc.)."""
+        url = (redis_config.url or "").strip().lower()
+        if not url:
+            return False
+        return "localhost" not in url and "127.0.0.1" not in url
+
     def check_redis(self) -> bool:
-        """Check if Redis is running, and auto-start if not"""
+        """Check if Redis is running. On Render/external Redis, only check connection; locally, auto-start if needed."""
         import redis
-        
+
         try:
             logger.info("Checking Redis connection...")
             r = redis.from_url(redis_config.url, socket_timeout=5)
             r.ping()
-            logger.info("[OK] Redis is already running")
+            logger.info("[OK] Redis is reachable")
             return True
         except Exception as e:
+            if self._is_external_redis():
+                logger.error(f"[ERROR] Cannot connect to external Redis: {e}")
+                logger.info("Check REDIS_URL (e.g. Render Redis add-on or Upstash) and network.")
+                return False
             logger.warning(f"Redis not running: {e}")
             logger.info("Attempting to auto-start Redis...")
-            
-            # Try to start Redis
             redis_process = self.start_redis()
             if redis_process:
                 self.processes.append(redis_process)
                 return True
-            else:
-                logger.error("[ERROR] Could not auto-start Redis")
-                logger.info("Please start Redis manually:")
-                logger.info("  Windows: cd C:\\Users\\Top Cash Pawn\\Okorie-AI\\redis && .\\redis-server.exe")
-                logger.info("  Linux/Mac: redis-server &")
-                return False
+            logger.error("[ERROR] Could not auto-start Redis")
+            logger.info("Please start Redis manually or set REDIS_URL to an external Redis.")
+            return False
     
     def init_database(self) -> bool:
         """Initialize database tables"""
@@ -160,11 +166,16 @@ class AppointmentSetterSystem:
             logger.warning("[WARNING] Configuration warnings:")
             for w in warnings:
                 logger.warning(f"  - {w}")
-            
-            response = input("\nContinue anyway? (y/n): ")
-            if response.lower() != 'y':
-                return False
-        
+            # On Render (RUN_MODE set) or non-interactive, do not block on input
+            if os.getenv("RUN_MODE"):
+                logger.warning("RUN_MODE is set; continuing despite warnings.")
+            else:
+                try:
+                    response = input("\nContinue anyway? (y/n): ")
+                    if response.lower() != 'y':
+                        return False
+                except EOFError:
+                    logger.warning("Non-interactive; continuing despite warnings.")
         logger.info("[OK] Environment configuration OK")
         return True
     
@@ -212,51 +223,73 @@ class AppointmentSetterSystem:
         """Start Celery beat scheduler"""
         try:
             logger.info("Starting Celery beat scheduler...")
-            
             cmd = [
                 sys.executable, "-m", "celery",
                 "-A", "src.workflow.celery_app",
                 "beat",
                 "--loglevel=info"
             ]
-            
-            # Create logs directory if it doesn't exist
             Path("logs").mkdir(exist_ok=True)
-            
-            # Open log file for beat output
             beat_log = open("logs/celery_beat.log", "a")
-            
             process = subprocess.Popen(
                 cmd,
                 stdout=beat_log,
                 stderr=subprocess.STDOUT,
                 text=True
             )
-            
             time.sleep(2)
-            
             if process.poll() is None:
                 logger.info("[OK] Celery beat scheduler started (logs: logs/celery_beat.log)")
                 return process
-            else:
-                logger.error("[ERROR] Celery beat failed to start")
-                beat_log.close()
-                return None
-        
+            logger.error("[ERROR] Celery beat failed to start")
+            beat_log.close()
+            return None
         except Exception as e:
             logger.error(f"[ERROR] Error starting Celery beat: {e}")
+            return None
+
+    def start_celery_worker_with_beat(self) -> Optional[subprocess.Popen]:
+        """Start Celery worker and beat in one process (for Render background worker)."""
+        try:
+            logger.info("Starting Celery worker + beat (single process)...")
+            cmd = [
+                sys.executable, "-m", "celery",
+                "-A", "src.workflow.celery_app",
+                "worker",
+                "--beat",
+                "--loglevel=info",
+                "--pool=solo" if sys.platform == "win32" else "--pool=prefork"
+            ]
+            Path("logs").mkdir(exist_ok=True)
+            worker_log = open("logs/celery_worker.log", "a")
+            process = subprocess.Popen(
+                cmd,
+                stdout=worker_log,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            time.sleep(3)
+            if process.poll() is None:
+                logger.info("[OK] Celery worker+beat started (logs: logs/celery_worker.log)")
+                return process
+            logger.error("[ERROR] Celery worker+beat failed to start")
+            worker_log.close()
+            return None
+        except Exception as e:
+            logger.error(f"[ERROR] Error starting Celery worker+beat: {e}")
             return None
     
     def start_fastapi(self) -> Optional[subprocess.Popen]:
         """Start FastAPI server"""
         try:
+            port = os.getenv("PORT", "8000")
             logger.info("Starting FastAPI server...")
             
             cmd = [
                 sys.executable, "-m", "uvicorn",
                 "src.api.main:app",
                 "--host", "0.0.0.0",
-                "--port", "8000",
+                "--port", port,
                 "--reload" if app_config.debug else "--no-reload"
             ]
             
@@ -276,7 +309,7 @@ class AppointmentSetterSystem:
             time.sleep(3)
             
             if process.poll() is None:
-                logger.info("[OK] FastAPI server started on http://localhost:8000 (logs: logs/fastapi.log)")
+                logger.info(f"[OK] FastAPI server started on port {port} (logs: logs/fastapi.log)")
                 return process
             else:
                 logger.error("[ERROR] FastAPI server failed to start")
@@ -316,62 +349,75 @@ class AppointmentSetterSystem:
         logger.info("[OK] All services stopped")
     
     def run(self):
-        """Main entry point - start all services"""
+        """Main entry point. Use RUN_MODE=web|worker|all to run only part of the stack (e.g. on Render)."""
+        run_mode = (os.getenv("RUN_MODE") or "all").strip().lower()
         logger.info("=" * 60)
         logger.info("IUL Appointment Setter System")
+        logger.info(f"RUN_MODE={run_mode}")
         logger.info("=" * 60)
-        
-        # Pre-flight checks
+
         if not self.check_redis():
             sys.exit(1)
-        
         if not self.init_database():
             sys.exit(1)
-        
         if not self.check_env_vars():
             sys.exit(1)
-        
-        # Start services
+
         logger.info("\n" + "=" * 60)
         logger.info("Starting Services")
         logger.info("=" * 60)
-        
-        celery_worker = self.start_celery_worker()
-        if not celery_worker:
-            logger.error("Failed to start Celery worker. Exiting.")
-            sys.exit(1)
-        self.processes.append(celery_worker)
-        
-        celery_beat = self.start_celery_beat()
-        if not celery_beat:
-            logger.error("Failed to start Celery beat. Exiting.")
-            self.stop_all()
-            sys.exit(1)
-        self.processes.append(celery_beat)
-        
-        fastapi = self.start_fastapi()
-        if not fastapi:
-            logger.error("Failed to start FastAPI. Exiting.")
-            self.stop_all()
-            sys.exit(1)
-        self.processes.append(fastapi)
-        
-        # System is now running
+
+        if run_mode == "web":
+            # Render Web Service: FastAPI only (Redis/DB/Celery run elsewhere)
+            fastapi = self.start_fastapi()
+            if not fastapi:
+                logger.error("Failed to start FastAPI. Exiting.")
+                sys.exit(1)
+            self.processes.append(fastapi)
+            logger.info("[OK] Web service running (FastAPI only)")
+        elif run_mode == "worker":
+            # Render Background Worker: Celery worker + beat in one process
+            worker = self.start_celery_worker_with_beat()
+            if not worker:
+                logger.error("Failed to start Celery worker+beat. Exiting.")
+                sys.exit(1)
+            self.processes.append(worker)
+            logger.info("[OK] Worker running (Celery worker + beat)")
+        else:
+            # Local / all: Redis (if local), Celery worker, Celery beat, FastAPI
+            celery_worker = self.start_celery_worker()
+            if not celery_worker:
+                logger.error("Failed to start Celery worker. Exiting.")
+                sys.exit(1)
+            self.processes.append(celery_worker)
+            celery_beat = self.start_celery_beat()
+            if not celery_beat:
+                logger.error("Failed to start Celery beat. Exiting.")
+                self.stop_all()
+                sys.exit(1)
+            self.processes.append(celery_beat)
+            fastapi = self.start_fastapi()
+            if not fastapi:
+                logger.error("Failed to start FastAPI. Exiting.")
+                self.stop_all()
+                sys.exit(1)
+            self.processes.append(fastapi)
+            logger.info("[OK] Full stack running (worker + beat + API)")
+
+        port = os.getenv("PORT", "8000")
         logger.info("\n" + "=" * 60)
         logger.info("[OK] System is RUNNING")
         logger.info("=" * 60)
-        logger.info("API: http://localhost:8000")
-        logger.info("Docs: http://localhost:8000/docs")
-        logger.info("\nPress Ctrl+C to stop")
+        if run_mode != "worker":
+            logger.info(f"API: http://0.0.0.0:{port}")
+            logger.info(f"Docs: http://0.0.0.0:{port}/docs")
+        if run_mode == "all":
+            logger.info("\nPress Ctrl+C to stop")
         logger.info("=" * 60 + "\n")
-        
+
         self.running = True
-        
-        # Register signal handlers
         signal.signal(signal.SIGINT, lambda s, f: self.stop_all())
         signal.signal(signal.SIGTERM, lambda s, f: self.stop_all())
-        
-        # Monitor processes
         try:
             self.monitor_processes()
         except KeyboardInterrupt:

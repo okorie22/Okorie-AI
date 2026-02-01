@@ -118,6 +118,19 @@ class Lead(Base):
     events = relationship("Event", back_populates="lead")
 
 
+class Suppression(Base):
+    """Suppression log for bounces, complaints, unsubscribes (SendGrid webhook, manual, etc.)."""
+    __tablename__ = "suppressions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), index=True, nullable=False)
+    email = Column(String(255), index=True, nullable=False)
+    reason = Column(String(100), index=True, nullable=False)  # bounce, complaint, unsubscribe, dropped, blocked
+    source = Column(String(100), index=True, nullable=False)  # sendgrid_webhook, manual, cleanup
+    event_metadata = Column(JSON, nullable=True)  # extra event data from webhook (avoid name 'metadata' - reserved)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
 class LeadScore(Base):
     """Lead scoring data"""
     __tablename__ = "lead_scores"

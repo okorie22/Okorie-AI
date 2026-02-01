@@ -184,29 +184,41 @@ class CopyBotAgent(QObject):
             
         # Check trading mode and leverage availability
         self.trading_mode = config.TRADING_MODE.lower()
-        if self.trading_mode not in ["spot", "leverage"]:
+        if self.trading_mode not in ["spot", "leverage", "futures"]:
             warning(f"Invalid TRADING_MODE: {config.TRADING_MODE}. Defaulting to 'spot'.")
             self.trading_mode = "spot"
+        
+        # Normalize "leverage" to "futures" for consistency
+        if self.trading_mode == "leverage":
+            self.trading_mode = "futures"
             
         info(f"Trading Mode: {self.trading_mode.upper()}")
         
-        # Check hyperliquid availability if in leverage mode
+        # Check hyperliquid availability if in futures mode
         self.leverage_available = False
-        if self.trading_mode == "leverage":
-            if not LEVERAGE_UTILS_AVAILABLE:
-                warning("Leverage trading utilities not available. Falling back to spot trading.")
+        if self.trading_mode == "futures":
+            try:
+                from src.scripts.trading.hyperliquid_exchange import get_hyperliquid_exchange
+                # Try to initialize (will fail gracefully if credentials missing)
+                try:
+                    exchange = get_hyperliquid_exchange()
+                    if exchange:
+                        self.leverage_available = True
+                        info("✅ Hyperliquid futures trading available")
+                    else:
+                        warning("Hyperliquid exchange not available. Falling back to spot trading.")
+                        self.trading_mode = "spot"
+                except Exception as e:
+                    # If credentials missing but paper trading enabled, allow it
+                    if getattr(config, 'PAPER_TRADING_ENABLED', False):
+                        info("⚠️ Hyperliquid credentials not set, but paper trading enabled - futures mode allowed")
+                        self.leverage_available = True
+                    else:
+                        warning(f"Hyperliquid not available: {e}. Falling back to spot trading.")
+                        self.trading_mode = "spot"
+            except ImportError:
+                warning("Hyperliquid SDK not installed. Falling back to spot trading.")
                 self.trading_mode = "spot"
-            elif not config.USE_HYPERLIQUID:
-                warning("Hyperliquid is disabled in config. Falling back to spot trading.")
-                self.trading_mode = "spot"
-            else:
-                # Test hyperliquid connection
-                self.leverage_available = check_hyperliquid_available()
-                if not self.leverage_available:
-                    warning("Hyperliquid connection failed. Falling back to spot trading.")
-                    self.trading_mode = "spot"
-                else:
-                    info("Hyperliquid connection verified. Leverage trading enabled!")
         
         # Check if necessary functions exist in nice_funcs
         self.ai_analysis_available = (
@@ -1096,18 +1108,54 @@ Confidence should reflect your agreement with the wallet's action, with higher c
             error(f"Error executing position updates: {str(e)}")
             return False
 
+    def _get_token_symbol(self, token_mint: str, token_data: dict = None) -> str:
+        """Convert token address to symbol for Hyperliquid trading"""
+        try:
+            # First try to get symbol from token_data if available
+            if token_data and token_data.get('symbol'):
+                symbol = str(token_data.get('symbol')).upper()
+                # Validate it's a reasonable symbol (not an address)
+                if len(symbol) <= 10 and symbol.isalnum():
+                    return symbol
+            
+            # Try mapping function
+            from src.nice_funcs_hl import get_token_symbol_from_address
+            symbol = get_token_symbol_from_address(token_mint)
+            if symbol and len(symbol) <= 10:
+                return symbol
+            
+            # Fallback: use first 4 chars
+            return token_mint[:4].upper()
+        except:
+            # Fallback: use first 4 chars
+            return token_mint[:4].upper()
+    
     def _execute_mirror_buy(self, wallet: str, token_mint: str, token_data: dict):
-        """Execute buy transaction by mirroring the wallet action - NO AI ANALYSIS"""
+        """Execute buy transaction by mirroring the wallet action - routes to spot or futures based on TRADING_MODE"""
         try:
             # Skip if token is excluded
             if token_mint in config.EXCLUDED_TOKENS:
                 warning(f"Skipping buy for excluded token: {token_mint}")
                 return
             
+            # Check trading mode and route accordingly
+            trading_mode = getattr(config, 'TRADING_MODE', 'spot')
+            
+            if trading_mode == "futures":
+                return self._execute_futures_buy(wallet, token_mint, token_data)
+            else:
+                return self._execute_spot_buy(wallet, token_mint, token_data)
+        except Exception as e:
+            warning(f"Execute buy failed: {e}")
+            return None
+
+    def _execute_spot_buy(self, wallet: str, token_mint: str, token_data: dict):
+        """Execute spot buy transaction (existing logic)"""
+        try:
             token_name = token_data.get('name', 'Unknown')
             token_symbol = token_data.get('symbol', 'UNK')
             
-            info(f"🔄 Mirroring BUY: {token_symbol} ({token_name})")
+            info(f"🔄 Mirroring SPOT BUY: {token_symbol} ({token_name})")
             
             # Set agent context for proper attribution
             from src.scripts.webhooks.webhook_handler import agent_context
@@ -1187,20 +1235,153 @@ Confidence should reflect your agreement with the wallet's action, with higher c
                         error(f"Live trading buy failed: {e}")
                     
         except Exception as e:
-            error(f"Error executing mirror buy: {str(e)}")
+            error(f"Error executing spot buy: {str(e)}")
+    
+    def _execute_futures_buy(self, wallet: str, token_mint: str, token_data: dict):
+        """Execute perpetual futures buy via Hyperliquid"""
+        try:
+            from src.scripts.trading.hyperliquid_exchange import get_hyperliquid_exchange
+            from src.scripts.trading.position_manager import PositionRequest, PositionAction
+            from src.config import FUTURES_DEFAULT_LEVERAGE, FUTURES_SUPPORTED_TOKENS
+            
+            from src.config import PAPER_TRADING_ENABLED
+            
+            token_name = token_data.get('name', 'Unknown')
+            token_symbol = self._get_token_symbol(token_mint, token_data)
+            
+            info(f"🔄 Mirroring FUTURES BUY: {token_symbol} ({token_name})")
+            
+            # Check if token is supported for futures
+            if token_symbol not in FUTURES_SUPPORTED_TOKENS:
+                warning(f"{token_symbol} not supported for futures trading. Supported: {FUTURES_SUPPORTED_TOKENS}")
+                return
+            
+            # Get position size from position_manager
+            position_request = PositionRequest(
+                agent_id="copybot_futures",
+                token_address=token_mint,
+                action=PositionAction.BUY,
+                requested_amount_usd=token_data.get('usd_value', 0),
+                reason=f"Mirrored wallet action: {wallet[:8]}..."
+            )
+            
+            response = self.position_manager.request_position_sizing(position_request)
+            if not response.approved:
+                warning(f"Position sizing rejected: {response.limit_reason}")
+                return
+            
+            # Paper trading mode - simulate Hyperliquid trade
+            if PAPER_TRADING_ENABLED:
+                try:
+                    from src.paper_trading import execute_paper_trade
+                    # Get current price for simulation
+                    try:
+                        from src.scripts.shared_services.optimized_price_service import get_optimized_price_service
+                        price_service = get_optimized_price_service()
+                        price = price_service.get_price(token_mint) or 0.0
+                    except:
+                        price = 0.0
+                    
+                    if price > 0:
+                        # Simulate futures position in paper trading
+                        # Calculate token amount (with leverage effect for simulation)
+                        token_amount = (response.approved_amount_usd * FUTURES_DEFAULT_LEVERAGE) / price
+                        
+                        success = execute_paper_trade(
+                            token_mint, "BUY", token_amount, price,
+                            "copybot_futures", token_symbol, token_name
+                        )
+                        
+                        if success:
+                            info(f"✅ Paper FUTURES BUY: {token_symbol} ${response.approved_amount_usd:.2f} @ {FUTURES_DEFAULT_LEVERAGE}x (simulated)")
+                            
+                            # Register position in position_manager
+                            self.position_manager.register_position(
+                                token_address=token_mint,
+                                size_usd=response.approved_amount_usd,
+                                agent_id="copybot_futures"
+                            )
+                            
+                            # Emit order executed signal
+                            self.order_executed.emit(
+                                "CopyBot", "BUY", token_symbol,
+                                response.approved_amount_usd, 0, 0, 0, "", token_mint,
+                                f"Paper Futures LONG: {wallet[:8]}... @ {FUTURES_DEFAULT_LEVERAGE}x"
+                            )
+                        else:
+                            warning(f"❌ Paper futures buy failed: {token_symbol}")
+                    else:
+                        warning(f"No price available for {token_symbol} - skipping paper futures buy")
+                except Exception as e:
+                    error(f"Paper trading futures buy failed: {e}")
+                return
+            
+            # Live trading mode - execute on Hyperliquid
+            # Get Hyperliquid exchange
+            exchange = get_hyperliquid_exchange()
+            if not exchange:
+                error("Hyperliquid exchange not available")
+                return
+            
+            # Execute perpetual order
+            result = exchange.place_order(
+                symbol=token_symbol,
+                side='A',  # Buy/Long
+                size_usd=response.approved_amount_usd,
+                leverage=FUTURES_DEFAULT_LEVERAGE,
+                order_type='market'
+            )
+            
+            if result.get('success'):
+                info(f"✅ Successfully executed FUTURES BUY: {token_symbol} ${response.approved_amount_usd:.2f} @ {FUTURES_DEFAULT_LEVERAGE}x")
+                
+                # Register position in position_manager
+                self.position_manager.register_position(
+                    token_address=token_mint,
+                    size_usd=response.approved_amount_usd,
+                    agent_id="copybot_futures"
+                )
+                
+                # Emit order executed signal
+                self.order_executed.emit(
+                    "CopyBot", "BUY", token_symbol,
+                    response.approved_amount_usd, 0, 0, 0, "", token_mint,
+                    f"Futures LONG: {wallet[:8]}... @ {FUTURES_DEFAULT_LEVERAGE}x"
+                )
+            else:
+                error(f"❌ Futures buy failed: {result.get('error', 'Unknown error')}")
+                
+        except Exception as e:
+            error(f"Error executing futures buy: {str(e)}")
+            import traceback
+            error(traceback.format_exc())
 
     def _execute_mirror_sell(self, wallet: str, token_mint: str, token_data: dict):
-        """Execute sell transaction by mirroring the wallet action - NO AI ANALYSIS"""
+        """Execute sell transaction by mirroring the wallet action - routes to spot or futures based on TRADING_MODE"""
         try:
             # Skip if token is excluded
             if token_mint in config.EXCLUDED_TOKENS:
                 warning(f"Skipping sell for excluded token: {token_mint}")
                 return
             
+            # Check trading mode and route accordingly
+            trading_mode = getattr(config, 'TRADING_MODE', 'spot')
+            
+            if trading_mode == "futures":
+                return self._execute_futures_sell(wallet, token_mint, token_data)
+            else:
+                return self._execute_spot_sell(wallet, token_mint, token_data)
+        except Exception as e:
+            warning(f"Execute sell failed: {e}")
+            return None
+
+    def _execute_spot_sell(self, wallet: str, token_mint: str, token_data: dict):
+        """Execute spot sell transaction (existing logic)"""
+        try:
             token_name = token_data.get('name', 'Unknown')
             token_symbol = token_data.get('symbol', 'UNK')
             
-            info(f"🔄 Mirroring SELL: {token_symbol} ({token_name})")
+            info(f"🔄 Mirroring SPOT SELL: {token_symbol} ({token_name})")
             
             # Use unified balance lookup for reliable balance check
             try:
@@ -1299,7 +1480,173 @@ Confidence should reflect your agreement with the wallet's action, with higher c
                     warning(f"❌ Failed to mirror SELL: {token_symbol} ({token_name})")
                         
         except Exception as e:
-            error(f"Error executing mirror sell: {str(e)}")
+            error(f"Error executing spot sell: {str(e)}")
+    
+    def _execute_futures_sell(self, wallet: str, token_mint: str, token_data: dict):
+        """Execute perpetual futures sell/close via Hyperliquid"""
+        try:
+            from src.scripts.trading.hyperliquid_exchange import get_hyperliquid_exchange
+            from src.config import FUTURES_SUPPORTED_TOKENS
+            
+            from src.config import PAPER_TRADING_ENABLED
+            
+            token_name = token_data.get('name', 'Unknown')
+            token_symbol = self._get_token_symbol(token_mint, token_data)
+            
+            info(f"🔄 Mirroring FUTURES SELL: {token_symbol} ({token_name})")
+            
+            # Check if token is supported for futures
+            if token_symbol not in FUTURES_SUPPORTED_TOKENS:
+                warning(f"{token_symbol} not supported for futures trading")
+                return
+            
+            # Paper trading mode - simulate Hyperliquid close
+            if PAPER_TRADING_ENABLED:
+                try:
+                    from src.paper_trading import execute_paper_trade
+                    # Get current price for simulation
+                    try:
+                        from src.scripts.shared_services.optimized_price_service import get_optimized_price_service
+                        price_service = get_optimized_price_service()
+                        price = price_service.get_price(token_mint) or 0.0
+                    except:
+                        price = 0.0
+                    
+                    # Get token balance from paper trading
+                    try:
+                        from src.paper_trading import get_paper_portfolio
+                        portfolio = get_paper_portfolio()
+                        token_row = portfolio[portfolio['token_address'] == token_mint]
+                        if not token_row.empty:
+                            token_balance = float(token_row.iloc[0]['amount'])
+                        else:
+                            token_balance = 0.0
+                    except:
+                        token_balance = 0.0
+                    
+                    if token_balance > 0 and price > 0:
+                        success = execute_paper_trade(
+                            token_mint, "SELL", token_balance, price,
+                            "copybot_futures", token_symbol, token_name
+                        )
+                        
+                        if success:
+                            info(f"✅ Paper FUTURES SELL: {token_symbol} (simulated close)")
+                            
+                            # Remove from position manager
+                            self.position_manager.remove_position(token_mint)
+                            
+                            # Emit order executed signal
+                            self.order_executed.emit(
+                                "CopyBot", "SELL", token_symbol,
+                                0, 0, 0, 0, "", token_mint,
+                                f"Paper Futures CLOSE: {wallet[:8]}..."
+                            )
+                        else:
+                            warning(f"❌ Paper futures sell failed: {token_symbol}")
+                    else:
+                        info(f"No position to close for {token_symbol} in paper trading")
+                        self.position_manager.remove_position(token_mint)
+                except Exception as e:
+                    error(f"Paper trading futures sell failed: {e}")
+                return
+            
+            # Live trading mode - execute on Hyperliquid
+            # Get Hyperliquid exchange
+            exchange = get_hyperliquid_exchange()
+            if not exchange:
+                error("Hyperliquid exchange not available")
+                return
+            
+            # Check if we have an open position
+            position = exchange.get_position(symbol=token_symbol)
+            if not position or abs(position.get('size', 0)) == 0:
+                info(f"No open position for {token_symbol} - nothing to close")
+                # Remove from position manager if tracked
+                self.position_manager.remove_position(token_mint)
+                return
+            
+            # Close the position (100% close for mirror sell)
+            result = exchange.close_position(symbol=token_symbol, percentage=100.0)
+            
+            if result.get('success'):
+                info(f"✅ Successfully closed FUTURES position: {token_symbol}")
+                
+                # Remove from position manager
+                self.position_manager.remove_position(token_mint)
+                
+                # Emit order executed signal
+                self.order_executed.emit(
+                    "CopyBot", "SELL", token_symbol,
+                    0, 0, 0, 0, "", token_mint,
+                    f"Futures CLOSE: {wallet[:8]}..."
+                )
+            else:
+                error(f"❌ Futures sell failed: {result.get('error', 'Unknown error')}")
+                
+        except Exception as e:
+            error(f"Error executing futures sell: {str(e)}")
+            import traceback
+            error(traceback.format_exc())
+    
+    def _monitor_hyperliquid_positions(self):
+        """Monitor open Hyperliquid positions for liquidation risk"""
+        try:
+            from src.scripts.trading.hyperliquid_exchange import get_hyperliquid_exchange
+            from src.scripts.trading.hyperliquid_account_manager import get_hyperliquid_account_manager
+            from src.nice_funcs_hl import calculate_liquidation_price
+            
+            exchange = get_hyperliquid_exchange()
+            if not exchange:
+                return
+            
+            positions = exchange.get_positions()
+            if not positions:
+                return
+            
+            for pos in positions:
+                symbol = pos['symbol']
+                entry_price = pos['entry_price']
+                leverage = pos['leverage']
+                size = pos['size']
+                is_long = size > 0
+                liquidation_price = pos.get('liquidation_price', 0)
+                
+                # Get current price
+                try:
+                    from src.scripts.shared_services.optimized_price_service import get_optimized_price_service
+                    price_service = get_optimized_price_service()
+                    # Try to get price using symbol (may need address mapping)
+                    current_price = entry_price  # Fallback to entry price
+                    # TODO: Map symbol to token address for price lookup
+                except:
+                    current_price = entry_price
+                
+                # Calculate liquidation distance
+                if liquidation_price > 0:
+                    if is_long:
+                        distance_pct = ((current_price - liquidation_price) / entry_price) * 100
+                    else:
+                        distance_pct = ((liquidation_price - current_price) / entry_price) * 100
+                    
+                    # Alert if within 5% of liquidation
+                    if distance_pct < 5:
+                        warning(f"⚠️ {symbol} position near liquidation: {distance_pct:.1f}% away (Liq: ${liquidation_price:.2f}, Current: ${current_price:.2f})")
+                        
+                        # Auto-reduce if within 2% (safety mechanism)
+                        if distance_pct < 2:
+                            error(f"🚨 CRITICAL: {symbol} position within 2% of liquidation - auto-reducing position")
+                            # Close 50% of position
+                            result = exchange.close_position(symbol=symbol, percentage=50.0)
+                            if result.get('success'):
+                                info(f"✅ Auto-reduced {symbol} position by 50% due to liquidation risk")
+                            else:
+                                error(f"❌ Failed to auto-reduce {symbol} position: {result.get('error')}")
+                
+        except Exception as e:
+            error(f"Error monitoring Hyperliquid positions: {e}")
+            import traceback
+            error(traceback.format_exc())
 
     def get_portfolio_data(self):
         """Get current portfolio data for self-stop checks"""
@@ -2692,6 +3039,11 @@ Confidence should reflect your agreement with the wallet's action, with higher c
                     if config.AI_EXIT_TARGETS_ENABLED:
                         self.check_exit_targets()
                     
+                    # Monitor Hyperliquid positions for liquidation risk (if futures mode)
+                    trading_mode = getattr(config, 'TRADING_MODE', 'spot')
+                    if trading_mode == "futures":
+                        self._monitor_hyperliquid_positions()
+                    
                     # Sleep for a long interval - webhooks will wake us up
                     time.sleep(60)  # 1 minute for faster exit target checking
                     
@@ -3358,6 +3710,58 @@ Confidence should reflect your agreement with the wallet's action, with higher c
             error(f"Error processing parsed transaction: {e}")
             return False
 
+    def _get_hyperliquid_tracked_wallets(self) -> set:
+        """Tracked Hyperliquid addresses: from config HYPERLIQUID_WALLETS_TO_TRACK or top N from ranked_whales.json."""
+        try:
+            from src.config import HYPERLIQUID_WALLETS_TO_TRACK, HYPERLIQUID_COPY_TOP_N
+            from src.config import WHALE_DATA_DIR, WHALE_RANKED_FILE
+            if HYPERLIQUID_WALLETS_TO_TRACK:
+                return set(HYPERLIQUID_WALLETS_TO_TRACK)
+            import os
+            from pathlib import Path
+            ranked_path = Path(WHALE_DATA_DIR) / WHALE_RANKED_FILE
+            if not ranked_path.exists():
+                return set()
+            with open(ranked_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            addrs = list(data.keys())[:HYPERLIQUID_COPY_TOP_N]
+            return set(addrs)
+        except Exception:
+            return set()
+
+    def process_hyperliquid_fill(self, event: dict) -> bool:
+        """Process a Hyperliquid fill event from WebSocket listener; execute mirror futures trade."""
+        try:
+            from src.config import FUTURES_SUPPORTED_TOKENS, HYPERLIQUID_COPY_ENABLED
+            if not HYPERLIQUID_COPY_ENABLED:
+                return False
+            wallet = event.get("wallet") or event.get("user")
+            if not wallet:
+                return False
+            tracked = self._get_hyperliquid_tracked_wallets()
+            if wallet not in tracked:
+                return False
+            symbol = (event.get("symbol") or "").strip().upper()
+            if not symbol or symbol not in FUTURES_SUPPORTED_TOKENS:
+                warning(f"Hyperliquid fill: symbol {symbol} not supported")
+                return False
+            side = (event.get("side") or "").strip().lower()
+            size_usd = float(event.get("size_usd", 0) or 0)
+            if size_usd <= 0:
+                return False
+            token_data = {"symbol": symbol, "usd_value": size_usd, "name": symbol}
+            token_mint = symbol
+            if side in ("buy", "long", "a"):
+                self._execute_futures_buy(wallet, token_mint, token_data)
+                return True
+            if side in ("sell", "short", "b"):
+                self._execute_futures_sell(wallet, token_mint, token_data)
+                return True
+            return False
+        except Exception as e:
+            error(f"process_hyperliquid_fill error: {e}")
+            return False
+
     def check_exit_targets(self):
         """Check positions against AI-recommended exit targets (DISABLED - AI Analysis handles exits)"""
         if not config.AI_EXIT_TARGETS_ENABLED:
@@ -3899,55 +4303,59 @@ Confidence should reflect your agreement with the wallet's action, with higher c
             return False, f"Validation error: {str(e)}"
 
     def _fetch_ohlcv_for_analysis(self, token_address: str) -> Optional[pd.DataFrame]:
-        """Fetch OHLCV data for AI exit analysis (same as AI Confirmation)"""
+        """Fetch OHLCV data for AI exit analysis using free multi-source collector"""
         try:
-            import os
-            import requests
             import pandas as pd
             from src.config import AI_CONFIRMATION_LOOKBACK_DAYS, AI_CONFIRMATION_TIMEFRAME
+            from src.scripts.shared_services.ohlcv_collector import collect_token_data_with_fallback
             
             # Handle None or invalid token addresses
             if not token_address or not isinstance(token_address, str):
                 warning("Invalid token address provided for OHLCV data")
                 return None
+            
+            # Use OHLCV collector with fallback system
+            result = collect_token_data_with_fallback(
+                token=token_address,
+                days_back=AI_CONFIRMATION_LOOKBACK_DAYS,
+                timeframe=AI_CONFIRMATION_TIMEFRAME
+            )
+            
+            if result and result.get('data') is not None:
+                df = result['data']
                 
-            api_key = os.getenv("BIRDEYE_API_KEY")
-            if not api_key:
-                warning("No Birdeye API key available for OHLCV data")
+                # Ensure 'date' column exists (used by technical indicators)
+                if 'date' not in df.columns:
+                    if 'datetime' in df.columns:
+                        df['date'] = df['datetime']
+                    elif 'timestamp' in df.columns:
+                        df['date'] = pd.to_datetime(df['timestamp'], unit='s')
+                    else:
+                        warning(f"No timestamp column found in OHLCV data for {token_address[:8]}...")
+                        return None
+                
+                # Ensure required columns for technical analysis
+                required_cols = ['open', 'high', 'low', 'close', 'volume']
+                if not all(col in df.columns for col in required_cols):
+                    warning(f"Missing required OHLCV columns for technical analysis: {token_address[:8]}...")
+                    return None
+                
+                # Sort by date/time for proper analysis
+                if 'time' in df.columns:
+                    df = df.sort_values('time').reset_index(drop=True)
+                elif 'date' in df.columns:
+                    df = df.sort_values('date').reset_index(drop=True)
+                elif 'timestamp' in df.columns:
+                    df = df.sort_values('timestamp').reset_index(drop=True)
+                
+                debug(f"✅ OHLCV data for exit analysis fetched via {result.get('source', 'unknown')}: {len(df)} candles")
+                return df
+            else:
+                warning(f"No OHLCV data available from collector for exit analysis: {token_address[:8]}...")
                 return None
             
-            # Calculate time range
-            end_time = int(time.time())
-            start_time = end_time - (AI_CONFIRMATION_LOOKBACK_DAYS * 24 * 3600)
-            
-            # Fetch OHLCV data
-            url = f"https://public-api.birdeye.so/defi/ohlcv"
-            params = {
-                'address': token_address,
-                'type': AI_CONFIRMATION_TIMEFRAME,  # '1H'
-                'time_from': start_time,
-                'time_to': end_time
-            }
-            headers = {"X-API-KEY": api_key}
-            
-            response = requests.get(url, params=params, headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('success') and data.get('data'):
-                    candles = data['data']
-                    if candles:
-                        # Convert to DataFrame
-                        df = pd.DataFrame(candles)
-                        df['date'] = pd.to_datetime(df['time'], unit='s')
-                        df = df.sort_values('time').reset_index(drop=True)
-                        return df
-            
-            warning(f"Failed to fetch OHLCV data for {token_address[:8]}...")
-            return None
-            
         except Exception as e:
-            error(f"Error fetching OHLCV data for {token_address[:8]}...: {e}")
+            error(f"Error fetching OHLCV data for exit analysis: {token_address[:8]}...: {e}")
             return None
 
     def _calculate_technical_indicators(self, ohlcv_data: pd.DataFrame) -> Dict[str, Any]:

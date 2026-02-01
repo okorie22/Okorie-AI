@@ -127,68 +127,53 @@ class AIConfirmation:
             return self._create_approved_result(f"AI analysis error: {str(e)}")
     
     def _fetch_ohlcv_data(self, token_address: str, timeframe: str = '1m') -> Optional[pd.DataFrame]:
-        """Fetch OHLCV data from Birdeye API"""
+        """Fetch OHLCV data using free multi-source collector with fallback"""
         try:
             # Handle None or invalid token addresses
             if not token_address or not isinstance(token_address, str):
                 warning("Invalid token address provided for OHLCV data")
                 return None
+            
+            # Use OHLCV collector with fallback system
+            from src.scripts.shared_services.ohlcv_collector import collect_token_data_with_fallback
+            
+            result = collect_token_data_with_fallback(
+                token=token_address,
+                days_back=AI_CONFIRMATION_LOOKBACK_DAYS,
+                timeframe=timeframe
+            )
+            
+            if result and result.get('data') is not None:
+                df = result['data']
                 
-            api_key = os.getenv("BIRDEYE_API_KEY")
-            if not api_key:
-                warning("No Birdeye API key available for OHLCV data")
-                return None
-            
-            # Calculate time range
-            end_time = int(time.time())
-            start_time = end_time - (AI_CONFIRMATION_LOOKBACK_DAYS * 24 * 3600)
-            
-            # Fetch OHLCV data
-            url = f"https://public-api.birdeye.so/defi/ohlcv"
-            params = {
-                'address': token_address,
-                'type': timeframe,  # Use timeframe as-is (1m, 5m, 1h, etc.)
-                'time_from': start_time,
-                'time_to': end_time
-            }
-            headers = {"X-API-KEY": api_key}
-            
-            response = requests.get(url, params=params, headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                success = data.get('success', False)
-                items_count = len(data.get('data', {}).get('items', []))
+                # Ensure datetime column exists (collector may use 'timestamp')
+                if 'datetime' not in df.columns:
+                    if 'timestamp' in df.columns:
+                        df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
+                    elif 'date' in df.columns:
+                        df['datetime'] = pd.to_datetime(df['date'])
+                    else:
+                        # If no timestamp column, create from index
+                        warning(f"No timestamp column found in OHLCV data for {token_address[:8]}...")
+                        return None
                 
-                if data.get('success') and data.get('data', {}).get('items'):
-                    items = data['data']['items']
-                    
-                    # Convert to DataFrame
-                    df_data = []
-                    for item in items:
-                        df_data.append({
-                            'timestamp': item['unixTime'],
-                            'open': float(item['o']),
-                            'high': float(item['h']),
-                            'low': float(item['l']),
-                            'close': float(item['c']),
-                            'volume': float(item['v'])
-                        })
-                    
-                    df = pd.DataFrame(df_data)
-                    df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
-                    df = df.sort_values('datetime').reset_index(drop=True)
-                    
-                    return df
-                else:
-                    warning(f"No OHLCV data returned for {token_address[:8]}...")
+                # Ensure required columns exist
+                required_cols = ['open', 'high', 'low', 'close', 'volume']
+                if not all(col in df.columns for col in required_cols):
+                    warning(f"Missing required OHLCV columns for {token_address[:8]}...")
                     return None
+                
+                # Sort by datetime
+                df = df.sort_values('datetime').reset_index(drop=True)
+                
+                debug(f"✅ OHLCV data fetched via {result.get('source', 'unknown')}: {len(df)} candles")
+                return df
             else:
-                warning(f"OHLCV API error {response.status_code} for {token_address[:8]}...")
+                warning(f"No OHLCV data available from collector for {token_address[:8]}...")
                 return None
                 
         except Exception as e:
-            warning(f"Error fetching OHLCV data for {token_address[:8]}...: {e}")
+            warning(f"Error fetching OHLCV data via collector for {token_address[:8]}...: {e}")
             return None
     
     def _analyze_launch_mode(self, df: pd.DataFrame, token_address: str) -> Dict[str, Any]:

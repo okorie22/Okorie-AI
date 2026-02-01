@@ -646,6 +646,136 @@ class PositionManager:
         """Get current total allocation in USD"""
         with self.position_lock:
             return sum(pos.current_size_usd for pos in self.active_positions.values())
+    
+    def get_hyperliquid_positions(self) -> List[Dict[str, Any]]:
+        """
+        Get positions from Hyperliquid account
+        
+        Returns:
+            List of Hyperliquid position dicts
+        """
+        try:
+            from src.scripts.trading.hyperliquid_account_manager import get_hyperliquid_account_manager
+            
+            manager = get_hyperliquid_account_manager()
+            if manager:
+                return manager.sync_positions()
+            return []
+        except Exception as e:
+            debug(f"Error getting Hyperliquid positions: {e}", file_only=True)
+            return []
+    
+    def get_unified_portfolio(self) -> Dict[str, Any]:
+        """
+        Get combined spot (Solana) + perpetual (Hyperliquid) positions
+        
+        Returns:
+            Dict with:
+            - spot: Spot positions from Solana wallet
+            - perpetual: Perpetual positions from Hyperliquid
+            - total_value_usd: Combined total value
+            - spot_value_usd: Total spot positions value
+            - perpetual_value_usd: Total perpetual positions value
+        """
+        with self.position_lock:
+            # Get spot positions (existing)
+            spot_positions = {
+                addr: {
+                    'size_usd': pos.current_size_usd,
+                    'agent': pos.agent_id,
+                    'entry_price': pos.entry_price,
+                    'current_price': pos.current_price,
+                    'type': 'spot'
+                }
+                for addr, pos in self.active_positions.items()
+            }
+            
+            # Get perpetual positions from Hyperliquid
+            perp_positions_raw = self.get_hyperliquid_positions()
+            perp_positions = {}
+            perp_total_value = 0.0
+            
+            for pos in perp_positions_raw:
+                symbol = pos.get('symbol', '')
+                size_usd = abs(pos.get('size', 0)) * pos.get('entry_price', 0)
+                perp_total_value += size_usd
+                
+                # Convert symbol to token address format (may need mapping)
+                # For now, use symbol as key
+                perp_positions[symbol] = {
+                    'size_usd': size_usd,
+                    'agent': 'copybot_futures',
+                    'entry_price': pos.get('entry_price', 0),
+                    'current_price': pos.get('entry_price', 0),  # Approximate
+                    'unrealized_pnl': pos.get('unrealized_pnl', 0),
+                    'leverage': pos.get('leverage', 1),
+                    'liquidation_price': pos.get('liquidation_price', 0),
+                    'type': 'perpetual'
+                }
+            
+            # Calculate spot total value
+            spot_total_value = sum(pos['size_usd'] for pos in spot_positions.values())
+            
+            # Get account balances
+            account_balance = self._get_account_balance()
+            
+            # Get Hyperliquid equity if available
+            try:
+                from src.scripts.trading.hyperliquid_account_manager import get_hyperliquid_account_manager
+                hl_manager = get_hyperliquid_account_manager()
+                if hl_manager:
+                    hl_equity = hl_manager.get_total_equity()
+                else:
+                    hl_equity = perp_total_value  # Fallback to position value
+            except:
+                hl_equity = perp_total_value
+            
+            total_value = account_balance + hl_equity
+            
+            return {
+                'spot': spot_positions,
+                'perpetual': perp_positions,
+                'total_value_usd': total_value,
+                'spot_value_usd': spot_total_value,
+                'perpetual_value_usd': hl_equity,
+                'spot_positions_count': len(spot_positions),
+                'perpetual_positions_count': len(perp_positions),
+                'account_balance': account_balance,
+                'hyperliquid_equity': hl_equity
+            }
+    
+    def _calculate_total_value(self, spot_positions: Dict, perp_positions: List[Dict]) -> float:
+        """
+        Calculate total portfolio value from spot and perpetual positions
+        
+        Args:
+            spot_positions: Dict of spot positions
+            perp_positions: List of perpetual positions
+        
+        Returns:
+            Total value in USD
+        """
+        spot_value = sum(pos.get('size_usd', 0) for pos in spot_positions.values())
+        
+        # Get Hyperliquid equity (includes unrealized PnL)
+        try:
+            from src.scripts.trading.hyperliquid_account_manager import get_hyperliquid_account_manager
+            hl_manager = get_hyperliquid_account_manager()
+            if hl_manager:
+                perp_value = hl_manager.get_total_equity()
+            else:
+                # Fallback: sum position values
+                perp_value = sum(
+                    abs(p.get('size', 0)) * p.get('entry_price', 0) 
+                    for p in perp_positions
+                )
+        except:
+            perp_value = 0
+        
+        # Add Solana wallet balance
+        account_balance = self._get_account_balance()
+        
+        return account_balance + perp_value
 
 # Global instance
 _position_manager = None

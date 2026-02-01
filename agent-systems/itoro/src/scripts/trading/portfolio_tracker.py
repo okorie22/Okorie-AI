@@ -734,18 +734,53 @@ class PortfolioTracker:
                     sol_value_usd = sol_balance * sol_price
                     staked_sol_value_usd = staked_sol_balance * sol_price
                     
+                    # Add Hyperliquid positions and equity
+                    hyperliquid_equity = 0.0
+                    hyperliquid_positions = {}
+                    hyperliquid_position_count = 0
+                    
+                    try:
+                        from src.scripts.trading.hyperliquid_account_manager import get_hyperliquid_account_manager
+                        hl_manager = get_hyperliquid_account_manager()
+                        if hl_manager:
+                            hyperliquid_equity = hl_manager.get_total_equity()
+                            hl_positions = hl_manager.sync_positions()
+                            
+                            # Convert Hyperliquid positions to position dict format
+                            for pos in hl_positions:
+                                symbol = pos.get('symbol', '')
+                                size_usd = abs(pos.get('size', 0)) * pos.get('entry_price', 0)
+                                if size_usd > 0:
+                                    hyperliquid_position_count += 1
+                                    # Use symbol as key (may need address mapping later)
+                                    hyperliquid_positions[symbol] = {
+                                        'amount': abs(pos.get('size', 0)),
+                                        'price': pos.get('entry_price', 0),
+                                        'value_usd': size_usd,
+                                        'symbol': symbol,
+                                        'name': symbol,
+                                        'unrealized_pnl': pos.get('unrealized_pnl', 0),
+                                        'leverage': pos.get('leverage', 1),
+                                        'liquidation_price': pos.get('liquidation_price', 0),
+                                        'type': 'perpetual',
+                                        'last_updated': datetime.now().isoformat()
+                                    }
+                    except Exception as e:
+                        debug(f"Could not fetch Hyperliquid data: {e}", file_only=True)
+                    
                     # Calculate total value (staked SOL is already included in positions_value_usd)
-                    total_value = usdc_balance + sol_value_usd + positions_value_usd
+                    # Add Hyperliquid equity to total
+                    total_value = usdc_balance + sol_value_usd + positions_value_usd + hyperliquid_equity
                     
                     # CRITICAL FIX: Log unrealistic portfolio values but preserve actual data for testing
                     # If total value exceeds $1M, log warning but keep actual values for testing
                     if total_value > 1_000_000:
                         warning(f"⚠️ Unrealistic portfolio value detected: ${total_value:.2f}")
-                        warning(f"  USDC: ${usdc_balance:.2f}, SOL: ${sol_value_usd:.2f}, Staked SOL: ${staked_sol_value_usd:.2f}, Positions: ${positions_value_usd:.2f}")
+                        warning(f"  USDC: ${usdc_balance:.2f}, SOL: ${sol_value_usd:.2f}, Staked SOL: ${staked_sol_value_usd:.2f}, Positions: ${positions_value_usd:.2f}, Hyperliquid: ${hyperliquid_equity:.2f}")
                         warning(f"  This may be due to free API tier pricing issues. Consider upgrading to paid Birdeye API.")
                         warning(f"  Preserving actual values for testing purposes.")
                     
-                    debug(f"Paper trading data: ${total_value:.2f} (USDC: ${usdc_balance:.2f}, SOL: ${sol_value_usd:.2f}, Staked SOL: ${staked_sol_value_usd:.2f}, Positions: ${positions_value_usd:.2f})")
+                    debug(f"Paper trading data: ${total_value:.2f} (USDC: ${usdc_balance:.2f}, SOL: ${sol_value_usd:.2f}, Staked SOL: ${staked_sol_value_usd:.2f}, Positions: ${positions_value_usd:.2f}, Hyperliquid: ${hyperliquid_equity:.2f})")
                     
                     return {
                         'total_value_usd': total_value,
@@ -758,7 +793,10 @@ class PortfolioTracker:
                         'staked_sol_price': sol_price,  # Same as SOL
                         'positions_value_usd': positions_value_usd,
                         'position_count': position_count,
-                        'positions': positions
+                        'positions': positions,
+                        'hyperliquid_equity': hyperliquid_equity,
+                        'hyperliquid_positions': hyperliquid_positions,
+                        'hyperliquid_position_count': hyperliquid_position_count
                     }
                     
                 except ImportError:
@@ -1270,7 +1308,7 @@ class PortfolioTracker:
             if not current_data:
                 return
             
-            # Create snapshot
+            # Create snapshot (include Hyperliquid data)
             snapshot = PortfolioSnapshot(
                 timestamp=datetime.now(),
                 total_value_usd=current_data.get('total_value_usd', 0.0),
@@ -1285,6 +1323,11 @@ class PortfolioTracker:
                 staked_sol_price=current_data.get('staked_sol_price', 0.0),
                 positions=current_data.get('positions', {})
             )
+            
+            # Add Hyperliquid data as attributes (extend snapshot)
+            snapshot.hyperliquid_equity = current_data.get('hyperliquid_equity', 0.0)
+            snapshot.hyperliquid_positions = current_data.get('hyperliquid_positions', {})
+            snapshot.hyperliquid_position_count = current_data.get('hyperliquid_position_count', 0)
             
             # Store snapshot
             with self.snapshot_lock:

@@ -42,7 +42,9 @@ try:
         WHALE_DATA_DIR, WHALE_RANKED_FILE, WHALE_HISTORY_FILE,
         WHALE_UPDATE_INTERVAL_HOURS, WHALE_MAX_STORED_WALLETS,
         WHALE_HISTORY_MAX_RECORDS, WHALE_HISTORY_RETENTION_DAYS,
-        LOG_LEVEL, LOG_TO_FILE, LOG_DIRECTORY
+        LOG_LEVEL, LOG_TO_FILE, LOG_DIRECTORY,
+        WHALE_TRADING_MODE, WHALE_APIFY_ACTOR_FUTURES, WHALE_APIFY_INPUT_FUTURES,
+        WHALE_ENRICHMENT_7D_ENABLED, WHALE_ENRICHMENT_MAX_WALLETS, WHALE_ENRICHMENT_RATE_LIMIT_SEC,
     )
     # Try to import core_bridge (may not be available)
     try:
@@ -63,7 +65,9 @@ except ImportError:
         WHALE_DATA_DIR, WHALE_RANKED_FILE, WHALE_HISTORY_FILE,
         WHALE_UPDATE_INTERVAL_HOURS, WHALE_MAX_STORED_WALLETS,
         WHALE_HISTORY_MAX_RECORDS, WHALE_HISTORY_RETENTION_DAYS,
-        LOG_LEVEL, LOG_TO_FILE, LOG_DIRECTORY
+        LOG_LEVEL, LOG_TO_FILE, LOG_DIRECTORY,
+        WHALE_TRADING_MODE, WHALE_APIFY_ACTOR_FUTURES, WHALE_APIFY_INPUT_FUTURES,
+        WHALE_ENRICHMENT_7D_ENABLED, WHALE_ENRICHMENT_MAX_WALLETS, WHALE_ENRICHMENT_RATE_LIMIT_SEC,
     )
     # Try to import core_bridge (may not be available)
     try:
@@ -131,6 +135,17 @@ class WhaleAgent(BaseAgent):
         # Initialize Apify client with first token
         self.current_token_index = 0
         self.apify_client = ApifyClient(self.apify_tokens[self.current_token_index])
+
+        # Mode-aware actor: futures = Hyperliquid leaderboard, spot = GMGN CopyTrade
+        self.trading_mode = WHALE_TRADING_MODE
+        if self.trading_mode == "futures":
+            self.apify_actor_id = WHALE_APIFY_ACTOR_FUTURES
+            self.apify_input = WHALE_APIFY_INPUT_FUTURES
+            logger.info("🔮 Whale Agent: futures mode — using Hyperliquid leaderboard scraper")
+        else:
+            self.apify_actor_id = APIFY_ACTOR_ID
+            self.apify_input = APIFY_DEFAULT_INPUT
+            logger.info("💎 Whale Agent: spot mode — using GMGN CopyTrade Wallet Scraper")
         
         # Data storage paths
         self.data_dir = Path(WHALE_DATA_DIR)
@@ -563,24 +578,25 @@ class WhaleAgent(BaseAgent):
     
     async def _fetch_apify_data(self) -> Optional[pd.DataFrame]:
         """
-        Fetch data from Apify GMGN CopyTrade Wallet Scraper with token fallback
+        Fetch data from Apify (mode-aware: GMGN for spot, Hyperliquid leaderboard for futures)
         """
         max_token_attempts = len(self.apify_tokens)
         token_attempt = 0
 
         while token_attempt < max_token_attempts:
             try:
-                logger.info(f"🔄 Fetching data from Apify (Token {self.current_token_index + 1}/{len(self.apify_tokens)})...")
+                logger.info(f"🔄 Fetching data from Apify {self.trading_mode} (Token {self.current_token_index + 1}/{len(self.apify_tokens)})...")
+                logger.info(f"📡 Actor: {self.apify_actor_id}")
 
                 # Run the actor
-                run = self.apify_client.actor(APIFY_ACTOR_ID).call(
-                    run_input=APIFY_DEFAULT_INPUT
+                run = self.apify_client.actor(self.apify_actor_id).call(
+                    run_input=self.apify_input
                 )
 
                 # Wait for completion
                 while run['status'] not in [ActorJobStatus.SUCCEEDED, ActorJobStatus.FAILED]:
                     await asyncio.sleep(10)
-                    run = self.apify_client.actor(APIFY_ACTOR_ID).last_run()
+                    run = self.apify_client.actor(self.apify_actor_id).last_run()
 
                 if run['status'] == ActorJobStatus.FAILED:
                     error_msg = run.get('meta', {}).get('error', 'Unknown error')
@@ -596,7 +612,7 @@ class WhaleAgent(BaseAgent):
 
                 # Convert to DataFrame
                 df = pd.DataFrame(dataset_items)
-                logger.info(f"✅ Fetched {len(df)} wallet records from Apify")
+                logger.info(f"✅ Fetched {len(df)} wallet records from Apify ({self.trading_mode} mode)")
 
                 # Log sample data for debugging
                 if len(df) > 0:
@@ -631,6 +647,85 @@ class WhaleAgent(BaseAgent):
 
         logger.error("❌ Failed to fetch data from Apify with all available tokens")
         return None
+
+    def _is_hyperliquid_format(self, df: pd.DataFrame) -> bool:
+        """True if DataFrame is from Hyperliquid leaderboard (has ethAddress, accountValue)."""
+        cols = set(df.columns) if len(df) > 0 else set()
+        return "ethAddress" in cols or "accountValue" in cols
+
+    def _normalize_hyperliquid_row(self, row: Any) -> Dict[str, Any]:
+        """
+        Normalize one Hyperliquid leaderboard row to WhaleWallet-compatible dict.
+        Handles flat keys (windowPerformances/0/1/pnl or windowPerformances.0.1.pnl) and nested API format.
+        """
+        def _f(key: str, default: Any = 0) -> Any:
+            if hasattr(row, "get"):
+                return row.get(key, default)
+            if isinstance(row, pd.Series):
+                return row.get(key, default)
+            return default
+
+        def _float(v: Any, default: float = 0.0) -> float:
+            if v is None or (isinstance(v, float) and pd.isna(v)):
+                return default
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return default
+
+        def _get_pnl_roi(win_idx: int, field: str) -> float:
+            # Flat keys (CSV / flattened JSON)
+            for sep in ("/", "."):
+                key = f"windowPerformances{sep}{win_idx}{sep}1{sep}{field}"
+                v = _f(key, None)
+                if v is not None:
+                    return _float(v, 0.0)
+            # Nested: row["windowPerformances"][win_idx][1][field]
+            wp = _f("windowPerformances", None)
+            if isinstance(wp, (list, tuple)) and len(wp) > win_idx:
+                w = wp[win_idx]
+                if isinstance(w, (list, tuple)) and len(w) > 1 and isinstance(w[1], dict):
+                    return _float(w[1].get(field), 0.0)
+            return 0.0
+
+        # windowPerformances: 0=day, 1=week, 2=month
+        pnl_1d = _get_pnl_roi(0, "pnl")
+        pnl_7d = _get_pnl_roi(1, "pnl")
+        pnl_30d = _get_pnl_roi(2, "pnl")
+        roi_1d = _get_pnl_roi(0, "roi")
+        roi_7d = _get_pnl_roi(1, "roi")
+        roi_30d = _get_pnl_roi(2, "roi")
+        account_value = _float(_f("accountValue"), 0.0)
+        address = str(_f("ethAddress", "") or "")
+        display_name = str(_f("displayName", "") or "")
+
+        # Use ROI as percentage (e.g. 0.03 -> 3.0) for pnl_* in scoring; store raw for display
+        pnl_1d_pct = roi_1d * 100.0
+        pnl_7d_pct = roi_7d * 100.0
+        pnl_30d_pct = roi_30d * 100.0
+
+        return {
+            "address": address,
+            "wallet_address": address,
+            "twitter_handle": display_name,
+            "twitter_username": display_name,
+            "displayName": display_name,
+            "ethAddress": address,
+            "account_value": account_value,
+            "pnl_1d": pnl_1d_pct,
+            "pnl_7d": pnl_7d_pct,
+            "pnl_30d": pnl_30d_pct,
+            "realized_profit_1d": pnl_1d,
+            "realized_profit_7d": pnl_7d,
+            "realized_profit_30d": pnl_30d,
+            "winrate_7d": 0.5,
+            "txs_30d": 0,
+            "token_active": 1,
+            "last_active": datetime.now().isoformat(),
+            "is_blue_verified": False,
+            "avg_holding_period_7d": 86400.0,
+            "is_futures": True,
+        }
     
     def _normalize_metric(self, value: float, min_val: float, max_val: float) -> float:
         """Normalize a metric to 0-1 range"""
@@ -640,160 +735,166 @@ class WhaleAgent(BaseAgent):
     
     def _calculate_wallet_score(self, wallet_data: Dict[str, Any]) -> float:
         """
-        Calculate comprehensive score for a wallet based on multiple metrics
+        Calculate comprehensive score for a wallet (spot or futures).
+        Futures: score from ROI % only; no strict realized_profit/token_active thresholds.
         """
         try:
-            # Extract metrics with safe defaults - handle different field names
-            # Note: pnl_30d and pnl_7d are percentages, not absolute amounts
-            pnl_30d_pct = float(wallet_data.get('pnl_30d', 0))  # This is percentage
-            pnl_7d_pct = float(wallet_data.get('pnl_7d', 0))    # This is percentage
-            realized_profit_30d = float(wallet_data.get('realized_profit_30d', 0))  # This is absolute amount
-            realized_profit_7d = float(wallet_data.get('realized_profit_7d', 0))    # This is absolute amount
-            winrate_7d = float(wallet_data.get('winrate_7d', 0))
-            txs_30d = int(wallet_data.get('txs_30d', 0))
-            
-            # Handle token_active from risk object
-            risk_data = wallet_data.get('risk', {})
-            if isinstance(risk_data, dict):
-                token_active = int(risk_data.get('token_active', 0))
+            is_futures = bool(wallet_data.get("is_futures", False))
+
+            # PNL/ROI as percentage (pnl_30d etc may be in % e.g. 3.0 for 3%, or decimal 0.03)
+            pnl_30d_pct = float(wallet_data.get("pnl_30d", 0) or 0)
+            pnl_7d_pct = float(wallet_data.get("pnl_7d", 0) or 0)
+            pnl_1d_raw = wallet_data.get("pnl_1d")
+            pnl_1d_pct = 0.0
+            if pnl_1d_raw not in (None, "NaN", float("nan")):
+                try:
+                    pnl_1d_pct = float(pnl_1d_raw)
+                except (TypeError, ValueError):
+                    pass
+
+            realized_profit_30d = float(wallet_data.get("realized_profit_30d", 0) or 0)
+            realized_profit_7d = float(wallet_data.get("realized_profit_7d", 0) or 0)
+            winrate_7d = float(wallet_data.get("winrate_7d", 0) or 0)
+            txs_30d = int(wallet_data.get("txs_30d", 0) or 0)
+            risk_data = wallet_data.get("risk", {})
+            token_active = int(risk_data.get("token_active", wallet_data.get("token_active", 0)) or 0) if isinstance(risk_data, dict) else int(wallet_data.get("token_active", 0) or 0)
+            is_blue_verified = bool(wallet_data.get("is_blue_verified", False))
+            avg_holding_period_7d = float(wallet_data.get("avg_holding_period_7d", 1) or 1)
+
+            if not is_futures:
+                # Spot: apply strict thresholds
+                if (
+                    realized_profit_30d < WHALE_THRESHOLDS["min_pnl_30d"]
+                    or winrate_7d < WHALE_THRESHOLDS["min_winrate_7d"]
+                    or txs_30d > WHALE_THRESHOLDS["max_txs_30d"]
+                    or token_active < WHALE_THRESHOLDS["min_token_active"]
+                    or token_active > WHALE_THRESHOLDS["max_token_active"]
+                    or avg_holding_period_7d < WHALE_THRESHOLDS["min_avg_holding_period"]
+                    or avg_holding_period_7d > WHALE_THRESHOLDS["max_avg_holding_period"]
+                ):
+                    return 0.0
             else:
-                token_active = int(wallet_data.get('token_active', 0))
-            
-            is_blue_verified = bool(wallet_data.get('is_blue_verified', False))
-            avg_holding_period_7d = float(wallet_data.get('avg_holding_period_7d', 1))
-            
-            # Apply thresholds based on ideal wallet characteristics
-            # Use realized_profit for absolute amounts, pnl percentages for relative performance
-            if (realized_profit_30d < WHALE_THRESHOLDS['min_pnl_30d'] or
-                winrate_7d < WHALE_THRESHOLDS['min_winrate_7d'] or
-                txs_30d > WHALE_THRESHOLDS['max_txs_30d'] or
-                token_active < WHALE_THRESHOLDS['min_token_active'] or
-                token_active > WHALE_THRESHOLDS['max_token_active'] or
-                avg_holding_period_7d < WHALE_THRESHOLDS['min_avg_holding_period'] or
-                avg_holding_period_7d > WHALE_THRESHOLDS['max_avg_holding_period']):
-                return 0.0
-            
-            # Get 1-day PNL data (handle NaN/None values)
-            pnl_1d_pct = float(wallet_data.get('pnl_1d', 0)) if wallet_data.get('pnl_1d') not in [None, 'NaN', float('nan')] else 0
-            realized_profit_1d = float(wallet_data.get('realized_profit_1d', 0)) if wallet_data.get('realized_profit_1d') not in [None, 'NaN', float('nan')] else 0
-            
-            # Normalize PNL metrics based on ideal wallet characteristics
-            # Use percentage-based PNL for better comparison across different wallet sizes
-            pnl_30d_norm = self._normalize_metric(pnl_30d_pct, 0, 5.0)  # Cap at 500% (5.0 as decimal)
-            pnl_7d_norm = self._normalize_metric(pnl_7d_pct, 0, 3.0)    # Cap at 300% (3.0 as decimal)
-            pnl_1d_norm = self._normalize_metric(pnl_1d_pct, 0, 1.0)    # Cap at 100% (1.0 as decimal)
-            
-            # Other normalized metrics
-            winrate_norm = winrate_7d  # Already 0-1
-            txs_norm = 1 - self._normalize_metric(txs_30d, 0, WHALE_THRESHOLDS['max_txs_30d'])  # Inverse
-            token_norm = self._normalize_metric(
-                token_active, 
-                WHALE_THRESHOLDS['min_token_active'], 
-                WHALE_THRESHOLDS['max_token_active']
-            )
-            
-            # Improved holding period normalization
-            # Optimal holding period is between 1 hour and 7 days for most profitable traders
-            optimal_holding_min = 1.0 / 24.0  # 1 hour in days
-            optimal_holding_max = 7.0  # 7 days
-            holding_period_days = avg_holding_period_7d / 86400.0  # Convert seconds to days
-            
+                # Futures: no strict filter; rank all by ROI (negative ROI gets lower score)
+                pass
+
+            # Normalize PNL (as percentage: e.g. 5 = 5%, 100 = 100%)
+            pnl_30d_norm = self._normalize_metric(pnl_30d_pct, -50, 100)
+            pnl_7d_norm = self._normalize_metric(pnl_7d_pct, -30, 50)
+            pnl_1d_norm = self._normalize_metric(pnl_1d_pct, -20, 20)
+            winrate_norm = winrate_7d
+            txs_norm = 1 - self._normalize_metric(txs_30d, 0, WHALE_THRESHOLDS["max_txs_30d"]) if WHALE_THRESHOLDS["max_txs_30d"] else 0.5
+            token_norm = self._normalize_metric(token_active, WHALE_THRESHOLDS["min_token_active"], WHALE_THRESHOLDS["max_token_active"]) if not is_futures else 0.5
+            holding_period_days = avg_holding_period_7d / 86400.0
+            optimal_holding_min, optimal_holding_max = 1.0 / 24.0, 7.0
             if optimal_holding_min <= holding_period_days <= optimal_holding_max:
-                # Peak score for optimal range
-                holding_norm = 1.0 - abs(holding_period_days - 1.0) / 6.0  # Peak at 1 day
+                holding_norm = 1.0 - abs(holding_period_days - 1.0) / 6.0
             elif holding_period_days < optimal_holding_min:
-                # Penalize very short holding periods (likely MEV bots)
                 holding_norm = 0.2
             else:
-                # Gradually decrease for longer holding periods
                 holding_norm = max(0.1, 1.0 / (1.0 + (holding_period_days - optimal_holding_max) / 30.0))
-            
-            # Calculate weighted score with new priority order
+            if is_futures:
+                holding_norm = 0.5
+
             score = (
-                WHALE_SCORING_WEIGHTS['pnl_30d'] * pnl_30d_norm +
-                WHALE_SCORING_WEIGHTS['pnl_7d'] * pnl_7d_norm +
-                WHALE_SCORING_WEIGHTS['pnl_1d'] * pnl_1d_norm +
-                WHALE_SCORING_WEIGHTS['winrate_7d'] * winrate_norm +
-                WHALE_SCORING_WEIGHTS['avg_holding_period_7d'] * holding_norm +
-                WHALE_SCORING_WEIGHTS['token_active'] * token_norm +
-                WHALE_SCORING_WEIGHTS['is_blue_verified'] * (1.0 if is_blue_verified else 0.0) +
-                WHALE_SCORING_WEIGHTS['txs_30d'] * txs_norm
+                WHALE_SCORING_WEIGHTS["pnl_30d"] * pnl_30d_norm
+                + WHALE_SCORING_WEIGHTS["pnl_7d"] * pnl_7d_norm
+                + WHALE_SCORING_WEIGHTS["pnl_1d"] * pnl_1d_norm
+                + WHALE_SCORING_WEIGHTS["winrate_7d"] * winrate_norm
+                + WHALE_SCORING_WEIGHTS["avg_holding_period_7d"] * holding_norm
+                + WHALE_SCORING_WEIGHTS["token_active"] * token_norm
+                + WHALE_SCORING_WEIGHTS["is_blue_verified"] * (1.0 if is_blue_verified else 0.0)
+                + WHALE_SCORING_WEIGHTS["txs_30d"] * txs_norm
             )
-            
-            return score
-            
+            return max(0.0, min(1.0, score))
         except Exception as e:
             logger.error(f"Error calculating score for wallet: {e}")
             return 0.0
     
     def _process_wallet_data(self, df: pd.DataFrame) -> List[WhaleWallet]:
         """
-        Process raw wallet data and create WhaleWallet objects
+        Process raw wallet data and create WhaleWallet objects.
+        Handles both GMGN (spot) and Hyperliquid (futures) formats.
         """
         wallets = []
-        
+        is_hyperliquid = self._is_hyperliquid_format(df)
+        if is_hyperliquid:
+            logger.info("🔮 Processing Hyperliquid (futures) data format")
+        else:
+            logger.info("💎 Processing GMGN (spot) data format")
+
+        enrichment_count = 0
         for _, row in df.iterrows():
             try:
-                # Calculate score
-                score = self._calculate_wallet_score(row.to_dict())
-                
-                if score > 0:  # Only include wallets that meet minimum criteria
-                    # Handle different field names
-                    address = str(row.get('address', row.get('wallet_address', '')))
-                    twitter_handle = str(row.get('twitter_username', row.get('twitter_handle', '')))
-                    pnl_30d = float(row.get('pnl_30d', row.get('realized_profit_30d', 0)))
-                    pnl_7d = float(row.get('pnl_7d', row.get('realized_profit_7d', 0)))
-                    # Handle NaN values in pnl_1d
-                    pnl_1d_raw = row.get('pnl_1d', row.get('realized_profit_1d', 0))
-                    if pnl_1d_raw is None or str(pnl_1d_raw).lower() in ['nan', 'null']:
-                        pnl_1d = 0.0
-                    else:
+                if is_hyperliquid:
+                    wallet_data = self._normalize_hyperliquid_row(row)
+                    if not wallet_data or not wallet_data.get("address"):
+                        continue
+                    if WHALE_ENRICHMENT_7D_ENABLED and enrichment_count < WHALE_ENRICHMENT_MAX_WALLETS:
                         try:
-                            pnl_1d = float(pnl_1d_raw)
-                        except (ValueError, TypeError):
-                            pnl_1d = 0.0
-                    winrate_7d = float(row.get('winrate_7d', 0))
-                    txs_30d = int(row.get('txs_30d', 0))
-                    
-                    # Handle token_active from risk object
-                    risk_data = row.get('risk', {})
-                    if isinstance(risk_data, dict):
-                        token_active = int(risk_data.get('token_active', 0))
-                    else:
-                        token_active = int(row.get('token_active', 0))
-                    
-                    last_active = str(row.get('last_active', ''))
-                    is_blue_verified = bool(row.get('is_blue_verified', False))
-                    avg_holding_period_7d = float(row.get('avg_holding_period_7d', 1))
-                    
-                    wallet = WhaleWallet(
-                        address=address,
-                        twitter_handle=twitter_handle,
-                        pnl_30d=pnl_30d,
-                        pnl_7d=pnl_7d,
-                        pnl_1d=pnl_1d,
-                        winrate_7d=winrate_7d,
-                        txs_30d=txs_30d,
-                        token_active=token_active,
-                        last_active=last_active,
-                        is_blue_verified=is_blue_verified,
-                        avg_holding_period_7d=avg_holding_period_7d,
-                        score=score,
-                        rank=0,  # Will be set after sorting
-                        last_updated=datetime.now().isoformat(),
-                        is_active=True
-                    )
-                    wallets.append(wallet)
-                    
+                            try:
+                                from src.scripts.trading.hyperliquid_enrichment import enrich_wallet_7d_from_hyperliquid
+                            except ImportError:
+                                from ..scripts.trading.hyperliquid_enrichment import enrich_wallet_7d_from_hyperliquid
+                            addr = wallet_data.get("address", "")
+                            enriched = enrich_wallet_7d_from_hyperliquid(addr)
+                            wallet_data["winrate_7d"] = enriched["winrate_7d"]
+                            wallet_data["avg_holding_period_7d"] = enriched["avg_holding_period_7d"]
+                            enrichment_count += 1
+                            time.sleep(WHALE_ENRICHMENT_RATE_LIMIT_SEC)
+                        except Exception as e:
+                            logger.debug(f"Enrichment skipped for {wallet_data.get('address', '')[:8]}...: {e}")
+                else:
+                    wallet_data = row.to_dict()
+
+                score = self._calculate_wallet_score(wallet_data)
+                if score <= 0:
+                    continue
+
+                address = str(wallet_data.get("address", wallet_data.get("wallet_address", wallet_data.get("ethAddress", ""))) or "")
+                twitter_handle = str(wallet_data.get("twitter_username", wallet_data.get("twitter_handle", wallet_data.get("displayName", ""))) or "")
+                pnl_30d = float(wallet_data.get("pnl_30d", wallet_data.get("realized_profit_30d", 0)) or 0)
+                pnl_7d = float(wallet_data.get("pnl_7d", wallet_data.get("realized_profit_7d", 0)) or 0)
+                pnl_1d_raw = wallet_data.get("pnl_1d", wallet_data.get("realized_profit_1d", 0))
+                if pnl_1d_raw is None or str(pnl_1d_raw).lower() in ("nan", "null", ""):
+                    pnl_1d = 0.0
+                else:
+                    try:
+                        pnl_1d = float(pnl_1d_raw)
+                    except (ValueError, TypeError):
+                        pnl_1d = 0.0
+                winrate_7d = float(wallet_data.get("winrate_7d", 0) or 0)
+                txs_30d = int(wallet_data.get("txs_30d", 0) or 0)
+                risk_data = wallet_data.get("risk", {})
+                token_active = int(risk_data.get("token_active", wallet_data.get("token_active", 0)) or 0) if isinstance(risk_data, dict) else int(wallet_data.get("token_active", 0) or 0)
+                last_active = str(wallet_data.get("last_active", "") or datetime.now().isoformat())
+                is_blue_verified = bool(wallet_data.get("is_blue_verified", False))
+                avg_holding_period_7d = float(wallet_data.get("avg_holding_period_7d", 86400.0) or 86400.0)
+
+                wallet = WhaleWallet(
+                    address=address,
+                    twitter_handle=twitter_handle,
+                    pnl_30d=pnl_30d,
+                    pnl_7d=pnl_7d,
+                    pnl_1d=pnl_1d,
+                    winrate_7d=winrate_7d,
+                    txs_30d=txs_30d,
+                    token_active=token_active,
+                    last_active=last_active,
+                    is_blue_verified=is_blue_verified,
+                    avg_holding_period_7d=avg_holding_period_7d,
+                    score=score,
+                    rank=0,
+                    last_updated=datetime.now().isoformat(),
+                    is_active=True,
+                )
+                wallets.append(wallet)
             except Exception as e:
                 logger.error(f"Error processing wallet data: {e}")
                 continue
-        
-        # Sort by score and assign ranks
+
         wallets.sort(key=lambda x: x.score, reverse=True)
-        for i, wallet in enumerate(wallets):
-            wallet.rank = i + 1
-        
+        for i, w in enumerate(wallets):
+            w.rank = i + 1
         return wallets
     
     def _update_ranked_wallets(self, new_wallets: List[WhaleWallet]):

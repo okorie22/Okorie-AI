@@ -71,28 +71,48 @@ def dispatch_outbound_messages(self):
     
     # Check if we're within send window
     if not rate_limiter.is_within_send_window():
-        logger.debug("Outside send window, skipping dispatch")
+        logger.warning("Outside send window, skipping dispatch")
         return {"skipped": "outside_window"}
     
-    # Use an effective batch size capped by hourly/daily headroom so we still send
-    # when batch_size > hourly_cap (e.g. batch_size=20, hourly_cap=10).
+    # Get rate limit stats and calculate effective batch size
     stats = rate_limiter.get_send_stats()
     batch_size = sendgrid_config.batch_size
+    
+    # Log detailed stats BEFORE calculation for debugging
+    logger.info(
+        f"Rate limit check: batch_size={batch_size}, "
+        f"hourly_remaining={stats['hourly_remaining']}/{stats['hourly_cap']}, "
+        f"daily_remaining={stats['daily_remaining']}/{stats['daily_cap']}, "
+        f"sent_today={stats['sent_today']}, sent_this_hour={stats['sent_this_hour']}"
+    )
+    
+    # Calculate effective batch size (cap by available headroom)
     effective_batch = min(
         batch_size,
         max(0, stats["hourly_remaining"]),
         max(0, stats["daily_remaining"]),
     )
+    
+    # Log the calculation result
+    logger.info(
+        f"Effective batch calculation: min({batch_size}, max(0, {stats['hourly_remaining']}), "
+        f"max(0, {stats['daily_remaining']})) = {effective_batch}"
+    )
+    
     if effective_batch <= 0:
-        logger.warning("Rate limit reached, deferring dispatch")
+        logger.warning(
+            f"Rate limit reached, deferring dispatch. "
+            f"effective_batch={effective_batch}, stats={stats}"
+        )
         return {"skipped": "rate_limited", "stats": stats}
+    
     if effective_batch < batch_size:
-        logger.debug(
+        logger.info(
             f"Capping batch to headroom: requested={batch_size}, effective={effective_batch}"
         )
     
     logger.info(
-        f"Dispatch stats: {stats['sent_today']}/{stats['daily_cap']} daily, "
+        f"Proceeding with dispatch: {stats['sent_today']}/{stats['daily_cap']} daily, "
         f"{stats['sent_this_hour']}/{stats['hourly_cap']} hourly, effective_batch={effective_batch}"
     )
     

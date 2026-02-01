@@ -568,6 +568,36 @@ def receive_webhook():
         cprint(f"\n❌ WEBHOOK RECEIVER ERROR: {e}", "red", attrs=["bold"])
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
+@app.route('/webhook/hyperliquid', methods=['POST'])
+def receive_webhook_hyperliquid():
+    """Receive Hyperliquid fill events from WebSocket listener; forward to copybot process_hyperliquid_fill."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"status": "error", "message": "No data"}), 400
+        events = data.get("events", [])
+        if not events:
+            return jsonify({"status": "ok", "message": "No events"}), 200
+        from src.scripts.shared_services.simple_agent_coordinator import get_simple_agent_coordinator
+        coordinator = get_simple_agent_coordinator()
+        if not coordinator.start_execution("copybot"):
+            return jsonify({"status": "deferred", "reason": "higher_priority_agent"}), 200
+        processed_count = 0
+        for event in events:
+            try:
+                if copybot_agent and hasattr(copybot_agent, "process_hyperliquid_fill"):
+                    if copybot_agent.process_hyperliquid_fill(event):
+                        processed_count += 1
+            except Exception as e:
+                cprint(f"   Hyperliquid event error: {e}", "red")
+        coordinator.finish_execution("copybot")
+        return jsonify({"status": "processed", "count": processed_count}), 200
+    except Exception as e:
+        cprint(f"\n❌ HYPERLIQUID WEBHOOK ERROR: {e}", "red", attrs=["bold"])
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 # Coordination functions removed - now handled by Portfolio Tracker trigger system
 
 def status_endpoint():

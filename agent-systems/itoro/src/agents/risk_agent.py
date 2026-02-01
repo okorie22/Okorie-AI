@@ -191,10 +191,15 @@ class RiskAgent(BaseAgent):
             usdc_balance = current_snapshot.usdc_balance
             sol_value = current_snapshot.sol_value_usd
             
+            # Get Hyperliquid equity (if available)
+            hyperliquid_equity = getattr(current_snapshot, 'hyperliquid_equity', 0.0)
+            hyperliquid_positions = getattr(current_snapshot, 'hyperliquid_positions', {})
+            
             # Portfolio data is available and correct
             
             usdc_reserve_percent = (usdc_balance / total_value) if total_value > 0 else 0
             sol_reserve_percent = (sol_value / total_value) if total_value > 0 else 0
+            hyperliquid_reserve_percent = (hyperliquid_equity / total_value) if total_value > 0 else 0
             
             # Calculate drawdown from peak and update peak value
             self._update_peak_portfolio_value(total_value)
@@ -206,8 +211,15 @@ class RiskAgent(BaseAgent):
             # Get consecutive losses
             consecutive_losses = self.get_consecutive_losses()
             
-            # Get open positions with PnL
+            # Get open positions with PnL (includes Hyperliquid positions)
             open_positions = self._get_open_positions_with_pnl(current_snapshot)
+            
+            # Monitor Hyperliquid liquidation risk
+            liquidation_risk = self._check_hyperliquid_liquidation_risk(hyperliquid_positions)
+            
+            # Auto-close critical Hyperliquid positions (within 2% of liquidation)
+            if liquidation_risk.get('critical_positions'):
+                self._auto_close_critical_hyperliquid_positions(liquidation_risk['critical_positions'])
             
             metrics = PortfolioMetrics(
                 total_value_usd=total_value,
@@ -219,11 +231,134 @@ class RiskAgent(BaseAgent):
                 open_positions=open_positions
             )
             
+            # Add Hyperliquid-specific risk data as attributes
+            metrics.hyperliquid_equity = hyperliquid_equity
+            metrics.hyperliquid_reserve_percent = hyperliquid_reserve_percent
+            metrics.liquidation_risk = liquidation_risk
+            
             return metrics
             
         except Exception as e:
             error(f"Error calculating portfolio metrics: {e}")
             return None
+    
+    def _check_hyperliquid_liquidation_risk(self, hyperliquid_positions: Dict) -> Dict[str, Any]:
+        """
+        Check liquidation risk for Hyperliquid perpetual positions
+        
+        Returns:
+            Dict with:
+            - has_risk: bool
+            - positions_at_risk: List of positions within 5% of liquidation
+            - critical_positions: List of positions within 2% of liquidation
+            - max_risk_distance: float (minimum distance to liquidation across all positions)
+        """
+        try:
+            if not hyperliquid_positions:
+                return {
+                    'has_risk': False,
+                    'positions_at_risk': [],
+                    'critical_positions': [],
+                    'max_risk_distance': 100.0
+                }
+            
+            positions_at_risk = []
+            critical_positions = []
+            min_distance = 100.0
+            
+            try:
+                from src.scripts.shared_services.optimized_price_service import get_optimized_price_service
+                price_service = get_optimized_price_service()
+            except:
+                price_service = None
+            
+            for symbol, pos_data in hyperliquid_positions.items():
+                entry_price = pos_data.get('price', 0)
+                liquidation_price = pos_data.get('liquidation_price', 0)
+                size = pos_data.get('amount', 0)
+                is_long = size > 0
+                
+                if entry_price <= 0 or liquidation_price <= 0:
+                    continue
+                
+                # Get current price (approximate - use entry price if unavailable)
+                try:
+                    # TODO: Map symbol to token address for price lookup
+                    current_price = entry_price  # Fallback
+                except:
+                    current_price = entry_price
+                
+                # Calculate liquidation distance
+                if is_long:
+                    distance_pct = ((current_price - liquidation_price) / entry_price) * 100
+                else:
+                    distance_pct = ((liquidation_price - current_price) / entry_price) * 100
+                
+                min_distance = min(min_distance, distance_pct)
+                
+                if distance_pct < 2:
+                    critical_positions.append({
+                        'symbol': symbol,
+                        'distance_pct': distance_pct,
+                        'liquidation_price': liquidation_price,
+                        'current_price': current_price,
+                        'entry_price': entry_price
+                    })
+                elif distance_pct < 5:
+                    positions_at_risk.append({
+                        'symbol': symbol,
+                        'distance_pct': distance_pct,
+                        'liquidation_price': liquidation_price,
+                        'current_price': current_price,
+                        'entry_price': entry_price
+                    })
+            
+            return {
+                'has_risk': len(positions_at_risk) > 0 or len(critical_positions) > 0,
+                'positions_at_risk': positions_at_risk,
+                'critical_positions': critical_positions,
+                'max_risk_distance': min_distance
+            }
+            
+        except Exception as e:
+            error(f"Error checking Hyperliquid liquidation risk: {e}")
+            return {
+                'has_risk': False,
+                'positions_at_risk': [],
+                'critical_positions': [],
+                'max_risk_distance': 100.0
+            }
+    
+    def _auto_close_critical_hyperliquid_positions(self, critical_positions: List[Dict[str, Any]]):
+        """Automatically close Hyperliquid positions that are within 2% of liquidation"""
+        try:
+            from src.scripts.trading.hyperliquid_exchange import get_hyperliquid_exchange
+            
+            exchange = get_hyperliquid_exchange()
+            if not exchange:
+                return
+            
+            for pos in critical_positions:
+                symbol = pos.get('symbol')
+                distance_pct = pos.get('distance_pct', 0)
+                
+                if not symbol:
+                    continue
+                
+                warning(f"🚨 CRITICAL: {symbol} position within {distance_pct:.1f}% of liquidation - auto-closing 50%")
+                
+                # Close 50% of position to reduce risk
+                result = exchange.close_position(symbol=symbol, percentage=50.0)
+                
+                if result.get('success'):
+                    info(f"✅ Auto-reduced {symbol} position by 50% due to critical liquidation risk")
+                else:
+                    error(f"❌ Failed to auto-reduce {symbol} position: {result.get('error', 'Unknown error')}")
+                    
+        except Exception as e:
+            error(f"Error auto-closing critical Hyperliquid positions: {e}")
+            import traceback
+            error(traceback.format_exc())
     
     def get_consecutive_losses(self) -> int:
         """Get consecutive losses from execution tracker"""
@@ -248,10 +383,11 @@ class RiskAgent(BaseAgent):
             return 0
     
     def _get_open_positions_with_pnl(self, snapshot: PortfolioSnapshot) -> List[Dict[str, Any]]:
-        """Get open positions with PnL calculations (excluding protected tokens)"""
+        """Get open positions with PnL calculations (including Hyperliquid positions)"""
         try:
             positions = []
             
+            # Get spot positions
             for token_address, position_data in snapshot.positions.items():
                 # Handle both dict and float position data
                 if isinstance(position_data, dict):
@@ -286,8 +422,53 @@ class RiskAgent(BaseAgent):
                     'current_price': current_price,
                     'entry_price': entry_price,
                     'pnl_percent': pnl_percent,
-                    'amount': usd_value / current_price
+                    'amount': usd_value / current_price,
+                    'type': 'spot'
                 })
+            
+            # Get Hyperliquid perpetual positions
+            hyperliquid_positions = getattr(snapshot, 'hyperliquid_positions', {})
+            for symbol, pos_data in hyperliquid_positions.items():
+                try:
+                    unrealized_pnl = pos_data.get('unrealized_pnl', 0)
+                    entry_price = pos_data.get('price', 0)  # entry_price in pos_data
+                    current_price = entry_price  # Approximate - could fetch real-time price
+                    size_usd = pos_data.get('value_usd', 0)
+                    
+                    if size_usd <= 0:
+                        continue
+                    
+                    # Calculate PnL percentage from unrealized PnL
+                    if entry_price > 0:
+                        pnl_percent = (unrealized_pnl / size_usd) * 100
+                    else:
+                        pnl_percent = 0.0
+                    
+                    # Map symbol back to token address (approximate - may need reverse lookup)
+                    # For now, use symbol as identifier
+                    try:
+                        from src.nice_funcs_hl import get_token_symbol_from_address
+                        # Reverse lookup would be needed - for now use symbol
+                        token_address = symbol  # Placeholder - may need address mapping
+                    except:
+                        token_address = symbol
+                    
+                    positions.append({
+                        'token_address': token_address,
+                        'symbol': symbol,
+                        'usd_value': size_usd,
+                        'current_price': current_price,
+                        'entry_price': entry_price,
+                        'pnl_percent': pnl_percent,
+                        'unrealized_pnl': unrealized_pnl,
+                        'amount': abs(pos_data.get('amount', 0)),
+                        'leverage': pos_data.get('leverage', 1),
+                        'liquidation_price': pos_data.get('liquidation_price', 0),
+                        'type': 'perpetual'
+                    })
+                except Exception as e:
+                    debug(f"Error processing Hyperliquid position {symbol}: {e}", file_only=True)
+                    continue
             
             # Sort by PnL (worst first)
             positions.sort(key=lambda x: x['pnl_percent'])
@@ -794,7 +975,7 @@ REASONING: [detailed explanation of your decision]
             return False
     
     def execute_partial_close(self, percentage: float) -> bool:
-        """Close specified percentage of all positions (excluding protected tokens)"""
+        """Close specified percentage of all positions (spot and Hyperliquid)"""
         try:
             info(f"📉 Executing partial close - reducing all positions by {percentage:.1%}")
             
@@ -804,6 +985,8 @@ REASONING: [detailed explanation of your decision]
                 return False
             
             closed_count = 0
+            
+            # Close spot positions
             for token_address, position_data in current_snapshot.positions.items():
                 # Handle both dict and float position data
                 if isinstance(position_data, dict):
@@ -831,7 +1014,32 @@ REASONING: [detailed explanation of your decision]
                 success = self._close_position(token_address, amount_tokens)
                 if success:
                     closed_count += 1
-                    info(f"[SUCCESS] Partially closed: {token_address[:8]}... (${amount_to_close:.2f})")
+                    info(f"[SUCCESS] Partially closed spot: {token_address[:8]}... (${amount_to_close:.2f})")
+            
+            # Close Hyperliquid positions
+            hyperliquid_positions = getattr(current_snapshot, 'hyperliquid_positions', {})
+            for symbol, pos_data in hyperliquid_positions.items():
+                try:
+                    size_usd = pos_data.get('value_usd', 0)
+                    if size_usd <= 0:
+                        continue
+                    
+                    # Close percentage of Hyperliquid position
+                    from src.scripts.trading.hyperliquid_exchange import get_hyperliquid_exchange
+                    exchange = get_hyperliquid_exchange()
+                    if not exchange:
+                        continue
+                    
+                    # Close percentage (convert to 0-100 range)
+                    close_pct = percentage * 100
+                    result = exchange.close_position(symbol=symbol, percentage=close_pct)
+                    
+                    if result.get('success'):
+                        closed_count += 1
+                        info(f"[SUCCESS] Partially closed Hyperliquid: {symbol} ({close_pct:.1f}%)")
+                except Exception as e:
+                    debug(f"Error partially closing Hyperliquid position {symbol}: {e}", file_only=True)
+                    continue
             
             info(f"✅ Partial close completed - reduced {closed_count} positions")
             return closed_count > 0
@@ -860,7 +1068,7 @@ REASONING: [detailed explanation of your decision]
             return False
     
     def execute_full_liquidation(self) -> bool:
-        """Close all positions except excluded tokens (USDC, SOL, staked SOL)"""
+        """Close all positions (spot and Hyperliquid) except excluded tokens"""
         try:
             info("🚨 Executing full liquidation - closing all positions except protected tokens")
             
@@ -870,6 +1078,8 @@ REASONING: [detailed explanation of your decision]
                 return False
             
             closed_count = 0
+            
+            # Liquidate spot positions
             for token_address, position_data in current_snapshot.positions.items():
                 # Handle both dict and float position data
                 if isinstance(position_data, dict):
@@ -894,7 +1104,29 @@ REASONING: [detailed explanation of your decision]
                 success = self._close_position(token_address, amount_tokens)
                 if success:
                     closed_count += 1
-                    info(f"[SUCCESS] Liquidated: {token_address[:8]}... (${usd_value:.2f})")
+                    info(f"[SUCCESS] Liquidated spot: {token_address[:8]}... (${usd_value:.2f})")
+            
+            # Liquidate Hyperliquid positions
+            hyperliquid_positions = getattr(current_snapshot, 'hyperliquid_positions', {})
+            for symbol, pos_data in hyperliquid_positions.items():
+                try:
+                    size_usd = pos_data.get('value_usd', 0)
+                    if size_usd <= 0:
+                        continue
+                    
+                    # Close 100% of Hyperliquid position
+                    from src.scripts.trading.hyperliquid_exchange import get_hyperliquid_exchange
+                    exchange = get_hyperliquid_exchange()
+                    if not exchange:
+                        continue
+                    
+                    result = exchange.close_position(symbol=symbol, percentage=100.0)
+                    if result.get('success'):
+                        closed_count += 1
+                        info(f"[SUCCESS] Liquidated Hyperliquid: {symbol} (${size_usd:.2f})")
+                except Exception as e:
+                    error(f"Error liquidating Hyperliquid position {symbol}: {e}")
+                    continue
             
             info(f"✅ Full liquidation completed - closed {closed_count} positions")
             return closed_count > 0
@@ -930,10 +1162,115 @@ REASONING: [detailed explanation of your decision]
             return False
     
     def _close_position(self, token_address: str, amount: float) -> bool:
-        """Close a position using the trading system"""
+        """Close a position using the trading system (supports both spot and Hyperliquid futures)"""
         try:
-            info(f"🔄 Closing position: {token_address[:8]}... (amount: {amount:.6f})")
+            from src import config
+            trading_mode = getattr(config, 'TRADING_MODE', 'spot')
             
+            info(f"🔄 Closing position: {token_address[:8]}... (amount: {amount:.6f}, mode: {trading_mode})")
+            
+            # Check if this is a Hyperliquid futures position
+            if trading_mode == "futures":
+                # Check if position exists in Hyperliquid
+                is_hyperliquid = self._is_hyperliquid_position(token_address)
+                if is_hyperliquid:
+                    return self._close_hyperliquid_position(token_address, amount)
+            
+            # Default to spot position closing
+            return self._close_spot_position(token_address, amount)
+        except Exception as e:
+            warning(f"Close position failed: {e}")
+            return None
+
+    def _is_hyperliquid_position(self, token_address: str) -> bool:
+        """Check if a position is a Hyperliquid perpetual"""
+        try:
+            current_snapshot = self.portfolio_tracker.current_snapshot
+            if not current_snapshot:
+                return False
+            
+            hyperliquid_positions = getattr(current_snapshot, 'hyperliquid_positions', {})
+            if not hyperliquid_positions:
+                return False
+            
+            # Convert token address to symbol for Hyperliquid lookup
+            try:
+                from src.nice_funcs_hl import get_token_symbol_from_address
+                symbol = get_token_symbol_from_address(token_address)
+                
+                # Check if symbol exists in Hyperliquid positions
+                return symbol in hyperliquid_positions
+            except:
+                # Fallback: check if any Hyperliquid position matches
+                # This is less precise but works if symbol mapping fails
+                return len(hyperliquid_positions) > 0
+            
+        except Exception as e:
+            debug(f"Error checking if position is Hyperliquid: {e}", file_only=True)
+            return False
+    
+    def _close_hyperliquid_position(self, token_address: str, amount: float) -> bool:
+        """Close a Hyperliquid perpetual position"""
+        try:
+            from src.scripts.trading.hyperliquid_exchange import get_hyperliquid_exchange
+            from src.scripts.database.execution_tracker import get_execution_tracker
+            from src.nice_funcs_hl import get_token_symbol_from_address
+            
+            # Convert token address to symbol
+            symbol = get_token_symbol_from_address(token_address)
+            
+            info(f"🔄 Closing Hyperliquid position: {symbol} (from {token_address[:8]}...)")
+            
+            # Get Hyperliquid exchange
+            exchange = get_hyperliquid_exchange()
+            if not exchange:
+                error("Hyperliquid exchange not available")
+                return False
+            
+            # Check if we have an open position
+            position = exchange.get_position(symbol=symbol)
+            if not position or abs(position.get('size', 0)) == 0:
+                warning(f"No open Hyperliquid position for {symbol}")
+                return False
+            
+            # Close the position (100% close for risk management)
+            result = exchange.close_position(symbol=symbol, percentage=100.0)
+            
+            if result.get('success'):
+                # Get position value for tracking
+                position_value = abs(position.get('size', 0)) * position.get('entry_price', 0)
+                
+                # Track the execution
+                execution_tracker = get_execution_tracker()
+                execution_data = {
+                    'action': 'SELL',
+                    'token_address': token_address,
+                    'amount': abs(position.get('size', 0)),
+                    'price': position.get('entry_price', 0),
+                    'value_usd': position_value,
+                    'reason': 'Risk management - emergency action (Hyperliquid)',
+                    'agent': 'risk_agent',
+                    'exchange': 'hyperliquid',
+                    'symbol': symbol,
+                    'timestamp': datetime.now().isoformat()
+                }
+                
+                execution_tracker.record_execution(execution_data)
+                info(f"[SUCCESS] Closed Hyperliquid position: {symbol} (${position_value:.2f})")
+                return True
+            else:
+                error(f"❌ [FAILED] Could not close Hyperliquid position: {symbol} - {result.get('error', 'Unknown error')}")
+                return False
+                
+        except Exception as e:
+            error(f"Error closing Hyperliquid position: {e}")
+            import traceback
+            error(traceback.format_exc())
+            return False
+    
+    def _close_spot_position(self, token_address: str, amount: float) -> bool:
+        """Close a spot position (existing logic)"""
+        try:
             # Import trading modules
             from src.scripts.database.execution_tracker import get_execution_tracker
             from src import config

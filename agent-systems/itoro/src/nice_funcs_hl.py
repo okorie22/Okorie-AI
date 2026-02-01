@@ -774,17 +774,36 @@ def hyperliquid_leverage_entry(token_address: str, direction: str, confidence: f
 def get_token_symbol_from_address(token_address: str):
     """
     Convert token address to symbol for Hyperliquid
-    This is a simplified mapping - you'd want a more comprehensive one
+    Enhanced mapping for common Solana tokens to Hyperliquid symbols
     """
-    # Common mappings
+    # Common Solana token address to Hyperliquid symbol mappings
     address_to_symbol = {
+        # Native tokens
         'So11111111111111111111111111111111111111111': 'SOL',
         'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 'USDC',
+        'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 'USDT',
+        
+        # Meme coins
         '9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump': 'BONK',
-        '67mTTGnVRunoSLGitgRGK2FJp5cT1KschjzWH9zKc3r': 'WIF'
+        '67mTTGnVRunoSLGitgRGK2FJp5cT1KschjzWH9zKc3r': 'WIF',
+        'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': 'BONK',  # Alternative BONK address
+        
+        # Major tokens (if they have Solana versions)
+        # Note: Hyperliquid primarily supports major tokens like BTC, ETH, SOL, etc.
+        # For unknown tokens, we'll need to extract symbol from metadata or use fallback
     }
-
-    return address_to_symbol.get(token_address, token_address[:4].upper())
+    
+    # Check direct mapping
+    if token_address in address_to_symbol:
+        return address_to_symbol[token_address]
+    
+    # For unknown tokens, try to infer from common patterns
+    # If it looks like a short symbol already (4-10 alphanumeric), return uppercase
+    if len(token_address) <= 10 and token_address.replace('_', '').isalnum():
+        return token_address.upper()
+    
+    # Default fallback
+    return token_address[:4].upper()
 
     # Run tests
     debug("Running function tests...", file_only=True)

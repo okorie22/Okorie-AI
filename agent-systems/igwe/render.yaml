@@ -1,0 +1,33 @@
+# Render Blueprint: IUL Appointment Setter (igwe)
+# If your repo root is the parent of agent-systems/igwe, set Root Directory to "agent-systems/igwe" in Dashboard for both services.
+# Required: Add Render Redis (or external Redis) and set REDIS_URL.
+# Required: Add Render Postgres (or external DB) and set DATABASE_URL.
+
+services:
+  - type: web
+    name: iul-appointment-setter
+    rootDir: agent-systems/igwe
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: RUN_MODE
+        value: web
+      - key: PYTHONPATH
+        value: .
+      - key: PORT
+        sync: false
+    # In Dashboard: link Redis add-on (sets REDIS_URL), link Postgres (sets DATABASE_URL).
+
+  - type: worker
+    name: iul-appointment-setter-worker
+    rootDir: agent-systems/igwe
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: RUN_MODE
+        value: worker
+      - key: PYTHONPATH
+        value: .
+    # In Dashboard: link same Redis and Postgres as web service (REDIS_URL, DATABASE_URL).

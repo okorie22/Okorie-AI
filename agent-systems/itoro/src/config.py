@@ -288,6 +288,14 @@ APIFY_DEFAULT_INPUT = {
     "traderType": "all"
 }
 
+# Whale Agent mode: use TRADING_MODE (see Trading Mode below) or override with WHALE_TRADING_MODE env (e.g. "futures")
+# Futures mode: Hyperliquid leaderboard scraper
+WHALE_APIFY_ACTOR_FUTURES = "saswave~hyperliquid-leaderboard-vaults-scraper"
+WHALE_APIFY_INPUT_FUTURES = {
+    "max_batches": 1,
+    "page_type": "leaderboard"
+}
+
 # Whale Agent Scoring Configuration
 # Prioritized scoring: PNL (30d > 7d > 1d) → Winrate → Holding Period → Token Active → Others
 WHALE_SCORING_WEIGHTS = {
@@ -321,6 +329,11 @@ WHALE_UPDATE_INTERVAL_HOURS = 48  # Update frequency in hours
 WHALE_MAX_STORED_WALLETS = 100   # Maximum wallets to store
 WHALE_HISTORY_MAX_RECORDS = 1000 # Maximum history entries to keep
 WHALE_HISTORY_RETENTION_DAYS = 365 # Keep 365 days of history data
+
+# Whale 7d enrichment from Hyperliquid user_fills (futures path only)
+WHALE_ENRICHMENT_7D_ENABLED = os.getenv('WHALE_ENRICHMENT_7D_ENABLED', 'true').lower() == 'true'
+WHALE_ENRICHMENT_MAX_WALLETS = int(os.getenv('WHALE_ENRICHMENT_MAX_WALLETS', '1000'))
+WHALE_ENRICHMENT_RATE_LIMIT_SEC = float(os.getenv('WHALE_ENRICHMENT_RATE_LIMIT_SEC', '0.5'))
 
 # =============================================================================
 # 💰 CORE TRADING CONFIGURATION
@@ -397,8 +410,32 @@ else:
     print("Personal wallet balance features will not work until this is set")
 
 # Trading Mode Configuration
-TRADING_MODE = "spot"
-USE_HYPERLIQUID = False
+TRADING_MODE = os.getenv('TRADING_MODE', 'futures').lower()  # Options: "spot" or "futures"
+WHALE_TRADING_MODE = os.getenv('WHALE_TRADING_MODE', TRADING_MODE).lower()  # Whale agent can override (e.g. "futures")
+USE_HYPERLIQUID = False  # Deprecated - use TRADING_MODE instead
+
+# Futures Trading Settings (for TRADING_MODE="futures")
+FUTURES_DEFAULT_LEVERAGE = 5  # Default leverage multiplier (1-50)
+FUTURES_MAX_LEVERAGE = 10  # Maximum allowed leverage (safety limit)
+FUTURES_MIN_LEVERAGE = 1  # Minimum leverage (1x = spot equivalent)
+FUTURES_SUPPORTED_TOKENS = ['BTC', 'ETH', 'SOL', 'MATIC', 'AVAX', 'BNB', 'XRP', 'ADA', 'DOT', 'LINK', 'UNI', 'AAVE']  # Well-known tokens
+FUTURES_MAX_POSITION_SIZE_PCT = 0.25  # Max 25% of Hyperliquid equity per position
+FUTURES_MAX_OPEN_POSITIONS = 5  # Maximum concurrent perpetual positions
+
+# Hyperliquid copy-trading (WebSocket userFills -> copybot)
+HYPERLIQUID_COPY_ENABLED = os.getenv('HYPERLIQUID_COPY_ENABLED', 'false').lower() == 'true'
+HYPERLIQUID_WALLETS_TO_TRACK = []  # List of 0x addresses; if empty, load top N from ranked_whales.json when in futures mode
+HYPERLIQUID_COPY_TOP_N = int(os.getenv('HYPERLIQUID_COPY_TOP_N', '10'))  # Top N from ranked file when WALLETS_TO_TRACK empty
+COPYBOT_HYPERLIQUID_WEBHOOK_URL = os.getenv('COPYBOT_HYPERLIQUID_WEBHOOK_URL', 'http://localhost:8080/webhook/hyperliquid')
+HYPERLIQUID_WEBSOCKET_URL = os.getenv('HYPERLIQUID_WEBSOCKET_URL', 'wss://api.hyperliquid.xyz/ws')
+
+# Cashflow Agent Settings
+CASHFLOW_AGENT_ENABLED = os.getenv('CASHFLOW_AGENT_ENABLED', 'False').lower() == 'true'
+HYPERLIQUID_MIN_BALANCE_USD = float(os.getenv('HYPERLIQUID_MIN_BALANCE_USD', '1000'))
+HYPERLIQUID_MAX_BALANCE_USD = float(os.getenv('HYPERLIQUID_MAX_BALANCE_USD', '5000'))
+HYPERLIQUID_DEPOSIT_THRESHOLD_USD = float(os.getenv('HYPERLIQUID_DEPOSIT_THRESHOLD_USD', '500'))
+
+# Legacy Leverage Settings (deprecated - use FUTURES_* settings)
 DEFAULT_LEVERAGE = 2.0
 MAX_LEVERAGE = 5.0
 MIRROR_WITH_LEVERAGE = False

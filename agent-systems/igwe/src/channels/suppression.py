@@ -52,7 +52,7 @@ class SuppressionManager:
             email=lead.email,
             reason=reason,
             source=source,
-            metadata=metadata
+            event_metadata=metadata
         )
         self.db.add(suppression)
         
