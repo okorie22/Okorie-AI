@@ -122,6 +122,11 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     total_imports = db.query(LeadSourceRun).count()
     total_imported = db.query(func.sum(LeadSourceRun.new_leads_imported)).scalar() or 0
     total_duplicates = db.query(func.sum(LeadSourceRun.duplicates_skipped)).scalar() or 0
+    verified_emails_count = db.query(Lead).filter(
+        Lead.email.isnot(None),
+        Lead.email != "",
+        Lead.email_deliverable.is_(True)
+    ).count()
     
     # Tier breakdown
     tier_counts = {}
@@ -536,6 +541,10 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
                     <div class="metric-row">
                         <span class="metric-name">Duplicates Skipped</span>
                         <span class="metric-value-small">{total_duplicates:,}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Verified Emails</span>
+                        <span class="metric-value-small">{verified_emails_count:,}</span>
                     </div>
                     <div class="metric-row">
                         <span class="metric-name">Success Rate</span>
