@@ -86,10 +86,18 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     ).count()
     
     # Count clicked messages (check if 'clicked' key exists and is true)
-    clicked_count = db.query(Message).filter(
-        Message.direction == MessageDirection.OUTBOUND,
-        Message.message_metadata.op('->>')('clicked') == 'true'
-    ).count()
+    # Use SQLite json_extract vs PostgreSQL ->> so dashboard works with both
+    dialect_name = db.get_bind().dialect.name
+    if dialect_name == 'sqlite':
+        clicked_count = db.query(Message).filter(
+            Message.direction == MessageDirection.OUTBOUND,
+            func.json_extract(Message.message_metadata, '$.clicked') == 'true'
+        ).count()
+    else:
+        clicked_count = db.query(Message).filter(
+            Message.direction == MessageDirection.OUTBOUND,
+            Message.message_metadata.op('->>')('clicked') == 'true'
+        ).count()
     
     bounced_count = db.query(Lead).filter(
         Lead.suppression_reason == 'bounce'
