@@ -496,6 +496,19 @@ def run_apify_import(self):
             
             logger.info(f"Run {run_num}: Extracted {len(leads_data)} leads from CSV")
             
+            # Email verification (Rapid Email Validator)
+            verification_map = {}
+            if workflow_config.email_verification_enabled:
+                emails_to_verify = [
+                    (lead_data.get("email") or "").strip().lower()
+                    for lead_data in leads_data
+                    if lead_data.get("email")
+                ]
+                if emails_to_verify:
+                    from ..ingestion.email_verifier import build_email_to_result_map
+                    verification_map = build_email_to_result_map(emails_to_verify)
+                    logger.info(f"Run {run_num}: Verified {len(verification_map)} emails")
+            
             # Import leads
             new_leads = []
             duplicates = 0
@@ -512,6 +525,16 @@ def run_apify_import(self):
                     duplicates += 1
                     logger.debug(f"Duplicate found: {lead_data['email']}")
                     continue
+                
+                # Attach verification result for this lead
+                email = (lead_data.get("email") or "").strip().lower()
+                if email:
+                    ver = verification_map.get(email, {})
+                    lead_data["email_deliverable"] = ver.get("deliverable", False)
+                    lead_data["email_verification_status"] = ver.get("status")
+                else:
+                    lead_data["email_deliverable"] = None
+                    lead_data["email_verification_status"] = None
                 
                 # Create new lead
                 lead = Lead(**{k: v for k, v in lead_data.items() if k != 'metadata'})
@@ -538,19 +561,18 @@ def run_apify_import(self):
             self.db.commit()
             logger.info(f"Run {run_num}: Scored {len(new_leads)} new leads")
             
-            # Start conversations for ALL leads with emails (scoring determines priority, not eligibility)
+            # Start conversations only for leads with deliverable email (verified)
             conversations_started = 0
             if workflow_config.auto_start_conversations:
                 for lead in new_leads:
-                    # Only requirement: must have email
-                    if lead.email:
+                    if lead.email and lead.email_deliverable:
                         try:
                             workflow_engine.start_conversation(lead)
                             conversations_started += 1
                         except Exception as e:
                             logger.error(f"Error starting conversation for lead {lead.id}: {e}")
                 
-                logger.info(f"Run {run_num}: Started {conversations_started} conversations (all leads with emails)")
+                logger.info(f"Run {run_num}: Started {conversations_started} conversations (leads with deliverable email)")
             
             # Cleanup CSV
             if csv_path.exists():

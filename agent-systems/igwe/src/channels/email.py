@@ -63,6 +63,10 @@ class SendGridService:
             logger.warning(f"Skipping suppressed lead {lead_id}: {lead.suppression_reason}")
             return {"success": False, "error": "Lead suppressed"}
         
+        if lead.email_deliverable is not True:
+            logger.warning(f"Skipping lead {lead_id}: email not deliverable (status={lead.email_verification_status})")
+            return {"success": False, "error": "Email not deliverable"}
+        
         # Check rate limits
         from .rate_limiter import SendRateLimiter
         rate_limiter = SendRateLimiter(self.db)

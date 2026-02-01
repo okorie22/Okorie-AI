@@ -233,6 +233,7 @@ class WorkflowConfig(BaseSettings):
     apify_run_interval_hours: int = Field(default=6, alias="APIFY_RUN_INTERVAL_HOURS")
     follow_up_delay_hours: int = Field(default=24, alias="FOLLOW_UP_DELAY_HOURS")
     auto_start_conversations: bool = Field(default=True, alias="AUTO_START_CONVERSATIONS")
+    email_verification_enabled: bool = Field(default=True, alias="EMAIL_VERIFICATION_ENABLED")
     # NOTE: tier_threshold removed - ALL leads with emails now get contacted
     reminder_24h_enabled: bool = Field(default=True, alias="REMINDER_24H_ENABLED")
     reminder_2h_enabled: bool = Field(default=True, alias="REMINDER_2H_ENABLED")

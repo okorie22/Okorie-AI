@@ -106,6 +106,10 @@ class Lead(Base):
     suppression_reason = Column(String(100), nullable=True)  # bounce, complaint, unsubscribe, duplicate_cleanup
     suppressed_at = Column(DateTime(timezone=True), nullable=True)
     
+    # Email deliverability (Rapid Email Validator; None = not yet verified)
+    email_deliverable = Column(Boolean, nullable=True)  # True = can email, False = do not email
+    email_verification_status = Column(String(50), nullable=True)  # VALID, INVALID_FORMAT, DISPOSABLE, etc.
+    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

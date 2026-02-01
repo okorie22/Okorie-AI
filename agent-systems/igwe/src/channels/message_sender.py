@@ -104,6 +104,9 @@ class MessageSender:
         if not lead.email:
             logger.error(f"Lead {lead.id} has no email")
             return {"success": False, "error": "No email"}
+        if lead.email_deliverable is not True:
+            logger.warning(f"Lead {lead.id} email not deliverable, skipping send")
+            return {"success": False, "error": "Email not deliverable"}
         
         result = self.email_service.send_email(
             to_email=lead.email,

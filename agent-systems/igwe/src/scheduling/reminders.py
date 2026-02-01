@@ -58,8 +58,8 @@ class ReminderService:
                 appt_time = appointment.scheduled_at.strftime("%I:%M %p")
                 appt_date = appointment.scheduled_at.strftime("%B %d, %Y")
                 
-                # Send email reminder
-                if lead.email:
+                # Send email reminder (only if email verified deliverable)
+                if lead.email and lead.email_deliverable:
                     template_data = self.templates.render(
                         "reminder_24h_email",
                         lead,
@@ -149,8 +149,8 @@ class ReminderService:
                 
                 appt_time = appointment.scheduled_at.strftime("%I:%M %p")
                 
-                # Send email reminder
-                if lead.email:
+                # Send email reminder (only if email verified deliverable)
+                if lead.email and lead.email_deliverable:
                     template_data = self.templates.render(
                         "reminder_2h_email",
                         lead,
@@ -346,8 +346,8 @@ class ReminderService:
             return
         
         try:
-            # Send email
-            if lead.email:
+            # Send email (only if email verified deliverable)
+            if lead.email and lead.email_deliverable:
                 template_data = self.templates.render(
                     "no_show_recovery_email",
                     lead,
