@@ -7,12 +7,15 @@ Single launcher that starts all required services:
 - Celery worker (background tasks)
 - Celery beat (scheduler)
 - FastAPI server (webhooks)
+- Optional: ngrok tunnel (ENABLE_NGROK=1) for HTTPS webhook URL (e.g. SendGrid)
 """
 import sys
 import time
 import subprocess
 import signal
 import os
+import json
+import urllib.request
 from pathlib import Path
 from loguru import logger
 from typing import List, Optional
@@ -319,7 +322,63 @@ class AppointmentSetterSystem:
         except Exception as e:
             logger.error(f"[ERROR] Error starting FastAPI: {e}")
             return None
-    
+
+    def _should_run_ngrok(self) -> bool:
+        """True if ENABLE_NGROK is set (1, true, yes)."""
+        v = (os.getenv("ENABLE_NGROK") or "").strip().lower()
+        return v in ("1", "true", "yes")
+
+    def _get_ngrok_public_url(self, port: str = "8000", max_attempts: int = 15) -> Optional[str]:
+        """Poll ngrok local API for the HTTPS public URL. Returns None if not found."""
+        for _ in range(max_attempts):
+            try:
+                req = urllib.request.Request("http://127.0.0.1:4040/api/tunnels")
+                with urllib.request.urlopen(req, timeout=2) as resp:
+                    data = json.loads(resp.read().decode())
+                tunnels = data.get("tunnels") or []
+                for t in tunnels:
+                    addr = (t.get("config", {}).get("addr") or "")
+                    if f":{port}" in addr or addr.endswith(port):
+                        url = (t.get("public_url") or "").strip()
+                        if url.startswith("https://"):
+                            return url
+                return (tunnels[0].get("public_url") or "").strip() or None
+            except Exception:
+                time.sleep(0.8)
+        return None
+
+    def start_ngrok(self) -> Optional[subprocess.Popen]:
+        """Start ngrok tunnel to port (for HTTPS webhook URL). Requires ngrok installed and authtoken set."""
+        port = os.getenv("PORT", "8000")
+        try:
+            if not self._should_run_ngrok():
+                return None
+            # ngrok must be in PATH (install via scripts/install_ngrok_vm.sh on VM)
+            process = subprocess.Popen(
+                ["ngrok", "http", port],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                text=True,
+            )
+            time.sleep(2)
+            if process.poll() is not None:
+                logger.warning("[WARN] ngrok exited; is it installed and authtoken set? Run: ngrok config add-authtoken <token>")
+                return None
+            self.processes.append(process)
+            public_url = self._get_ngrok_public_url(port)
+            if public_url:
+                logger.info(f"[OK] ngrok tunnel: {public_url}")
+                logger.info(f"     SendGrid Event Webhook URL: {public_url.rstrip('/')}/webhooks/sendgrid")
+            else:
+                logger.info("[OK] ngrok started; get URL at http://127.0.0.1:4040")
+            return process
+        except FileNotFoundError:
+            logger.warning("[WARN] ngrok not found in PATH. Install: bash scripts/install_ngrok_vm.sh")
+            return None
+        except Exception as e:
+            logger.warning(f"[WARN] ngrok start failed: {e}")
+            return None
+
     def monitor_processes(self):
         """Monitor running processes and restart if needed"""
         while self.running:
@@ -375,6 +434,7 @@ class AppointmentSetterSystem:
                 sys.exit(1)
             self.processes.append(fastapi)
             logger.info("[OK] Web service running (FastAPI only)")
+            self.start_ngrok()  # optional: ENABLE_NGROK=1
         elif run_mode == "worker":
             # Render Background Worker: Celery worker + beat in one process
             worker = self.start_celery_worker_with_beat()
@@ -403,6 +463,7 @@ class AppointmentSetterSystem:
                 sys.exit(1)
             self.processes.append(fastapi)
             logger.info("[OK] Full stack running (worker + beat + API)")
+            self.start_ngrok()  # optional: ENABLE_NGROK=1
 
         port = os.getenv("PORT", "8000")
         logger.info("\n" + "=" * 60)
