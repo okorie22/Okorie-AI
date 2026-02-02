@@ -67,6 +67,11 @@ celery_app.conf.beat_schedule = {
         'task': 'src.workflow.tasks.enrich_high_priority_leads',
         'schedule': crontab(minute='0', hour='2'),  # Daily at 2 AM
     },
+    # Re-verify stale email addresses (verified > 30 days ago or never) - daily at 3 AM
+    're-verify-stale-emails': {
+        'task': 'src.workflow.tasks.re_verify_stale_emails',
+        'schedule': crontab(minute='0', hour='3'),  # Daily at 3 AM UTC
+    },
 }
 
 # Auto-discover tasks from modules

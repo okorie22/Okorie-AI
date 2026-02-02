@@ -107,6 +107,11 @@ class MessageSender:
         if lead.email_deliverable is not True:
             logger.warning(f"Lead {lead.id} email not deliverable, skipping send")
             return {"success": False, "error": "Email not deliverable"}
+        from datetime import datetime, timezone, timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+        if not lead.email_verified_at or lead.email_verified_at < cutoff:
+            logger.warning(f"Lead {lead.id} email verification stale, skipping send")
+            return {"success": False, "error": "Email verification expired"}
         
         result = self.email_service.send_email(
             to_email=lead.email,

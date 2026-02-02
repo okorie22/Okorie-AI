@@ -1,7 +1,7 @@
 """
 SendGrid email integration with reply webhook support.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
 from sqlalchemy.orm import Session
@@ -66,6 +66,11 @@ class SendGridService:
         if lead.email_deliverable is not True:
             logger.warning(f"Skipping lead {lead_id}: email not deliverable (status={lead.email_verification_status})")
             return {"success": False, "error": "Email not deliverable"}
+        # Only send if verified within last 30 days (stale = re-verify first)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+        if not lead.email_verified_at or lead.email_verified_at < cutoff:
+            logger.warning(f"Skipping lead {lead_id}: email verification stale or missing (run re-verify job)")
+            return {"success": False, "error": "Email verification expired"}
         
         # Check rate limits
         from .rate_limiter import SendRateLimiter

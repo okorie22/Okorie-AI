@@ -2,7 +2,7 @@
 Appointment reminder system - sends 24h and 2h reminders.
 """
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict
 from loguru import logger
 
@@ -58,8 +58,9 @@ class ReminderService:
                 appt_time = appointment.scheduled_at.strftime("%I:%M %p")
                 appt_date = appointment.scheduled_at.strftime("%B %d, %Y")
                 
-                # Send email reminder (only if email verified deliverable)
-                if lead.email and lead.email_deliverable:
+                # Send email reminder (only if email verified deliverable and verified within 30 days)
+                _cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+                if lead.email and lead.email_deliverable and (lead.email_verified_at and lead.email_verified_at >= _cutoff):
                     template_data = self.templates.render(
                         "reminder_24h_email",
                         lead,
@@ -149,8 +150,9 @@ class ReminderService:
                 
                 appt_time = appointment.scheduled_at.strftime("%I:%M %p")
                 
-                # Send email reminder (only if email verified deliverable)
-                if lead.email and lead.email_deliverable:
+                # Send email reminder (only if email verified deliverable and verified within 30 days)
+                _cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+                if lead.email and lead.email_deliverable and (lead.email_verified_at and lead.email_verified_at >= _cutoff):
                     template_data = self.templates.render(
                         "reminder_2h_email",
                         lead,
@@ -346,8 +348,9 @@ class ReminderService:
             return
         
         try:
-            # Send email (only if email verified deliverable)
-            if lead.email and lead.email_deliverable:
+            # Send email (only if email verified deliverable and verified within 30 days)
+            _cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+            if lead.email and lead.email_deliverable and (lead.email_verified_at and lead.email_verified_at >= _cutoff):
                 template_data = self.templates.render(
                     "no_show_recovery_email",
                     lead,

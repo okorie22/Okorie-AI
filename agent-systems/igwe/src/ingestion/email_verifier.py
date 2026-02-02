@@ -12,8 +12,15 @@ from loguru import logger
 DEFAULT_BASE_URL = "https://rapid-email-verifier.fly.dev"
 BATCH_SIZE = 100
 
-# Statuses we consider safe to email
-DELIVERABLE_STATUSES = frozenset({"VALID", "PROBABLY_VALID"})
+# Only VALID is safe to email (PROBABLY_VALID = role addresses, bounce more)
+DELIVERABLE_STATUSES = frozenset({"VALID"})
+
+# Role/generic local parts: never treat as deliverable (high bounce)
+ROLE_LOCAL_PARTS = frozenset({
+    "info", "sales", "support", "admin", "contact", "hello", "office", "team",
+    "hr", "noreply", "no-reply", "mail", "enquiries", "inquiry", "enquiry",
+    "help", "feedback", "webmaster", "postmaster", "abuse", "billing",
+})
 
 
 def validate_batch(emails: List[str], base_url: str | None = None) -> List[Dict[str, Any]]:
@@ -23,7 +30,7 @@ def validate_batch(emails: List[str], base_url: str | None = None) -> List[Dict[
     Returns a list of dicts, one per email, with keys:
       - email: str
       - status: str | None (e.g. VALID, INVALID_FORMAT, DISPOSABLE; None on API error)
-      - deliverable: bool (True only for VALID or PROBABLY_VALID)
+      - deliverable: bool (True only for VALID; role addresses blocked)
     On API failure for the batch, returns entries with status=None and deliverable=False.
     """
     base_url = (base_url or os.getenv("EMAIL_VERIFIER_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
@@ -51,6 +58,11 @@ def validate_batch(emails: List[str], base_url: str | None = None) -> List[Dict[
             email = item.get("email", "")
             status = item.get("status")
             deliverable = status in DELIVERABLE_STATUSES
+            # Block role/generic addresses even if validator says VALID
+            if deliverable and "@" in email:
+                local = email.split("@", 1)[0].strip().lower()
+                if local in ROLE_LOCAL_PARTS:
+                    deliverable = False
             results.append({"email": email, "status": status, "deliverable": deliverable})
 
     return results

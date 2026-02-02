@@ -1,16 +1,18 @@
 """
 Validate all leads' emails in the database using Rapid Email Validator.
-Updates email_deliverable and email_verification_status on each lead.
+Updates email_deliverable, email_verification_status, and email_verified_at on each lead.
 
 Uses DATABASE_URL from environment (via .env). Run from project root:
   python scripts/validate_leads_emails.py
   python scripts/validate_leads_emails.py --dry-run
   python scripts/validate_leads_emails.py --limit 200
+  python scripts/validate_leads_emails.py --stale-only   # only leads needing re-verify (for daily cron)
 """
 import argparse
 import sys
 from pathlib import Path
 from collections import Counter
+from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -26,6 +28,7 @@ def main():
     parser = argparse.ArgumentParser(description="Validate lead emails via Rapid Email Validator")
     parser.add_argument("--dry-run", action="store_true", help="Fetch and log results only, do not update DB")
     parser.add_argument("--limit", type=int, default=None, help="Process at most N leads (for testing)")
+    parser.add_argument("--stale-only", action="store_true", help="Only re-verify leads with stale or missing email_verified_at (for daily cron)")
     args = parser.parse_args()
 
     db = SessionLocal()
@@ -34,11 +37,15 @@ def main():
             Lead.email.isnot(None),
             Lead.email != ""
         ).order_by(Lead.id)
+        if args.stale_only:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+            from sqlalchemy import or_
+            query = query.filter(or_(Lead.email_verified_at.is_(None), Lead.email_verified_at < cutoff))
         if args.limit:
             query = query.limit(args.limit)
         leads = query.all()
         total = len(leads)
-        logger.info(f"Found {total} leads with email to validate")
+        logger.info(f"Found {total} leads with email to validate" + (" (stale-only)" if args.stale_only else ""))
         if total == 0:
             return
 
@@ -68,6 +75,7 @@ def main():
                 if not args.dry_run:
                     lead.email_deliverable = deliverable
                     lead.email_verification_status = status
+                    lead.email_verified_at = datetime.now(timezone.utc)
 
             if not args.dry_run:
                 db.commit()

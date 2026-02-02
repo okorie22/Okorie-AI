@@ -3,7 +3,7 @@ Celery tasks for workflow automation.
 """
 from celery import Task
 from loguru import logger
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import asyncio
 from pathlib import Path
@@ -532,9 +532,11 @@ def run_apify_import(self):
                     ver = verification_map.get(email, {})
                     lead_data["email_deliverable"] = ver.get("deliverable", False)
                     lead_data["email_verification_status"] = ver.get("status")
+                    lead_data["email_verified_at"] = datetime.now(timezone.utc) if verification_map else None
                 else:
                     lead_data["email_deliverable"] = None
                     lead_data["email_verification_status"] = None
+                    lead_data["email_verified_at"] = None
                 
                 # Create new lead
                 lead = Lead(**{k: v for k, v in lead_data.items() if k != 'metadata'})
@@ -622,3 +624,51 @@ def run_apify_import(self):
         "leads_needed": leads_needed,
         "run_results": run_results
     }
+
+
+@celery_app.task(base=DatabaseTask, bind=True)
+def re_verify_stale_emails(self):
+    """
+    Re-verify leads whose email_verified_at is null or older than 30 days.
+    Updates email_deliverable, email_verification_status, email_verified_at.
+    Run daily so send path (verified-within-30-days gate) stays valid.
+    """
+    from sqlalchemy import or_
+    from ..storage.models import Lead
+    from ..ingestion.email_verifier import validate_batch
+
+    BATCH_SIZE = 100
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    query = self.db.query(Lead).filter(
+        Lead.email.isnot(None),
+        Lead.email != "",
+        or_(Lead.email_verified_at.is_(None), Lead.email_verified_at < cutoff)
+    ).order_by(Lead.id)
+    leads = query.all()
+    total = len(leads)
+    if total == 0:
+        logger.info("re_verify_stale_emails: no stale leads to verify")
+        return {"processed": 0}
+
+    logger.info(f"re_verify_stale_emails: verifying {total} stale leads")
+    processed = 0
+    for i in range(0, total, BATCH_SIZE):
+        batch = leads[i : i + BATCH_SIZE]
+        emails = [lead.email.strip().lower() for lead in batch if lead.email]
+        if not emails:
+            continue
+        results = validate_batch(emails)
+        email_to_result = {r["email"]: r for r in results}
+        for lead in batch:
+            if not lead.email:
+                continue
+            key = lead.email.strip().lower()
+            info = email_to_result.get(key, {})
+            lead.email_deliverable = info.get("deliverable", False)
+            lead.email_verification_status = info.get("status")
+            lead.email_verified_at = datetime.now(timezone.utc)
+            processed += 1
+        self.db.commit()
+        logger.info(f"re_verify_stale_emails: batch {i // BATCH_SIZE + 1}, {min(i + BATCH_SIZE, total)}/{total}")
+    logger.info(f"re_verify_stale_emails: done, {processed} leads updated")
+    return {"processed": processed}

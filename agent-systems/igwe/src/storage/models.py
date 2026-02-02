@@ -109,6 +109,7 @@ class Lead(Base):
     # Email deliverability (Rapid Email Validator; None = not yet verified)
     email_deliverable = Column(Boolean, nullable=True)  # True = can email, False = do not email
     email_verification_status = Column(String(50), nullable=True)  # VALID, INVALID_FORMAT, DISPOSABLE, etc.
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)  # When last verified; send only if within 30 days
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
