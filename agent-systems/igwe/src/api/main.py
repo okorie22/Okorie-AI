@@ -49,6 +49,26 @@ async def health_check():
     return {"status": "healthy", "service": "IUL Appointment Setter"}
 
 
+def _log_webhook_to_file(event: dict, result: Optional[dict] = None) -> None:
+    """Append one SendGrid webhook event to logs/sendgrid_webhook.log for debugging on VM."""
+    try:
+        import os
+        from datetime import datetime, timezone
+        log_dir = "logs"
+        os.makedirs(log_dir, exist_ok=True)
+        path = os.path.join(log_dir, "sendgrid_webhook.log")
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        ev = event.get("event") or ""
+        mid = event.get("sg_message_id") or ""
+        email = event.get("email") or ""
+        ok = (result or {}).get("success", False)
+        line = f"{ts}\t{ev}\tsg_message_id={mid}\temail={email}\tsuccess={ok}\n"
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(line)
+    except Exception:
+        pass  # do not fail webhook on log write
+
+
 # SendGrid webhooks
 @app.post("/webhooks/sendgrid")
 async def sendgrid_webhook(request: Request, db: Session = Depends(get_db)):
@@ -65,8 +85,8 @@ async def sendgrid_webhook(request: Request, db: Session = Depends(get_db)):
         if isinstance(data, list):
             results = []
             for event in data:
-                # Process event (delivery, open, click)
                 result = service.handle_webhook(event)
+                _log_webhook_to_file(event, result)
                 results.append(result)
                 
                 # Check for suppression events (bounce, complaint, spam)
@@ -88,6 +108,7 @@ async def sendgrid_webhook(request: Request, db: Session = Depends(get_db)):
         else:
             # Single event
             result = service.handle_webhook(data)
+            _log_webhook_to_file(data, result)
             
             # Check for suppression
             event_type = data.get("event")

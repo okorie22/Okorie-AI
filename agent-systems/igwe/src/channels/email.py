@@ -147,6 +147,8 @@ class SendGridService:
             response = self.client.send(message)
 
             # Log message to database; sent_at set here; delivered_at set by SendGrid webhook when event=delivered
+            # SendGrid X-Message-Id is short; webhook sg_message_id is long (prefix = X-Message-Id). Store stripped.
+            raw_xmid = (response.headers.get("X-Message-Id") or "").strip()
             message_record = self.message_repo.create({
                 "conversation_id": conversation_id,
                 "direction": MessageDirection.OUTBOUND,
@@ -155,7 +157,7 @@ class SendGridService:
                 "message_metadata": {
                     "subject": subject,
                     "to": to_email,
-                    "sendgrid_id": response.headers.get("X-Message-Id"),
+                    "sendgrid_id": raw_xmid or None,
                     **(metadata or {})
                 },
                 "sent_at": sent_at_utc,
@@ -194,19 +196,40 @@ class SendGridService:
         Handle SendGrid webhook events (delivery, open, click, reply).
         """
         event_type = webhook_data.get("event")
-        sendgrid_id = webhook_data.get("sg_message_id")
+        sendgrid_id = (webhook_data.get("sg_message_id") or "").strip()
         
         logger.info(f"Received SendGrid webhook: {event_type} for {sendgrid_id}")
         
         try:
-            # Find message by SendGrid ID
-            message = self.db.query(Message).filter(
-                Message.message_metadata["sendgrid_id"].astext == sendgrid_id
-            ).first()
-            
+            # Find message by SendGrid ID. X-Message-Id (stored) is short; webhook sg_message_id is long (stored is prefix).
+            message = None
+            if sendgrid_id:
+                # Try DB exact match first (JSONB)
+                try:
+                    message = self.db.query(Message).filter(
+                        Message.direction == MessageDirection.OUTBOUND,
+                        Message.channel == MessageChannel.EMAIL,
+                        Message.message_metadata["sendgrid_id"].astext == sendgrid_id
+                    ).first()
+                except Exception:
+                    message = None
+                # Fallback: compare in Python (webhook id often has suffix; stored id is prefix)
+                if not message:
+                    candidates = self.db.query(Message).filter(
+                        Message.direction == MessageDirection.OUTBOUND,
+                        Message.channel == MessageChannel.EMAIL,
+                        Message.message_metadata.isnot(None)
+                    ).order_by(Message.id.desc()).limit(500).all()
+                    for m in candidates:
+                        stored = (m.message_metadata or {}).get("sendgrid_id")
+                        if isinstance(stored, str):
+                            stored = stored.strip()
+                            if sendgrid_id == stored or sendgrid_id.startswith(stored) or stored.startswith(sendgrid_id):
+                                message = m
+                                break
             if not message:
-                logger.warning(f"Message not found for SendGrid ID: {sendgrid_id}")
-                return {"success": False, "error": "Message not found"}
+                logger.warning(f"Message not found for SendGrid ID: {sendgrid_id} (event={event_type})")
+                return {"success": False, "error": "Message not found", "sg_message_id": sendgrid_id}
             
             # Parse timestamp (SendGrid sends Unix epoch or ISO string); store as UTC datetime
             def _parse_ts(ts) -> Optional[datetime]:

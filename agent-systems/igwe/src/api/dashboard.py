@@ -11,7 +11,7 @@ from typing import Dict, Any
 from ..storage.database import get_db
 from ..storage.models import (
     Lead, Conversation, Message, LeadScore, LeadEnrichment, LeadSourceRun,
-    ConversationState, MessageDirection
+    ConversationState, MessageDirection, MessageChannel, Suppression
 )
 
 router = APIRouter(tags=["dashboard"])
@@ -74,41 +74,43 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         Message.direction == MessageDirection.INBOUND
     ).count()
     
-    # Delivery metrics
+    # Email-only delivery metrics (for EMAIL DELIVERY METRICS card)
+    emails_sent = db.query(Message).filter(
+        Message.direction == MessageDirection.OUTBOUND,
+        Message.channel == MessageChannel.EMAIL
+    ).count()
     delivered_count = db.query(Message).filter(
         Message.direction == MessageDirection.OUTBOUND,
+        Message.channel == MessageChannel.EMAIL,
         Message.delivered_at.isnot(None)
     ).count()
-    
     opened_count = db.query(Message).filter(
         Message.direction == MessageDirection.OUTBOUND,
+        Message.channel == MessageChannel.EMAIL,
         Message.read_at.isnot(None)
     ).count()
-    
-    # Count clicked messages (check if 'clicked' key exists and is true)
-    # Use SQLite json_extract vs PostgreSQL ->> so dashboard works with both
     dialect_name = db.get_bind().dialect.name
     if dialect_name == 'sqlite':
         clicked_count = db.query(Message).filter(
             Message.direction == MessageDirection.OUTBOUND,
+            Message.channel == MessageChannel.EMAIL,
             func.json_extract(Message.message_metadata, '$.clicked') == 'true'
         ).count()
     else:
         clicked_count = db.query(Message).filter(
             Message.direction == MessageDirection.OUTBOUND,
+            Message.channel == MessageChannel.EMAIL,
             Message.message_metadata.op('->>')('clicked') == 'true'
         ).count()
-    
     bounced_count = db.query(Lead).filter(
         Lead.suppression_reason == 'bounce'
     ).count()
-    
-    # Calculate rates
-    delivery_rate = (delivered_count / total_messages_sent * 100) if total_messages_sent > 0 else 0
+    # Rates for email card (denominator = emails_sent for delivery/bounce; delivered for open/click/reply)
+    delivery_rate = (delivered_count / emails_sent * 100) if emails_sent > 0 else 0
     open_rate = (opened_count / delivered_count * 100) if delivered_count > 0 else 0
     click_rate = (clicked_count / delivered_count * 100) if delivered_count > 0 else 0
     reply_rate = (total_messages_received / delivered_count * 100) if delivered_count > 0 else 0
-    bounce_rate = (bounced_count / total_messages_sent * 100) if total_messages_sent > 0 else 0
+    bounce_rate = (bounced_count / emails_sent * 100) if emails_sent > 0 else 0
     
     # Enrichment stats
     total_enriched = db.query(LeadEnrichment).count()
@@ -637,3 +639,55 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     """
     
     return HTMLResponse(content=html)
+
+
+@router.get("/email-delivery-diagnostics")
+async def email_delivery_diagnostics(db: Session = Depends(get_db)):
+    """JSON diagnostics: DB email stats + recent sendgrid_ids + webhook log tail. Use to verify events are received."""
+    from pathlib import Path
+    q = db.query(Message).filter(
+        Message.direction == MessageDirection.OUTBOUND,
+        Message.channel == MessageChannel.EMAIL,
+    )
+    sent = q.count()
+    delivered = q.filter(Message.delivered_at.isnot(None)).count()
+    opened = q.filter(Message.read_at.isnot(None)).count()
+    bounce_count = db.query(Suppression).filter(Suppression.reason == "bounce").count()
+    total_suppressions = db.query(Suppression).count()
+    recent = (
+        db.query(Message)
+        .filter(
+            Message.direction == MessageDirection.OUTBOUND,
+            Message.channel == MessageChannel.EMAIL,
+        )
+        .order_by(Message.id.desc())
+        .limit(10)
+        .all()
+    )
+    recent_messages = [
+        {
+            "id": m.id,
+            "sendgrid_id": (m.message_metadata or {}).get("sendgrid_id"),
+            "delivered_at": m.delivered_at.isoformat() if m.delivered_at else None,
+        }
+        for m in recent
+    ]
+    log_path = Path(__file__).resolve().parents[2] / "logs" / "sendgrid_webhook.log"
+    webhook_log_tail = []
+    if log_path.exists():
+        try:
+            with open(log_path, "r", encoding="utf-8") as f:
+                webhook_log_tail = f.readlines()[-30:]
+        except Exception:
+            pass
+    return {
+        "outbound_email_sent": sent,
+        "delivered_count": delivered,
+        "opened_count": opened,
+        "delivery_rate_pct": round((delivered / sent * 100), 1) if sent else 0,
+        "suppression_bounce_count": bounce_count,
+        "suppression_total": total_suppressions,
+        "recent_outbound_messages": recent_messages,
+        "webhook_log_tail": [line.rstrip() for line in webhook_log_tail],
+        "verdict": "Events received" if delivered > 0 else ("Webhook log has data but no delivered_at" if webhook_log_tail and sent else "No webhook log or no events yet"),
+    }
