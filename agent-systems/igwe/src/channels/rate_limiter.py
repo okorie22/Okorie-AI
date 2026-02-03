@@ -47,20 +47,14 @@ class SendRateLimiter:
     def can_send_batch(self, batch_size: int) -> bool:
         """
         Check if batch can be sent without exceeding limits.
-        
-        Args:
-            batch_size: Number of emails to send
-        
-        Returns:
-            True if batch can be sent, False otherwise
+        Uses same daily cap as get_send_stats (warmup when active).
         """
-        # Check daily cap
         sent_today = self._count_sent_today()
-        daily_remaining = self.config.daily_send_cap - sent_today
-        
+        effective_daily_cap = self._get_effective_daily_cap()
+        daily_remaining = effective_daily_cap - sent_today
         if batch_size > daily_remaining:
             logger.warning(
-                f"Daily cap reached: {sent_today}/{self.config.daily_send_cap} "
+                f"Daily cap reached: {sent_today}/{effective_daily_cap} "
                 f"(need {batch_size}, have {daily_remaining})"
             )
             return False

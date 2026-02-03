@@ -13,6 +13,21 @@ from ..storage.models import (
 from ..storage.repositories import ConversationRepository, EventRepository
 
 
+def _is_lead_eligible_for_email(lead: Lead) -> bool:
+    """True if lead can receive email (deliverable, verified within 30d, not suppressed)."""
+    if not lead or not lead.email:
+        return False
+    if lead.suppression_reason:
+        return False
+    if lead.email_deliverable is not True:
+        return False
+    from datetime import timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    if not lead.email_verified_at or lead.email_verified_at < cutoff:
+        return False
+    return True
+
+
 # State transition rules
 STATE_TRANSITIONS = {
     ConversationState.NEW: [
@@ -338,34 +353,31 @@ class WorkflowEngine:
     def process_pending_actions(self, limit: Optional[int] = None) -> Dict:
         """
         Process conversations with pending actions (next_action_at <= now).
-        
-        Args:
-            limit: Optional limit on number of conversations to process per batch
-        
-        Returns:
-            Dict with processing stats
+        Only considers conversations whose lead is eligible for email (deliverable, verified, not suppressed)
+        so we don't burn the batch on leads we can't send to.
         """
-        # Only process conversations in states that need outbound messages
         states_filter = [
             ConversationState.NEW,
             ConversationState.CONTACTED,
             ConversationState.NO_RESPONSE
         ]
-        
-        pending = self.conv_repo.get_pending_actions(limit=limit, states_filter=states_filter)
-        logger.info(f"Processing {len(pending)} pending actions (limit: {limit}, states: {[s.value for s in states_filter]})")
-        
+        # Fetch more than limit so we can filter to eligible leads and still fill the batch
+        fetch_limit = min((limit or 20) * 5, 150)
+        pending = self.conv_repo.get_pending_actions(limit=fetch_limit, states_filter=states_filter)
+        eligible = [c for c in pending if _is_lead_eligible_for_email(c.lead)]
+        batch = eligible[: (limit or 20)]
+        logger.info(
+            f"Pending: {len(pending)} total, {len(eligible)} eligible, processing {len(batch)} (limit={limit})"
+        )
         processed = 0
         errors = 0
-        
-        for conversation in pending:
+        for conversation in batch:
             try:
                 self._process_conversation_action(conversation)
                 processed += 1
             except Exception as e:
                 errors += 1
                 logger.error(f"Error processing conversation {conversation.id}: {e}")
-        
         return {"processed": processed, "errors": errors}
     
     def _process_conversation_action(self, conversation: Conversation):
