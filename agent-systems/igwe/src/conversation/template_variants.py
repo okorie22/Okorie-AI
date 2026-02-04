@@ -8,7 +8,7 @@ OPENER_EMAIL_VARIANTS = [
     {
         "id": "opener_email_v1",
         "subject": "quick question",
-        "body": """Hey {first_name} —
+        "body": """Hey {first_name}
 
 Do you handle your own retirement planning or do you have someone you trust for that?
 
@@ -41,7 +41,7 @@ Interested?"""
     {
         "id": "opener_email_v4",
         "subject": "one thing",
-        "body": """{first_name} —
+        "body": """{first_name} 
 
 Quick one: are you happy with how your retirement plan is structured?
 
@@ -63,13 +63,13 @@ If you're curious, happy to walk you through it.
     {
         "id": "opener_email_v6",
         "subject": "your retirement",
-        "body": """{first_name} —
+        "body": """{first_name} 
 
 Most {industry} owners I talk to don't realize there's a better way to save for retirement than a standard 401k.
 
 Want to see if it makes sense for you?
 
-No pressure, just a quick 15-minute call.
+No pressure, just a quick 30-minute call.
 """
     },
     {
@@ -86,7 +86,7 @@ Worth a quick 30 min call?"""
     {
         "id": "opener_email_v8",
         "subject": "one question",
-        "body": """{first_name} —
+        "body": """{first_name} 
 
 Do you have a solid exit/retirement plan in place, or is that still something you're figuring out?
 
@@ -108,7 +108,7 @@ Most don't realize there are ways to save significantly more than a 401k allows 
     {
         "id": "opener_email_v10",
         "subject": "planning ahead",
-        "body": """{first_name} —
+        "body": """{first_name} 
 
 Most {industry} owners I talk to don't have a real plan for what happens when they slow down or exit.
 
@@ -125,12 +125,12 @@ Are you happy with your current retirement setup, or open to seeing other option
 
 I specialize in helping {industry} owners structure plans that give better returns + tax benefits.
 
-15 minutes this week?"""
+30 minutes this week?"""
     },
     {
         "id": "opener_email_v12",
         "subject": "curious",
-        "body": """{first_name} —
+        "body": """{first_name} 
 
 Curious if you've looked into alternatives to standard retirement plans for business owners.
 
@@ -152,7 +152,7 @@ Should I close the loop, or is it worth a quick call?"""
     {
         "id": "followup1_email_v2",
         "subject": "following up",
-        "body": """{first_name} —
+        "body": """{first_name} 
 
 Circling back on this.
 
@@ -170,7 +170,7 @@ But if you're curious, 30 min call this week?"""
     {
         "id": "followup1_email_v4",
         "subject": "quick check",
-        "body": """{first_name} —
+        "body": """{first_name} 
 
 Not sure if you saw my last note.
 
@@ -197,7 +197,7 @@ Still worth connecting on retirement planning?"""
     {
         "id": "followup1_email_v7",
         "subject": "Re: {previous_subject}",
-        "body": """Hey {first_name} —
+        "body": """Hey {first_name} 
 
 Wanted to circle back on this. If timing's not right, all good.
 
@@ -231,7 +231,7 @@ If that changes: {calendly_link}"""
     {
         "id": "followup2_email_v3",
         "subject": "Re: {previous_subject}",
-        "body": """Hey {first_name} —
+        "body": """Hey {first_name} 
 
 Last note from me. If you're interested, here's where you can grab time: {calendly_link}
 
@@ -258,7 +258,7 @@ Otherwise, I'll close the loop."""
     {
         "id": "followup2_email_v6",
         "subject": "last check",
-        "body": """{first_name} —
+        "body": """{first_name} 
 
 Final note from me. No hard feelings if it's not a fit.
 
@@ -393,7 +393,7 @@ Looking forward to it."""
     {
         "id": "appointment_confirmed_v2",
         "subject": "confirmed - {date} at {time}",
-        "body": """Thanks {first_name} —
+        "body": """Thanks {first_name} 
 
 We're confirmed for {date} at {time}.
 
@@ -417,7 +417,7 @@ NO_SHOW_EMAIL_VARIANTS = [
     {
         "id": "no_show_v1",
         "subject": "missed you",
-        "body": """Hey {first_name} —
+        "body": """Hey {first_name} 
 
 We were scheduled for {time} but I didn't see you on the call.
 
