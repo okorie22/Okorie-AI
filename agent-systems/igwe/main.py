@@ -40,13 +40,13 @@ class AppointmentSetterSystem:
         logger.add(
             sys.stdout,
             format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> - <level>{message}</level>",
-            level=app_config.log_level
+            level=app_config.log_level.upper()
         )
         logger.add(
             "logs/system_{time}.log",
             rotation="1 day",
             retention="7 days",
-            level=app_config.log_level
+            level=app_config.log_level.upper()
         )
     
     def start_redis(self) -> Optional[subprocess.Popen]:
