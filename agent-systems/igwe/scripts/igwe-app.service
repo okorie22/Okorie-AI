@@ -1,0 +1,29 @@
+# systemd unit for IUL Appointment Setter (igwe) - auto-start on boot and restart on crash
+# Install: see scripts/install_systemd_service.sh and docs/GCP_VM_AUTO_START.md
+
+[Unit]
+Description=IUL Appointment Setter (igwe) - FastAPI + Celery worker + beat
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=APP_USER
+Group=APP_USER
+WorkingDirectory=APP_DIR
+
+# Load env from project .env (required for DB, Redis, SendGrid, etc.)
+EnvironmentFile=APP_DIR/.env
+# Non-interactive so config warnings don't block startup
+Environment=RUN_MODE=all
+
+# Use PYTHON_BIN so install script can set /usr/bin/python3 or APP_DIR/venv/bin/python
+ExecStart=PYTHON_BIN main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=igwe-app
+
+[Install]
+WantedBy=multi-user.target
