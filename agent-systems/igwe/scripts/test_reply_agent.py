@@ -56,8 +56,8 @@ def test_reply_agent_trigger():
     print(f"Response Body: {response.json()}")
     
     if response.status_code == 200:
-        print("\n✅ PASS: Inbound accepted")
-        print("\n📝 Next Steps:")
+        print("\n[PASS] Inbound accepted")
+        print("\nNext Steps:")
         print("   1. SSH into your VM")
         print("   2. Run: sudo journalctl -u igwe-app -n 100 --no-pager | grep -E 'AI Analysis:|Queuing delayed reply'")
         print("   3. You should see lines like:")
@@ -66,7 +66,7 @@ def test_reply_agent_trigger():
         print("\n   If you see those lines, the reply agent is working!")
         return True
     else:
-        print("\n❌ FAIL: Inbound rejected")
+        print("\n[FAIL] Inbound rejected")
         return False
 
 
@@ -107,17 +107,17 @@ def test_deduplication():
     if response1.status_code == 200 and response2.status_code == 200:
         resp2_msg = response2.json().get("message", "")
         if "duplicate" in resp2_msg.lower() or "already processed" in resp2_msg.lower():
-            print("\n✅ PASS: Duplicate was detected and rejected")
-            print("\n📝 Verify in dashboard:")
+            print("\n[PASS] Duplicate was detected and rejected")
+            print("\nVerify in dashboard:")
             print(f"   Go to {API_BASE_URL}/messages")
             print(f"   Search for: {test_email}")
             print("   You should see ONLY ONE message, not two")
             return True
         else:
-            print("\n❌ FAIL: Duplicate was NOT detected (created twice)")
+            print("\n[FAIL] Duplicate was NOT detected (created twice)")
             return False
     else:
-        print("\n❌ FAIL: First inbound was rejected")
+        print("\n[FAIL] First inbound was rejected")
         return False
 
 
@@ -147,8 +147,8 @@ def test_notification_sending():
     print(f"Response Body: {response.json()}")
     
     if response.status_code == 200:
-        print("\n✅ PASS: Inbound accepted")
-        print("\n📧 Check your email:")
+        print("\n[PASS] Inbound accepted")
+        print("\nCheck your email:")
         print(f"   Recipient: {os.getenv('HUMAN_NOTIFICATION_EMAIL', 'contact@okemokorie.com')}")
         print("   Subject: [NEW REPLY] Notification replied")
         print("   Body: Should contain the test message")
@@ -156,7 +156,7 @@ def test_notification_sending():
         print("   It should take you to the messages dashboard (NOT 404)")
         return True
     else:
-        print("\n❌ FAIL: Inbound rejected")
+        print("\n[FAIL] Inbound rejected")
         return False
 
 
@@ -188,14 +188,14 @@ def test_existing_lead():
     print(f"Response Body: {response.json()}")
     
     if response.status_code == 200:
-        print("\n✅ PASS: Inbound accepted")
-        print("\n📝 Verify:")
+        print("\n[PASS] Inbound accepted")
+        print("\nVerify:")
         print("   1. Check logs for 'AI Analysis' and 'Queuing delayed reply'")
         print("   2. Check dashboard - message should appear")
         print("   3. Check notification email")
         return True
     else:
-        print("\n❌ FAIL: Inbound rejected")
+        print("\n[FAIL] Inbound rejected")
         return False
 
 
@@ -226,7 +226,7 @@ if __name__ == "__main__":
     print("="*70)
     
     for test_name, passed in results:
-        status = "✅ PASS" if passed else "❌ FAIL"
+        status = "[PASS]" if passed else "[FAIL]"
         print(f"{status}: {test_name}")
     
     passed_count = sum(1 for _, p in results if p)
@@ -235,6 +235,6 @@ if __name__ == "__main__":
     print(f"\nTotal: {passed_count}/{total_count} tests passed")
     
     if passed_count == total_count:
-        print("\n🎉 All tests passed!")
+        print("\nAll tests passed!")
     else:
-        print("\n⚠️ Some tests failed - check output above")
+        print("\nSome tests failed - check output above")

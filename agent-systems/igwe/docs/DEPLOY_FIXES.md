@@ -2,10 +2,11 @@
 
 ## Code changes pushed to GitHub
 
-Three fixes applied:
+Four fixes applied:
 1. **Deduplication** - prevents SendGrid retries from creating duplicate messages/notifications
 2. **Reply agent unblocked** - removed early return that prevented AI from analyzing new lead inbounds
 3. **Repository method added** - `get_by_metadata_field` for duplicate detection
+4. **Notification links fixed** - links now point to `/messages?conversation_id=X` (works) instead of `/conversations/X` (404)
 
 ## VM Deployment Steps
 
@@ -39,7 +40,8 @@ Should show "active (running)".
 
 - **No more duplicate notifications** - same email won't process 3-4 times
 - **Reply agent will now run** - AI will analyze and queue responses for ALL inbounds (new and existing leads)
-- **Notification links work** - will point to https://api.reimaginewealth.org instead of localhost
+- **Notification links work** - will point to https://api.reimaginewealth.org/messages?conversation_id=X (no more 404s)
+- **Localhost links gone** - notifications use proper domain now
 
 ## Expected Behavior After Deploy
 
