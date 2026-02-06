@@ -53,7 +53,10 @@ def test_reply_agent_trigger():
     response = requests.post(INBOUND_URL, data=payload)
     
     print(f"\nResponse Status: {response.status_code}")
-    print(f"Response Body: {response.json()}")
+    try:
+        print(f"Response Body: {response.json()}")
+    except:
+        print(f"Response Body: {response.text}")
     
     if response.status_code == 200:
         print("\n[PASS] Inbound accepted")
@@ -194,7 +197,10 @@ def test_existing_lead():
     response = requests.post(INBOUND_URL, data=payload)
     
     print(f"\nResponse Status: {response.status_code}")
-    print(f"Response Body: {response.json()}")
+    try:
+        print(f"Response Body: {response.json()}")
+    except:
+        print(f"Response Body: {response.text}")
     
     if response.status_code == 200:
         print("\n[PASS] Inbound accepted")
