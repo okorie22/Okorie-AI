@@ -94,7 +94,10 @@ def test_deduplication():
     
     response1 = requests.post(INBOUND_URL, data=payload)
     print(f"\nFirst attempt - Status: {response1.status_code}")
-    print(f"Response: {response1.json()}")
+    try:
+        print(f"Response: {response1.json()}")
+    except:
+        print(f"Response: {response1.text}")
     
     # Wait a moment
     time.sleep(2)
@@ -102,7 +105,10 @@ def test_deduplication():
     print(f"\nSending DUPLICATE inbound (should be rejected)...")
     response2 = requests.post(INBOUND_URL, data=payload)
     print(f"\nSecond attempt - Status: {response2.status_code}")
-    print(f"Response: {response2.json()}")
+    try:
+        print(f"Response: {response2.json()}")
+    except:
+        print(f"Response: {response2.text}")
     
     if response1.status_code == 200 and response2.status_code == 200:
         resp2_msg = response2.json().get("message", "")
@@ -144,7 +150,10 @@ def test_notification_sending():
     
     response = requests.post(INBOUND_URL, data=payload)
     print(f"\nResponse Status: {response.status_code}")
-    print(f"Response Body: {response.json()}")
+    try:
+        print(f"Response Body: {response.json()}")
+    except:
+        print(f"Response Body: {response.text}")
     
     if response.status_code == 200:
         print("\n[PASS] Inbound accepted")
