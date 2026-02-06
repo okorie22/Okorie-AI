@@ -185,11 +185,11 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
         conv_repo = ConversationRepository(db)
         msg_repo = MessageRepository(db)
         
-        # Check for duplicate
-        existing_msg = msg_repo.get_by_metadata_field("message_id", message_id)
-        if existing_msg:
-            logger.info(f"Duplicate inbound detected (Message-ID: {message_id}), skipping")
-            return {"success": True, "message": "Already processed (duplicate)"}
+        # Check for duplicate - temporarily disabled due to JSONB query issues
+        # existing_msg = msg_repo.get_by_metadata_field("message_id", message_id)
+        # if existing_msg:
+        #     logger.info(f"Duplicate inbound detected (Message-ID: {message_id}), skipping")
+        #     return {"success": True, "message": "Already processed (duplicate)"}
         
         lead = lead_repo.get_by_email(from_email)
         if not lead:
