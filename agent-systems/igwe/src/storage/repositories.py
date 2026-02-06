@@ -175,6 +175,17 @@ class MessageRepository:
         return self.db.query(Message).filter(
             cast(Message.message_metadata[field], String) == value
         ).first()
+    
+    def get_by_conversation(self, conversation_id: int, limit: Optional[int] = None) -> List[Message]:
+        """Get messages for a conversation with optional limit"""
+        query = self.db.query(Message).filter(
+            Message.conversation_id == conversation_id
+        ).order_by(Message.created_at.desc())
+        
+        if limit:
+            query = query.limit(limit)
+        
+        return query.all()
 
 
 class EventRepository:
