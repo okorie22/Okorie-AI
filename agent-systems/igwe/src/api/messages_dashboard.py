@@ -4,6 +4,7 @@ Tracks messages sent and received via the messages table.
 """
 import json
 from html import escape
+from typing import Optional
 from fastapi import APIRouter, Depends, Request, Query, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -385,9 +386,9 @@ async def messages_dashboard(
                     <h3>New message</h3>
                     <form method="post" action="/messages/send" class="reply-form" id="compose-form">
                         <div class="form-group">
-                            <label>To (type name or email)</label>
+                            <label>To (type email or select from suggestions)</label>
                             <div class="compose-to-wrap">
-                                <input type="text" id="compose-to-search" placeholder="Type name or email..." autocomplete="off">
+                                <input type="email" name="to_email" id="compose-to-search" placeholder="email@example.com" autocomplete="off" required>
                                 <input type="hidden" name="conversation_id" id="compose-conversation-id">
                                 <ul id="compose-to-suggestions" class="compose-to-suggestions" style="display:none;"></ul>
                             </div>
@@ -488,9 +489,11 @@ async def messages_dashboard(
                 if (!searchEl.contains(e.target) && !ul.contains(e.target)) ul.style.display = "none";
             }});
             form.addEventListener("submit", function(e) {{
-                if (!hiddenEl.value) {{
+                // Allow raw email submission - no need to select from list
+                var emailVal = searchEl.value.trim();
+                if (!emailVal) {{
                     e.preventDefault();
-                    alert("Please choose a recipient by typing a name or email and selecting from the list.");
+                    alert("Please enter a recipient email address.");
                     return;
                 }}
             }});
@@ -505,19 +508,52 @@ async def messages_dashboard(
 @router.post("/messages/send", response_class=RedirectResponse)
 async def messages_send(
     db: Session = Depends(get_db),
-    conversation_id: int = Form(...),
+    conversation_id: Optional[int] = Form(None),
+    to_email: Optional[str] = Form(None),
     subject: str = Form(...),
     body: str = Form(...),
 ):
     """
-    Send an outbound email in a conversation (reply or compose). Uses SendGridService.
+    Send an outbound email. Accepts either conversation_id OR to_email.
+    If to_email provided, finds or creates lead and conversation.
     Redirects to /messages on success or /messages?send_error=1 on failure.
     """
-    conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
-    if not conv:
-        return RedirectResponse(url="/messages?send_error=1", status_code=303)
-    lead = db.query(Lead).filter(Lead.id == conv.lead_id).first()
-    if not lead or not lead.email or lead.email == "inbound-unknown@system":
+    from ..storage.repositories import LeadRepository, ConversationRepository
+    from ..storage.models import MessageChannel
+    
+    lead = None
+    conv = None
+    
+    # Try conversation_id first (from dropdown selection)
+    if conversation_id:
+        conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+        if conv:
+            lead = db.query(Lead).filter(Lead.id == conv.lead_id).first()
+    
+    # Fall back to raw email (typed directly)
+    if not lead and to_email:
+        to_email_clean = to_email.strip().lower()
+        lead_repo = LeadRepository(db)
+        lead = lead_repo.get_by_email(to_email_clean)
+        
+        # Create lead if doesn't exist
+        if not lead:
+            # Extract name from email if possible
+            email_name = to_email_clean.split("@")[0]
+            lead = lead_repo.create({
+                "email": to_email_clean,
+                "first_name": email_name.capitalize(),
+                "last_name": "",
+            })
+        
+        # Get or create conversation
+        conv_repo = ConversationRepository(db)
+        conv = conv_repo.get_active_by_lead(lead.id)
+        if not conv:
+            conv = conv_repo.create(lead.id, MessageChannel.EMAIL.value)
+    
+    # Validate we have everything
+    if not lead or not conv or not lead.email or lead.email == "inbound-unknown@system":
         return RedirectResponse(url="/messages?send_error=1", status_code=303)
     svc = SendGridService(db)
     out = svc.send_email(

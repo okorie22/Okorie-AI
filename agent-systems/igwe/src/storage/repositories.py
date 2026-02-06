@@ -2,6 +2,7 @@
 Repository pattern for database operations.
 """
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime
 
@@ -30,8 +31,11 @@ class LeadRepository:
         return self.db.query(Lead).filter(Lead.id == lead_id).first()
     
     def get_by_email(self, email: str) -> Optional[Lead]:
-        """Get lead by email"""
-        return self.db.query(Lead).filter(Lead.email == email).first()
+        """Get lead by email (case-insensitive)"""
+        if not email:
+            return None
+        email_normalized = email.strip().lower()
+        return self.db.query(Lead).filter(func.lower(Lead.email) == email_normalized).first()
     
     def find_by_email(self, email: str) -> Optional[Lead]:
         """Find lead by email (alias for get_by_email, for consistency)"""

@@ -191,6 +191,22 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
                     "html": inbound_html,
                 },
             })
+            
+            # Send notification for unknown sender too
+            from ..channels.notifications import NotificationService
+            from ..config import settings, llm_config
+            try:
+                notification_service = NotificationService(db, settings)
+                if llm_config.human_notification_email:
+                    notification_service.send_inbound_notification(
+                        lead=unknown_lead,
+                        inbound_message=inbound_text or inbound_html or "",
+                        subject=form_data.get("subject", ""),
+                        conversation_id=conv.id
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to send unknown sender notification: {e}")
+            
             return {"success": True, "message": "Email received but sender not found"}
         
         # Find or create conversation
@@ -245,7 +261,7 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
         
         # Use ReplyAgent to analyze and respond
         from ..conversation.reply_agent import ReplyAgent
-        from ..config import app_config
+        from ..config import llm_config
         
         # Build lead_data with enrichment if available
         lead_data_dict = {
@@ -263,7 +279,7 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
                 "personalization_bullets": lead.enrichment.personalization_bullets
             }
         
-        agent = ReplyAgent(app_config.llm_config)
+        agent = ReplyAgent(llm_config)
         analysis = agent.analyze_and_respond(
             inbound_message=inbound_text,
             lead_data=lead_data_dict,
