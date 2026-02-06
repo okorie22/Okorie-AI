@@ -130,7 +130,7 @@ class NotificationService:
         sentiment = analysis.get("sentiment", "neutral")
         
         # Build conversation URL
-        conversation_url = f"{self.base_url}/conversations/{conversation.id}"
+        conversation_url = f"{self.base_url}/messages?conversation_id={conversation.id}"
         
         # Build HTML email
         html_body = f"""
@@ -329,7 +329,7 @@ class NotificationService:
             name = f"{lead.first_name} {lead.last_name}".strip() or "Unknown Lead"
             email_subject = f"[NEW REPLY] {name} replied"
             
-            conversation_url = f"{self.base_url}/conversations/{conversation_id}"
+            conversation_url = f"{self.base_url}/messages?conversation_id={conversation_id}"
             
             body = f"""
 <!DOCTYPE html>

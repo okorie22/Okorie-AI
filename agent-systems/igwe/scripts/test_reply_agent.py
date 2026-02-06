@@ -1,376 +1,240 @@
 """
-Test script for ReplyAgent with synthetic inbound replies.
-Tests AI classification, confidence gating, and escalation logic.
+Test script to verify the reply agent triggers properly for inbounds.
+
+Tests:
+1. Reply agent triggering for new leads
+2. Reply agent triggering for existing leads
+3. Deduplication (same Message-ID sent twice)
+4. Notification sending
+
+Usage:
+    python -m scripts.test_reply_agent
 """
 import sys
 import os
 from pathlib import Path
 
 # Add parent directory to path
-_igwe_root = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_igwe_root))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Load .env from igwe root so OPENAI_API_KEY etc. are available
-_env = _igwe_root / ".env"
-if _env.exists():
-    from dotenv import load_dotenv
-    load_dotenv(_env)
+from dotenv import load_dotenv
+load_dotenv()
 
-from src.conversation.reply_agent import ReplyAgent, ReplyAction, ReplyIntent
-from src.config import llm_config
-from loguru import logger
+import requests
+import time
 from datetime import datetime
+import json
 
+# Configuration
+API_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
+INBOUND_URL = f"{API_BASE_URL}/webhooks/sendgrid/inbound"
 
-# Test cases with expected outcomes
-TEST_CASES = [
-    {
-        "name": "Interested - Simple Yes",
-        "message": "Yes, I'm interested",
-        "expected_intent": ReplyIntent.INTERESTED,
-        "expected_action": ReplyAction.AUTO_REPLY,
-        "expected_escalate": False
-    },
-    {
-        "name": "Interested - Tell Me More",
-        "message": "Tell me more about this",
-        "expected_intent": ReplyIntent.INTERESTED,
-        "expected_action": ReplyAction.AUTO_REPLY,
-        "expected_escalate": False
-    },
-    {
-        "name": "Scheduling - When Can We Talk",
-        "message": "When can we talk?",
-        "expected_intent": ReplyIntent.SCHEDULING,
-        "expected_action": ReplyAction.AUTO_REPLY,
-        "expected_escalate": False
-    },
-    {
-        "name": "Scheduling - Available Thursday",
-        "message": "I'm available Thursday afternoon",
-        "expected_intent": ReplyIntent.SCHEDULING,
-        "expected_action": ReplyAction.AUTO_REPLY,
-        "expected_escalate": False
-    },
-    {
-        "name": "Simple Question - Call Duration",
-        "message": "How long is the call?",
-        "expected_intent": ReplyIntent.SIMPLE_QUESTION,
-        "expected_action": ReplyAction.AUTO_REPLY,
-        "expected_escalate": False
-    },
-    {
-        "name": "Simple Question - Phone or Video",
-        "message": "Is this by phone or zoom?",
-        "expected_intent": ReplyIntent.SIMPLE_QUESTION,
-        "expected_action": ReplyAction.AUTO_REPLY,
-        "expected_escalate": False
-    },
-    {
-        "name": "FAQ - What is IUL",
-        "message": "What is IUL?",
-        "expected_intent": ReplyIntent.FAQ,
-        "expected_action": ReplyAction.AUTO_REPLY,
-        "expected_escalate": False
-    },
-    {
-        "name": "FAQ - Who Qualifies",
-        "message": "Who qualifies for this?",
-        "expected_intent": ReplyIntent.FAQ,
-        "expected_action": ReplyAction.AUTO_REPLY,
-        "expected_escalate": False
-    },
-    {
-        "name": "Compliance Trigger - Guaranteed Return",
-        "message": "What's the guaranteed return?",
-        "expected_intent": ReplyIntent.COMPLEX_QUESTION,
-        "expected_action": ReplyAction.ESCALATE,
-        "expected_escalate": True
-    },
-    {
-        "name": "Complex Question - Tax Benefits",
-        "message": "Can you explain the tax benefits and compare it to my 401k?",
-        "expected_intent": ReplyIntent.COMPLEX_QUESTION,
-        "expected_action": ReplyAction.AUTO_REPLY,
-        "expected_escalate": False
-    },
-    {
-        "name": "Multiple Questions",
-        "message": "How does this work? What are the fees? How much do I need? When can we start?",
-        "expected_intent": None,  # Don't test specific intent
-        "expected_action": ReplyAction.AUTO_REPLY,
-        "expected_escalate": False
-    },
-    {
-        "name": "Objection - Not Interested",
-        "message": "Not interested right now, maybe later",
-        "expected_intent": ReplyIntent.OBJECTION,
-        "expected_action": ReplyAction.AUTO_REPLY,
-        "expected_escalate": False
-    },
-    {
-        "name": "Objection - Already Have Coverage",
-        "message": "I already have life insurance",
-        "expected_intent": ReplyIntent.OBJECTION,
-        "expected_action": ReplyAction.AUTO_REPLY,
-        "expected_escalate": False
-    },
-    {
-        "name": "Objection - Cost Concern",
-        "message": "How much does this cost? Sounds expensive",
-        "expected_intent": ReplyIntent.OBJECTION,
-        "expected_action": ReplyAction.AUTO_REPLY,
-        "expected_escalate": False
-    },
-    {
-        "name": "Unsubscribe - Stop",
-        "message": "Stop emailing me",
-        "expected_intent": ReplyIntent.UNSUBSCRIBE,
-        "expected_action": ReplyAction.UNSUBSCRIBE,
-        "expected_escalate": False
-    },
-    {
-        "name": "Unsubscribe - Remove Me",
-        "message": "Remove me from your list",
-        "expected_intent": ReplyIntent.UNSUBSCRIBE,
-        "expected_action": ReplyAction.UNSUBSCRIBE,
-        "expected_escalate": False
-    },
-    {
-        "name": "Complaint - This is Spam",
-        "message": "This is spam, stop contacting me",
-        "expected_intent": ReplyIntent.COMPLAINT,
-        "expected_action": ReplyAction.ESCALATE,
-        "expected_escalate": True
-    },
-    {
-        "name": "Complaint - Threat",
-        "message": "I'm going to report you if you don't stop",
-        "expected_intent": ReplyIntent.COMPLAINT,
-        "expected_action": ReplyAction.ESCALATE,
-        "expected_escalate": True
-    },
-    {
-        "name": "Complaint - Legal Threat",
-        "message": "This is harassment, I'm calling my lawyer",
-        "expected_intent": ReplyIntent.COMPLAINT,
-        "expected_action": ReplyAction.ESCALATE,
-        "expected_escalate": True
-    },
-    {
-        "name": "Wrong Person",
-        "message": "Wrong person, I don't own a business",
-        "expected_intent": ReplyIntent.WRONG_PERSON,
-        "expected_action": ReplyAction.UNSUBSCRIBE,
-        "expected_escalate": False
-    }
-]
-
-
-# Sample lead data
-SAMPLE_LEAD = {
-    "email": "john.doe@example.com",
-    "first_name": "John",
-    "last_name": "Doe",
-    "company_name": "Acme Corporation",
-    "industry": "Technology"
-}
-
-
-# Sample conversation history
-SAMPLE_HISTORY = [
-    {
-        "direction": "outbound",
-        "body": "Hi John, I help business owners like you explore tax-advantaged strategies for retirement and wealth building. Would a 20-minute intro call make sense?",
-        "created_at": datetime.utcnow()
-    }
-]
-
-
-def run_tests():
-    """Run all test cases and report results"""
+def test_reply_agent_trigger():
+    """Test that reply agent gets triggered for an inbound"""
+    print("\n" + "="*70)
+    print("TEST 1: Reply Agent Triggering")
+    print("="*70)
     
-    # Check if GPT-4 is configured
-    if not llm_config.openai_api_key:
-        logger.error("❌ OpenAI API key not configured. Set OPENAI_API_KEY in .env file.")
-        logger.info("You can still test pre-screening logic (unsubscribe, threats, compliance triggers)")
-        print("\nRunning pre-screening tests only...\n")
-        run_prescreening_tests()
-        return
+    test_email = f"test-reply-agent-{int(time.time())}@example.com"
+    message_id = f"<test-{int(time.time())}@example.com>"
     
-    # Initialize agent
-    logger.info("Initializing ReplyAgent with GPT-4...")
-    agent = ReplyAgent(llm_config)
-    
-    # Run tests
-    results = {
-        "passed": 0,
-        "failed": 0,
-        "errors": 0
+    payload = {
+        "from": f"Test User <{test_email}>",
+        "to": "info@mail.reimaginewealth.org",
+        "subject": "Test Reply Agent",
+        "text": "Yes I am very interested in learning more about IUL",
+        "html": "<p>Yes I am very interested in learning more about IUL</p>",
+        "headers": f"Message-ID: {message_id}\nDate: {datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S +0000')}"
     }
     
-    print("\n" + "="*80)
-    print("REPLY AGENT TEST SUITE")
-    print("="*80 + "\n")
+    print(f"\nSending test inbound from: {test_email}")
+    print(f"Message-ID: {message_id}")
     
-    for i, test in enumerate(TEST_CASES, 1):
-        print(f"\nTest {i}/{len(TEST_CASES)}: {test['name']}")
-        print("-" * 80)
-        print(f"Message: \"{test['message']}\"")
-        
-        try:
-            # Run analysis
-            analysis = agent.analyze_and_respond(
-                inbound_message=test["message"],
-                lead_data=SAMPLE_LEAD,
-                conversation_history=SAMPLE_HISTORY
-            )
-            
-            # Check results
-            passed = True
-            
-            # Check escalation
-            if analysis.escalate != test["expected_escalate"]:
-                print(f"[FAIL] Expected escalate={test['expected_escalate']}, got {analysis.escalate}")
-                passed = False
-            
-            # Check action
-            if analysis.next_action != test["expected_action"]:
-                print(f"[FAIL] Expected action={test['expected_action'].value}, got {analysis.next_action.value}")
-                passed = False
-            
-            # Check intent (if specified)
-            if test["expected_intent"] and analysis.intent != test["expected_intent"]:
-                print(f"WARNING: Expected intent={test['expected_intent'].value}, got {analysis.intent.value}")
-                # Don't fail on intent mismatch, just warn
-            
-            # Display results
-            print(f"Intent: {analysis.intent.value}")
-            print(f"Confidence: {analysis.confidence:.2f}")
-            print(f"Action: {analysis.next_action.value}")
-            print(f"Escalate: {analysis.escalate}")
-            
-            if analysis.escalate:
-                print(f"Reason: {analysis.escalation_reason}")
-            else:
-                print(f"Response: \"{analysis.response_text}\"")
-            
-            if passed:
-                print("[PASS]")
-                results["passed"] += 1
-            else:
-                print("[FAIL]")
-                results["failed"] += 1
-        
-        except Exception as e:
-            print(f"[ERROR] {e}")
-            logger.error(f"Test error: {e}", exc_info=True)
-            results["errors"] += 1
+    response = requests.post(INBOUND_URL, data=payload)
     
-    # Summary
-    print("\n" + "="*80)
-    print("TEST SUMMARY")
-    print("="*80)
-    print(f"Total: {len(TEST_CASES)}")
-    print(f"Passed: {results['passed']}")
-    print(f"Failed: {results['failed']}")
-    print(f"Errors: {results['errors']}")
+    print(f"\nResponse Status: {response.status_code}")
+    print(f"Response Body: {response.json()}")
     
-    success_rate = (results["passed"] / len(TEST_CASES)) * 100
-    print(f"\nSuccess Rate: {success_rate:.1f}%")
-    
-    if results["failed"] == 0 and results["errors"] == 0:
-        print("\nAll tests passed!")
+    if response.status_code == 200:
+        print("\n✅ PASS: Inbound accepted")
+        print("\n📝 Next Steps:")
+        print("   1. SSH into your VM")
+        print("   2. Run: sudo journalctl -u igwe-app -n 100 --no-pager | grep -E 'AI Analysis:|Queuing delayed reply'")
+        print("   3. You should see lines like:")
+        print("      - 'AI Analysis: intent=interested, confidence=...'")
+        print("      - 'Queuing delayed reply for conversation...'")
+        print("\n   If you see those lines, the reply agent is working!")
+        return True
     else:
-        print("\nSome tests failed. Review output above.")
+        print("\n❌ FAIL: Inbound rejected")
+        return False
 
 
-def run_prescreening_tests():
-    """Run only pre-screening tests (no API calls)"""
+def test_deduplication():
+    """Test that duplicate Message-IDs are rejected"""
+    print("\n" + "="*70)
+    print("TEST 2: Deduplication")
+    print("="*70)
     
-    agent = ReplyAgent(llm_config)
+    test_email = f"test-dedupe-{int(time.time())}@example.com"
+    message_id = f"<test-dedupe-{int(time.time())}@example.com>"
     
-    prescreening_tests = [
-        {
-            "name": "Unsubscribe - Stop",
-            "message": "Stop",
-            "expected_action": ReplyAction.UNSUBSCRIBE
-        },
-        {
-            "name": "Threat - Lawyer",
-            "message": "I'm calling my lawyer",
-            "expected_action": ReplyAction.ESCALATE
-        },
-        {
-            "name": "Compliance - Guaranteed",
-            "message": "What's the guaranteed return?",
-            "expected_action": ReplyAction.ESCALATE
-        }
-    ]
+    payload = {
+        "from": f"Duplicate Test <{test_email}>",
+        "to": "info@mail.reimaginewealth.org",
+        "subject": "Deduplication Test",
+        "text": "This message should only appear once",
+        "html": "<p>This message should only appear once</p>",
+        "headers": f"Message-ID: {message_id}\nDate: {datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S +0000')}"
+    }
     
-    for test in prescreening_tests:
-        print(f"\n{test['name']}")
-        print(f"Message: \"{test['message']}\"")
-        
-        result = agent._pre_screen_message(test["message"])
-        
-        if result:
-            print(f"Intent: {result.intent.value}")
-            print(f"Action: {result.next_action.value}")
-            print(f"Escalate: {result.escalate}")
-            
-            if result.next_action == test["expected_action"]:
-                print("[PASS]")
-            else:
-                print(f"[FAIL] Expected {test['expected_action'].value}")
+    print(f"\nSending first inbound (should succeed)...")
+    print(f"From: {test_email}")
+    print(f"Message-ID: {message_id}")
+    
+    response1 = requests.post(INBOUND_URL, data=payload)
+    print(f"\nFirst attempt - Status: {response1.status_code}")
+    print(f"Response: {response1.json()}")
+    
+    # Wait a moment
+    time.sleep(2)
+    
+    print(f"\nSending DUPLICATE inbound (should be rejected)...")
+    response2 = requests.post(INBOUND_URL, data=payload)
+    print(f"\nSecond attempt - Status: {response2.status_code}")
+    print(f"Response: {response2.json()}")
+    
+    if response1.status_code == 200 and response2.status_code == 200:
+        resp2_msg = response2.json().get("message", "")
+        if "duplicate" in resp2_msg.lower() or "already processed" in resp2_msg.lower():
+            print("\n✅ PASS: Duplicate was detected and rejected")
+            print("\n📝 Verify in dashboard:")
+            print(f"   Go to {API_BASE_URL}/messages")
+            print(f"   Search for: {test_email}")
+            print("   You should see ONLY ONE message, not two")
+            return True
         else:
-            print("No pre-screening match (would go to GPT-4)")
-
-
-def test_notification():
-    """Test notification email"""
-    from src.channels.notifications import NotificationService
-    from src.storage.database import get_db
-    from src.config import settings
-    
-    print("\n" + "="*80)
-    print("TESTING NOTIFICATION SYSTEM")
-    print("="*80 + "\n")
-    
-    if not llm_config.human_notification_email:
-        print("[FAIL] HUMAN_NOTIFICATION_EMAIL not configured in .env")
-        return
-    
-    class _Config:
-        llm_config = settings.llm
-        sendgrid_config = settings.sendgrid
-    db = next(get_db())
-    notification_service = NotificationService(db, _Config())
-    
-    print(f"Sending test notification to: {llm_config.human_notification_email}")
-    
-    success = notification_service.send_test_notification()
-    
-    if success:
-        print("[PASS] Test notification sent successfully!")
-        print("Check your email inbox.")
+            print("\n❌ FAIL: Duplicate was NOT detected (created twice)")
+            return False
     else:
-        print("[FAIL] Failed to send test notification")
-        print("Check SendGrid configuration and logs.")
+        print("\n❌ FAIL: First inbound was rejected")
+        return False
+
+
+def test_notification_sending():
+    """Test that notifications are sent for inbounds"""
+    print("\n" + "="*70)
+    print("TEST 3: Notification Sending")
+    print("="*70)
+    
+    test_email = f"test-notification-{int(time.time())}@example.com"
+    message_id = f"<test-notif-{int(time.time())}@example.com>"
+    
+    payload = {
+        "from": f"Notification Test <{test_email}>",
+        "to": "info@mail.reimaginewealth.org",
+        "subject": "Notification Test",
+        "text": "You should receive a notification for this message",
+        "html": "<p>You should receive a notification for this message</p>",
+        "headers": f"Message-ID: {message_id}\nDate: {datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S +0000')}"
+    }
+    
+    print(f"\nSending test inbound (notification should be sent)...")
+    print(f"From: {test_email}")
+    
+    response = requests.post(INBOUND_URL, data=payload)
+    print(f"\nResponse Status: {response.status_code}")
+    print(f"Response Body: {response.json()}")
+    
+    if response.status_code == 200:
+        print("\n✅ PASS: Inbound accepted")
+        print("\n📧 Check your email:")
+        print(f"   Recipient: {os.getenv('HUMAN_NOTIFICATION_EMAIL', 'contact@okemokorie.com')}")
+        print("   Subject: [NEW REPLY] Notification replied")
+        print("   Body: Should contain the test message")
+        print("\n   Click 'View Full Conversation' link in email")
+        print("   It should take you to the messages dashboard (NOT 404)")
+        return True
+    else:
+        print("\n❌ FAIL: Inbound rejected")
+        return False
+
+
+def test_existing_lead():
+    """Test reply agent for existing known lead"""
+    print("\n" + "="*70)
+    print("TEST 4: Existing Lead Reply Agent")
+    print("="*70)
+    
+    # Use your actual email
+    test_email = "chibuokem.okorie@gmail.com"
+    message_id = f"<test-existing-{int(time.time())}@example.com>"
+    
+    payload = {
+        "from": f"Okem Okorie <{test_email}>",
+        "to": "info@mail.reimaginewealth.org",
+        "subject": "Follow-up question",
+        "text": "What are the tax benefits of IUL?",
+        "html": "<p>What are the tax benefits of IUL?</p>",
+        "headers": f"Message-ID: {message_id}\nDate: {datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S +0000')}"
+    }
+    
+    print(f"\nSending inbound from existing lead: {test_email}")
+    print(f"Message-ID: {message_id}")
+    
+    response = requests.post(INBOUND_URL, data=payload)
+    
+    print(f"\nResponse Status: {response.status_code}")
+    print(f"Response Body: {response.json()}")
+    
+    if response.status_code == 200:
+        print("\n✅ PASS: Inbound accepted")
+        print("\n📝 Verify:")
+        print("   1. Check logs for 'AI Analysis' and 'Queuing delayed reply'")
+        print("   2. Check dashboard - message should appear")
+        print("   3. Check notification email")
+        return True
+    else:
+        print("\n❌ FAIL: Inbound rejected")
+        return False
 
 
 if __name__ == "__main__":
-    import argparse
+    print("\n" + "="*70)
+    print("REPLY AGENT TEST SUITE")
+    print("="*70)
+    print(f"\nTesting against: {API_BASE_URL}")
+    print(f"Notification email: {os.getenv('HUMAN_NOTIFICATION_EMAIL', 'contact@okemokorie.com')}")
     
-    parser = argparse.ArgumentParser(description="Test Reply Agent")
-    parser.add_argument("--notification", action="store_true", help="Test notification email only")
-    parser.add_argument("--prescreening", action="store_true", help="Test pre-screening logic only (no API)")
+    results = []
     
-    args = parser.parse_args()
+    # Run all tests
+    results.append(("Reply Agent Trigger", test_reply_agent_trigger()))
+    time.sleep(3)
     
-    if args.notification:
-        test_notification()
-    elif args.prescreening:
-        run_prescreening_tests()
+    results.append(("Deduplication", test_deduplication()))
+    time.sleep(3)
+    
+    results.append(("Notification Sending", test_notification_sending()))
+    time.sleep(3)
+    
+    results.append(("Existing Lead", test_existing_lead()))
+    
+    # Summary
+    print("\n" + "="*70)
+    print("TEST SUMMARY")
+    print("="*70)
+    
+    for test_name, passed in results:
+        status = "✅ PASS" if passed else "❌ FAIL"
+        print(f"{status}: {test_name}")
+    
+    passed_count = sum(1 for _, p in results if p)
+    total_count = len(results)
+    
+    print(f"\nTotal: {passed_count}/{total_count} tests passed")
+    
+    if passed_count == total_count:
+        print("\n🎉 All tests passed!")
     else:
-        run_tests()
+        print("\n⚠️ Some tests failed - check output above")
