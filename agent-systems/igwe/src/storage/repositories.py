@@ -111,6 +111,17 @@ class ConversationRepository:
             self.db.refresh(conversation)
         return conversation
     
+    def update(self, conversation_id: int, updates: dict) -> Optional[Conversation]:
+        """Update conversation with arbitrary fields"""
+        conversation = self.get_by_id(conversation_id)
+        if conversation:
+            for key, value in updates.items():
+                setattr(conversation, key, value)
+            conversation.updated_at = datetime.utcnow()
+            self.db.commit()
+            self.db.refresh(conversation)
+        return conversation
+    
     def get_pending_actions(self, limit: Optional[int] = None, states_filter: Optional[List[ConversationState]] = None) -> List[Conversation]:
         """
         Get conversations with pending actions (next_action_at <= now).
