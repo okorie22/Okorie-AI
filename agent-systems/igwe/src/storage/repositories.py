@@ -182,10 +182,10 @@ class MessageRepository:
     
     def get_by_metadata_field(self, field: str, value: str) -> Optional[Message]:
         """Find message by a metadata field (e.g., message_id)"""
-        from sqlalchemy import cast, String
+        from sqlalchemy import text
         return self.db.query(Message).filter(
-            cast(Message.message_metadata[field], String) == value
-        ).first()
+            text(f"message_metadata->>'{field}' = :value")
+        ).params(value=value).first()
     
     def get_by_conversation(self, conversation_id: int, limit: Optional[int] = None) -> List[Message]:
         """Get messages for a conversation with optional limit"""
