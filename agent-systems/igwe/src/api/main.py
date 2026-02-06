@@ -146,14 +146,19 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
     """Handle inbound email replies via SendGrid Inbound Parse with AI reply agent"""
     try:
         form_data = await request.form()
-        from_email = form_data.get("from")
+        from_raw = form_data.get("from") or ""
         inbound_text = form_data.get("text", "")
         
-        # Extract email address if in "Name <email>" format
+        # Extract a real email address from SendGrid "from" (often "Name <email@x.com>")
+        from email.utils import parseaddr
         import re
-        email_match = re.search(r'<(.+?)>', from_email)
-        if email_match:
-            from_email = email_match.group(1)
+        _, parsed = parseaddr(from_raw)
+        from_email = (parsed or from_raw or "").strip()
+        # Last-resort: regex extract between <>
+        m = re.search(r"<([^>]+)>", from_email)
+        if m:
+            from_email = (m.group(1) or "").strip()
+        from_email = from_email.strip().lower()
         
         logger.info(f"Inbound email from: {from_email}")
         
@@ -165,19 +170,31 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
         
         lead = lead_repo.get_by_email(from_email)
         if not lead:
-            logger.warning(f"Inbound email from unknown sender: {from_email}")
+            # Create a real lead for first-time senders so they become "known" immediately.
+            logger.warning(f"Inbound email from new sender (creating lead): {from_email}")
             from ..storage.models import MessageDirection, MessageChannel
-            _UNKNOWN_SENDER_EMAIL = "inbound-unknown@system"
-            unknown_lead = lead_repo.get_by_email(_UNKNOWN_SENDER_EMAIL)
-            if not unknown_lead:
-                unknown_lead = lead_repo.create({
-                    "email": _UNKNOWN_SENDER_EMAIL,
-                    "first_name": "Unknown",
-                    "last_name": "Inbound",
+            if from_email and "@" in from_email:
+                local = from_email.split("@")[0].replace(".", " ").replace("_", " ").strip()
+                first = (local.split(" ")[0].capitalize() if local else "Unknown")
+                lead = lead_repo.create({
+                    "email": from_email,
+                    "first_name": first,
+                    "last_name": "",
                 })
-            conv = conv_repo.get_active_by_lead(unknown_lead.id)
+            else:
+                # Fallback bucket if email is missing/invalid
+                _UNKNOWN_SENDER_EMAIL = "inbound-unknown@system"
+                lead = lead_repo.get_by_email(_UNKNOWN_SENDER_EMAIL)
+                if not lead:
+                    lead = lead_repo.create({
+                        "email": _UNKNOWN_SENDER_EMAIL,
+                        "first_name": "Unknown",
+                        "last_name": "Inbound",
+                    })
+
+            conv = conv_repo.get_active_by_lead(lead.id)
             if not conv:
-                conv = conv_repo.create(unknown_lead.id, MessageChannel.EMAIL.value)
+                conv = conv_repo.create(lead.id, MessageChannel.EMAIL.value)
             inbound_html = form_data.get("html") or ""
             msg_repo.create({
                 "conversation_id": conv.id,
@@ -185,29 +202,29 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
                 "channel": MessageChannel.EMAIL,
                 "body": inbound_text or inbound_html or "",
                 "message_metadata": {
-                    "from": from_email,
+                    "from": from_raw or from_email,
                     "subject": form_data.get("subject"),
                     "to": form_data.get("to"),
                     "html": inbound_html,
                 },
             })
             
-            # Send notification for unknown sender too
+            # Send notification for first-time sender too
             from ..channels.notifications import NotificationService
             from ..config import settings, llm_config
             try:
                 notification_service = NotificationService(db, settings)
                 if llm_config.human_notification_email:
                     notification_service.send_inbound_notification(
-                        lead=unknown_lead,
+                        lead=lead,
                         inbound_message=inbound_text or inbound_html or "",
                         subject=form_data.get("subject", ""),
                         conversation_id=conv.id
                     )
             except Exception as e:
-                logger.warning(f"Failed to send unknown sender notification: {e}")
+                logger.warning(f"Failed to send new sender notification: {e}")
             
-            return {"success": True, "message": "Email received but sender not found"}
+            return {"success": True, "message": "Email received (new sender lead created)"}
         
         # Find or create conversation
         conversation = conv_repo.get_by_lead(lead.id)
@@ -228,7 +245,7 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
             "channel": conversation.channel,
             "body": inbound_text,
             "message_metadata": {
-                "from": from_email,
+                "from": from_raw or from_email,
                 "subject": form_data.get("subject")
             }
         })
@@ -450,9 +467,9 @@ async def twilio_webhook(request: Request, db: Session = Depends(get_db)):
         
         # Use ReplyAgent to analyze and respond
         from ..conversation.reply_agent import ReplyAgent
-        from ..config import app_config
+        from ..config import llm_config
         
-        agent = ReplyAgent(app_config.llm_config)
+        agent = ReplyAgent(llm_config)
         analysis = agent.analyze_and_respond(
             inbound_message=inbound_text,
             lead_data={

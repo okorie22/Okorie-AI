@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request, Query, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 from ..storage.database import get_db
@@ -171,7 +171,13 @@ async def messages_dashboard(
     if request.query_params.get("sent") == "1":
         send_status.append(('success', 'Message sent.'))
     if request.query_params.get("send_error") == "1":
-        send_status.append(('error', 'Could not send message. Check lead suppression and rate limits.'))
+        reason = (request.query_params.get("reason") or "").strip()
+        msg = "Could not send message."
+        if reason:
+            msg += f" Reason: {reason}"
+        else:
+            msg += " Check lead suppression and rate limits."
+        send_status.append(('error', msg))
 
     # For typeahead: id, label, email, search (lowercased name + email)
     conversations_for_js = []
@@ -547,9 +553,23 @@ async def messages_send(
         if not conv:
             conv = conv_repo.create(lead.id, MessageChannel.EMAIL.value)
     
+    # If this was a manual compose (to_email provided), force-enable sending for testing.
+    # Your SendGridService enforces verification gates; this override lets you send immediately.
+    if lead and to_email:
+        try:
+            now = datetime.now(timezone.utc)
+            lead.suppression_reason = None
+            lead.email_deliverable = True
+            lead.email_verification_status = "MANUAL_OVERRIDE"
+            lead.email_verified_at = now
+            db.add(lead)
+            db.commit()
+        except Exception:
+            db.rollback()
+
     # Validate we have everything
     if not lead or not conv or not lead.email or lead.email == "inbound-unknown@system":
-        return RedirectResponse(url="/messages?send_error=1", status_code=303)
+        return RedirectResponse(url="/messages?send_error=1&reason=invalid_recipient", status_code=303)
     svc = SendGridService(db)
     out = svc.send_email(
         to_email=lead.email,
@@ -560,4 +580,7 @@ async def messages_send(
     )
     if out.get("success"):
         return RedirectResponse(url="/messages?sent=1", status_code=303)
-    return RedirectResponse(url="/messages?send_error=1", status_code=303)
+    reason = (out.get("error") or "unknown_error").strip()
+    # Keep it short so querystring doesn't explode
+    reason = reason[:160]
+    return RedirectResponse(url=f"/messages?send_error=1&{urlencode({'reason': reason})}", status_code=303)

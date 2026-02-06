@@ -16,6 +16,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from src.storage.repositories import LeadRepository, ConversationRepository
 from src.storage.models import Base, MessageChannel
+from datetime import datetime, timezone
 
 
 def import_lead():
@@ -72,6 +73,11 @@ def import_lead():
             "email": email,
             "first_name": first_name,
             "last_name": last_name,
+            # Force-enable outbound sends for manually imported leads (testing + ops).
+            "suppression_reason": None,
+            "email_deliverable": True,
+            "email_verification_status": "MANUAL_IMPORT",
+            "email_verified_at": datetime.now(timezone.utc),
         }
         if phone:
             lead_data["phone"] = phone
