@@ -217,6 +217,21 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
             }
         })
         
+        # Send notification about new inbound (for human visibility)
+        from ..channels.notifications import NotificationService
+        from ..config import app_config
+        try:
+            notification_service = NotificationService(db, app_config)
+            if app_config.llm_config.human_notification_email:
+                notification_service.send_inbound_notification(
+                    lead=lead,
+                    inbound_message=inbound_text,
+                    subject=form_data.get("subject", ""),
+                    conversation_id=conversation.id
+                )
+        except Exception as e:
+            logger.warning(f"Failed to send inbound notification: {e}")
+        
         # Load conversation history
         messages = msg_repo.get_by_conversation(conversation.id, limit=5)
         history = [

@@ -306,6 +306,112 @@ class NotificationService:
         
         return html_body
     
+    def send_inbound_notification(
+        self,
+        lead: Lead,
+        inbound_message: str,
+        subject: str,
+        conversation_id: int
+    ) -> bool:
+        """
+        Send a simple notification when any inbound reply is received.
+        
+        Args:
+            lead: Lead object
+            inbound_message: The inbound message text
+            subject: Email subject from the inbound
+            conversation_id: Conversation ID
+        
+        Returns:
+            True if sent successfully
+        """
+        try:
+            name = f"{lead.first_name} {lead.last_name}".strip() or "Unknown Lead"
+            email_subject = f"[NEW REPLY] {name} replied"
+            
+            conversation_url = f"{self.base_url}/conversations/{conversation_id}"
+            
+            body = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }}
+        .header {{
+            background-color: #007bff;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }}
+        .message {{
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-left: 4px solid #007bff;
+            border-radius: 5px;
+            margin: 15px 0;
+        }}
+        .cta {{
+            background-color: #007bff;
+            color: white;
+            padding: 12px 25px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 15px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2 style="margin: 0;">💬 New Reply Received</h2>
+    </div>
+    
+    <p><strong>From:</strong> {name} ({lead.email})</p>
+    <p><strong>Company:</strong> {lead.company_name or 'N/A'}</p>
+    <p><strong>Subject:</strong> {subject or '(no subject)'}</p>
+    
+    <div class="message">
+        <strong>Their Message:</strong><br>
+        {inbound_message[:500]}{"..." if len(inbound_message) > 500 else ""}
+    </div>
+    
+    <div style="text-align: center; margin-top: 30px;">
+        <a href="{conversation_url}" class="cta">View Full Conversation</a>
+    </div>
+    
+    <hr style="margin-top: 30px; border: none; border-top: 1px solid #dee2e6;">
+    
+    <p style="color: #6c757d; font-size: 14px; text-align: center;">
+        The AI is analyzing this message and will respond automatically if appropriate.
+        <br>You'll receive an escalation alert if human review is needed.
+    </p>
+</body>
+</html>
+"""
+            
+            success = self._send_email(
+                to_email=self.notification_email,
+                subject=email_subject,
+                body=body
+            )
+            
+            if success:
+                logger.info(f"Inbound notification sent for lead {lead.id}")
+            
+            return success
+        
+        except Exception as e:
+            logger.error(f"Error sending inbound notification: {e}", exc_info=True)
+            return False
+    
     def _send_email(self, to_email: str, subject: str, body: str) -> bool:
         """
         Send email via SendGrid.

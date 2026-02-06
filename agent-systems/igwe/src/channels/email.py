@@ -142,7 +142,7 @@ class SendGridService:
                 plain_text_content=Content("text/plain", body_with_footer)
             )
             if sendgrid_config.reply_to:
-                message.reply_to = sendgrid_config.reply_to
+                message.reply_to = Email(sendgrid_config.reply_to)
             # Send via SendGrid
             response = self.client.send(message)
 
