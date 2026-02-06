@@ -21,11 +21,11 @@ class NotificationService:
         
         Args:
             db: Database session
-            config: AppConfig with notification settings
+            config: Settings object with notification settings
         """
         self.db = db
-        self.notification_email = config.llm_config.human_notification_email
-        self.sendgrid_config = config.sendgrid_config
+        self.notification_email = config.llm.human_notification_email
+        self.sendgrid_config = config.sendgrid
         self.base_url = os.getenv("APP_BASE_URL", "http://localhost:8000")
     
     def send_escalation_email(

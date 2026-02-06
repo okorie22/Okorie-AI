@@ -219,10 +219,10 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
         
         # Send notification about new inbound (for human visibility)
         from ..channels.notifications import NotificationService
-        from ..config import app_config
+        from ..config import settings, llm_config
         try:
-            notification_service = NotificationService(db, app_config)
-            if app_config.llm_config.human_notification_email:
+            notification_service = NotificationService(db, settings)
+            if llm_config.human_notification_email:
                 notification_service.send_inbound_notification(
                     lead=lead,
                     inbound_message=inbound_text,
@@ -285,7 +285,8 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
             
             # Send notification
             from ..channels.notifications import NotificationService
-            notification_service = NotificationService(db, app_config)
+            from ..config import settings
+            notification_service = NotificationService(db, settings)
             notification_service.send_escalation_email(
                 conversation=conversation,
                 lead=lead,
@@ -465,7 +466,8 @@ async def twilio_webhook(request: Request, db: Session = Depends(get_db)):
             
             # Send notification
             from ..channels.notifications import NotificationService
-            notification_service = NotificationService(db, app_config)
+            from ..config import settings
+            notification_service = NotificationService(db, settings)
             notification_service.send_escalation_email(
                 conversation=conversation,
                 lead=lead,
