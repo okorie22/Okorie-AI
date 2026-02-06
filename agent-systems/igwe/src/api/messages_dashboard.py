@@ -465,10 +465,7 @@ async def messages_dashboard(
                 ul.style.display = list.length ? "block" : "none";
             }}
             searchEl.addEventListener("input", function() {{
-                if (!hiddenEl.value || searchEl.value !== (hiddenEl.getAttribute("data-display") || "")) {{
-                    hiddenEl.value = "";
-                    hiddenEl.removeAttribute("data-display");
-                }}
+                hiddenEl.value = "";
                 showSuggestions(searchEl.value);
             }});
             searchEl.addEventListener("focus", function() {{ showSuggestions(searchEl.value); }});
@@ -479,9 +476,7 @@ async def messages_dashboard(
                 var c = CONVERSATIONS.filter(function(x) {{ return String(x.id) === String(id); }})[0];
                 if (!c) return;
                 hiddenEl.value = id;
-                var display = (c.label && c.email ? c.label + " <" + c.email + ">" : (c.email || c.label || ""));
-                hiddenEl.setAttribute("data-display", display);
-                searchEl.value = display;
+                searchEl.value = c.email || "";
                 ul.style.display = "none";
                 ul.innerHTML = "";
             }});
