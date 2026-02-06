@@ -182,9 +182,12 @@ class MessageRepository:
     
     def get_by_metadata_field(self, field: str, value: str) -> Optional[Message]:
         """Find message by a metadata field (e.g., message_id)"""
-        return self.db.query(Message).filter(
-            Message.message_metadata[field].astext == value
-        ).first()
+        # Query all messages and filter in Python (less efficient but works)
+        messages = self.db.query(Message).all()
+        for msg in messages:
+            if msg.message_metadata and msg.message_metadata.get(field) == value:
+                return msg
+        return None
     
     def get_by_conversation(self, conversation_id: int, limit: Optional[int] = None) -> List[Message]:
         """Get messages for a conversation with optional limit"""
