@@ -168,6 +168,12 @@ class MessageRepository:
             self.db.commit()
             self.db.refresh(message)
         return message
+    
+    def get_by_metadata_field(self, field: str, value: str) -> Optional[Message]:
+        """Find message by a metadata field (e.g., message_id)"""
+        return self.db.query(Message).filter(
+            Message.message_metadata[field].astext == value
+        ).first()
 
 
 class EventRepository:

@@ -163,11 +163,33 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
         
         logger.info(f"Inbound email from: {from_email}")
         
+        # Extract Message-ID for deduplication
+        headers_raw = form_data.get("headers", "")
+        message_id = None
+        for line in headers_raw.split("\n"):
+            if line.lower().startswith("message-id:"):
+                message_id = line.split(":", 1)[1].strip()
+                break
+        if not message_id:
+            # Generate fallback ID from email + subject + timestamp
+            from datetime import datetime
+            ts = int(datetime.utcnow().timestamp())
+            subject = form_data.get("subject", "")
+            message_id = f"generated-{from_email}-{subject}-{ts}"
+        
+        logger.info(f"Message-ID: {message_id}")
+        
         # Find lead by email
         from ..storage.repositories import LeadRepository, ConversationRepository, MessageRepository
         lead_repo = LeadRepository(db)
         conv_repo = ConversationRepository(db)
         msg_repo = MessageRepository(db)
+        
+        # Check for duplicate
+        existing_msg = msg_repo.get_by_metadata_field("message_id", message_id)
+        if existing_msg:
+            logger.info(f"Duplicate inbound detected (Message-ID: {message_id}), skipping")
+            return {"success": True, "message": "Already processed (duplicate)"}
         
         lead = lead_repo.get_by_email(from_email)
         if not lead:
@@ -207,6 +229,7 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
                     "subject": form_data.get("subject"),
                     "to": form_data.get("to"),
                     "html": inbound_html,
+                    "message_id": message_id,
                 },
             })
             
@@ -225,7 +248,7 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
             except Exception as e:
                 logger.warning(f"Failed to send new sender notification: {e}")
             
-            return {"success": True, "message": "Email received (new sender lead created)"}
+            # DON'T return early - let new leads continue to ReplyAgent logic below
         
         # Find or create conversation (repository API: get_active_by_lead / create(lead_id, channel))
         from ..storage.models import MessageChannel
@@ -243,7 +266,8 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
             "body": inbound_text,
             "message_metadata": {
                 "from": from_raw or from_email,
-                "subject": form_data.get("subject")
+                "subject": form_data.get("subject"),
+                "message_id": message_id,
             }
         })
         
