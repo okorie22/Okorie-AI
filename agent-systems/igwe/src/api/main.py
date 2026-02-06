@@ -142,6 +142,7 @@ def _should_append_booking_link(intent_value: str, response_text: Optional[str])
 
 
 @app.post("/webhooks/sendgrid/inbound")
+@app.post("/webhooks/sendgrid/inbound/")
 async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
     """Handle inbound email replies via SendGrid Inbound Parse with AI reply agent"""
     try:
@@ -226,23 +227,19 @@ async def sendgrid_inbound(request: Request, db: Session = Depends(get_db)):
             
             return {"success": True, "message": "Email received (new sender lead created)"}
         
-        # Find or create conversation
-        conversation = conv_repo.get_by_lead(lead.id)
+        # Find or create conversation (repository API: get_active_by_lead / create(lead_id, channel))
+        from ..storage.models import MessageChannel
+        conversation = conv_repo.get_active_by_lead(lead.id)
         if not conversation:
             logger.info(f"Creating new conversation for lead {lead.id}")
-            from ..storage.models import ConversationState, MessageChannel
-            conversation = conv_repo.create({
-                "lead_id": lead.id,
-                "state": ConversationState.ENGAGED,
-                "channel": MessageChannel.EMAIL
-            })
+            conversation = conv_repo.create(lead.id, MessageChannel.EMAIL.value)
         
         # Save inbound message
-        from ..storage.models import MessageDirection
+        from ..storage.models import MessageDirection, MessageChannel
         msg_repo.create({
             "conversation_id": conversation.id,
             "direction": MessageDirection.INBOUND,
-            "channel": conversation.channel,
+            "channel": MessageChannel.EMAIL,
             "body": inbound_text,
             "message_metadata": {
                 "from": from_raw or from_email,
